@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: conxist-api
+  datasource:
+    url: ${CONXIST_DB_URL:jdbc:postgresql://localhost:5432/conxist}
+    username: ${CONXIST_DB_USER:conxist}
+    password: ${CONXIST_DB_PASSWORD:}
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
+  modulith:
+    events:
+      republish-outstanding-events-on-restart: true
+
+server:
+  # No sign-in yet (ADR 0002): the API only listens on this machine.
+  address: ${CONXIST_BIND_ADDRESS:127.0.0.1}
+  port: ${CONXIST_API_PORT:8080}
+
+conxist:
+  workspace:
+    default-id: ${CONXIST_WORKSPACE_ID:00000000-0000-0000-0000-000000000001}
+  capture:
+    max-file-bytes: 26214400
+    max-text-characters: 2000000
+    storage-root: ${CONXIST_STORAGE_ROOT:./data/uploads}
+    accepted-media-types:
+      - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - text/plain
+      - text/markdown
+      - text/x-web-markdown
