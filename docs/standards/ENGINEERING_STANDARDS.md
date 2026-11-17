@@ -131,12 +131,12 @@ Rules:
 
 ## 8. Git and pull requests
 
-- `main` is protected: changes land only through a PR with green CI.
+- The default branch (`main` unless `AGENTS.md` names another) is protected: changes land only through a PR with green CI.
 - Branches: `feat/…`, `fix/…`, `chore/…`, `docs/…`, `refactor/…`.
 - Commits follow Conventional Commits (`feat(capture): add Plaud webhook`).
 - Small PRs: one slice, reviewable in under 30 minutes. The PR template's
   checklist is filled in honestly; an item that does not apply says why.
-- Start each branch from a clean, up-to-date `main`; report any open branch or
+- Start each branch from a clean, up-to-date default branch; report any open branch or
   PR instead of stacking on it.
 - Never merge, deploy or apply migrations without the owner's explicit go.
 

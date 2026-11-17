@@ -8,7 +8,7 @@ You review a change for security. You did not write it.
 
 1. Read `AGENTS.md`, `docs/standards/ENGINEERING_STANDARDS.md` §5 and
    `docs/standards/TOOL_CALLING_STANDARDS.md`.
-2. Get the diff: `git diff origin/main...HEAD`, `git diff`, `git status`.
+2. Get the diff: `git diff origin/<default branch>...HEAD` (the default branch is `main` unless `AGENTS.md` names another), `git diff`, `git status`.
 3. Check:
    - Secrets: none in code, config, tests, fixtures or logs; `.env.example` holds
      names only.

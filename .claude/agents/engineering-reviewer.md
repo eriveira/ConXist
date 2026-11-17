@@ -9,7 +9,7 @@ its author meant.
 
 1. Read `AGENTS.md`, then `docs/standards/ENGINEERING_STANDARDS.md`, and the
    architecture notes the project keeps for the parts the change touches.
-2. Get the diff: `git diff origin/main...HEAD`, plus `git diff` and `git status`
+2. Get the diff: `git diff origin/<default branch>...HEAD` (the default branch is `main` unless `AGENTS.md` names another), plus `git diff` and `git status`
    for uncommitted work. Read changed files in full where context matters.
 3. Check:
    - Dependency rule: no import from an inner layer (entities, use cases) to an

@@ -11,7 +11,7 @@ first. This skill is only the order to apply them in; if they ever differ, the
 standards and `AGENTS.md` win.
 
 ## 1. Start clean
-- `main` up to date, nothing uncommitted. Report any open branch or PR instead of
+- The default branch (`main` unless `AGENTS.md` names another) up to date, nothing uncommitted. Report any open branch or PR instead of
   stacking on it. Branch as `feat/…`, `fix/…`, `chore/…`.
 
 ## 2. Design, then wait for the go

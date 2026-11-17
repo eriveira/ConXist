@@ -7,7 +7,8 @@ tools: Read, Grep, Glob, Bash
 You check a UI change against `docs/standards/UI_STANDARDS.md` and the brand
 guidelines in the project's brand folder (see `AGENTS.md`). You did not write it.
 
-1. Get the diff (`git diff origin/main...HEAD`, `git diff`) and list changed UI
+1. Get the diff: `git diff origin/<default branch>...HEAD` (the default branch is
+   `main` unless `AGENTS.md` names another) and `git diff`; list changed UI
    files.
 2. Check:
    - A `ux-preflight` UX read exists for the change (PR description, design note
