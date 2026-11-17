@@ -1,4 +1,4 @@
-/* ConXist.ai design tokens v1.0 (2026-11-16)
+/* ConXist.ai design tokens v1.1 (2026-11-17)
    Generated from Branding/tokens/tokens.json. Edit the JSON first, then mirror here.
    Font: <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"> */
 :root {
@@ -42,6 +42,23 @@
   --cx-fg: var(--cx-ink);
   --cx-fg-muted: var(--cx-muted);
   --cx-accent: var(--cx-electric);
+  /* app UI (v1.1) */
+  --cx-border: #DDE3EC;
+  --cx-action: #006AF9;
+  --cx-on-action: #FFFFFF;
+  --cx-accent-soft: #E6F0FF;
+  --cx-accent-text: #005BDF;
+  --cx-canvas-dot: #C9D2DF;
+  --cx-edge: #A9B5C6;
+  --cx-scrim: rgba(0,8,40,.38);
+  --cx-ok-fg: #0A7A71;
+  --cx-ok-bg: #E3F8F6;
+  --cx-warn-fg: #8A5600;
+  --cx-warn-bg: #FFF3DC;
+  --cx-err-fg: #B4232A;
+  --cx-err-bg: #FDECEC;
+  --cx-soon-bg: #EEF1F6;
+  --cx-shadow-pop: 0 4px 8px rgba(0,19,50,.06), 0 24px 60px rgba(0,19,50,.18);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -50,6 +67,22 @@
     --cx-fg: #EAF1FF;
     --cx-fg-muted: #9AA8BD;
     --cx-accent: #4D9BFF;
+    --cx-border: #1E2B44;
+    --cx-action: #4D9BFF;
+    --cx-on-action: #000828;
+    --cx-accent-soft: #0F2547;
+    --cx-accent-text: #4D9BFF;
+    --cx-canvas-dot: #1C2740;
+    --cx-edge: #3A4A66;
+    --cx-scrim: rgba(0,0,0,.6);
+    --cx-ok-fg: #5BE3D7;
+    --cx-ok-bg: #0C2E2C;
+    --cx-warn-fg: #F8C36A;
+    --cx-warn-bg: #33270F;
+    --cx-err-fg: #FF8A8E;
+    --cx-err-bg: #3A1416;
+    --cx-soon-bg: #141F35;
+    --cx-shadow-pop: 0 4px 8px rgba(0,0,0,.4), 0 24px 60px rgba(0,0,0,.55);
   }
 }
 :root[data-theme="dark"] {
@@ -58,4 +91,20 @@
   --cx-fg: #EAF1FF;
   --cx-fg-muted: #9AA8BD;
   --cx-accent: #4D9BFF;
+  --cx-border: #1E2B44;
+  --cx-action: #4D9BFF;
+  --cx-on-action: #000828;
+  --cx-accent-soft: #0F2547;
+  --cx-accent-text: #4D9BFF;
+  --cx-canvas-dot: #1C2740;
+  --cx-edge: #3A4A66;
+  --cx-scrim: rgba(0,0,0,.6);
+  --cx-ok-fg: #5BE3D7;
+  --cx-ok-bg: #0C2E2C;
+  --cx-warn-fg: #F8C36A;
+  --cx-warn-bg: #33270F;
+  --cx-err-fg: #FF8A8E;
+  --cx-err-bg: #3A1416;
+  --cx-soon-bg: #141F35;
+  --cx-shadow-pop: 0 4px 8px rgba(0,0,0,.4), 0 24px 60px rgba(0,0,0,.55);
 }

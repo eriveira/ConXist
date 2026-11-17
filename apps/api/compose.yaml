@@ -1,0 +1,11 @@
+# Local PostgreSQL for `mvn spring-boot:run`. Listens on this machine only.
+# Set CONXIST_DB_PASSWORD in your shell first; it is never stored in the repo.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: conxist
+      POSTGRES_USER: conxist
+      POSTGRES_PASSWORD: ${CONXIST_DB_PASSWORD:?Set CONXIST_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
