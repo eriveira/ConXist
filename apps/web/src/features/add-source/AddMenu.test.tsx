@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { accessibilityViolations } from '../../a11y';
 import { PROVIDERS } from '../../testing';
 import { AddMenu } from './AddMenu';
 
@@ -17,6 +18,15 @@ describe('AddMenu', () => {
     await userEvent.click(screen.getByRole('button', { name: /Upload files/ }));
 
     expect(onChoose).toHaveBeenCalledWith(PROVIDERS[0]);
+  });
+
+  it('has no accessibility violations with the menu open', async () => {
+    const { container } = render(<AddMenu providers={PROVIDERS} onChoose={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add source' }));
+    await userEvent.click(screen.getByRole('button', { name: /Capture/ }));
+
+    expect(await accessibilityViolations(container)).toEqual([]);
   });
 
   it('shows coming-soon providers as unavailable', async () => {

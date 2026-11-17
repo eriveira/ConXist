@@ -73,13 +73,17 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
   const t = useT();
   const [syncing, setSyncing] = useState<string | null>(null);
   const [imported, setImported] = useState<Record<string, number>>({});
+  const [failed, setFailed] = useState<string | null>(null);
 
   async function sync(source: Source) {
     setSyncing(source.id);
+    setFailed(null);
     try {
       const result = await api.sync(source.id);
       setImported((current) => ({ ...current, [source.id]: result.imported }));
       onSynced();
+    } catch {
+      setFailed(source.id);
     } finally {
       setSyncing(null);
     }
@@ -102,6 +106,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
         documentCount: workspace.documentCounts[source.id] ?? 0,
         syncing: syncing === source.id,
         lastImported: imported[source.id] ?? null,
+        syncFailed: failed === source.id,
         onAddFiles: source.provider === 'UPLOAD' ? () => onAddFiles(source) : undefined,
         onSync: source.provider === 'PLAUD' ? () => void sync(source) : undefined,
       },
@@ -109,7 +114,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
     const hub: HubFlowNode = { id: HUB_ID, type: 'hub', position: layout.hub, data: { hub: workspace.hub } };
     return [...sourceNodes, hub];
     // sync and onAddFiles change identity each render; the data they close over is listed.
-  }, [workspace, providerLabels, syncing, imported]);
+  }, [workspace, providerLabels, syncing, imported, failed]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(target);
   const dragged = useRef(new Map<string, { x: number; y: number }>());

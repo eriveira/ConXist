@@ -4,7 +4,7 @@ import type {
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly detail: string | null) {
+  constructor(readonly status: number, readonly code: string | null, readonly detail: string | null) {
     super(detail ?? `Request failed with status ${status}`);
   }
 }
@@ -12,17 +12,21 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   if (!response.ok) {
-    throw new ApiError(response.status, await problemDetail(response));
+    const problem = await problemOf(response);
+    throw new ApiError(response.status, problem.code, problem.detail);
   }
   return (await response.json()) as T;
 }
 
-async function problemDetail(response: Response): Promise<string | null> {
+async function problemOf(response: Response): Promise<{ code: string | null; detail: string | null }> {
   try {
-    const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === 'string' ? body.detail : null;
+    const body = (await response.json()) as { code?: unknown; detail?: unknown };
+    return {
+      code: typeof body.code === 'string' ? body.code : null,
+      detail: typeof body.detail === 'string' ? body.detail : null,
+    };
   } catch {
-    return null;
+    return { code: null, detail: null };
   }
 }
 

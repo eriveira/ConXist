@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { accessibilityViolations } from '../../a11y';
 import { stubApi } from '../../testing';
 import { PlaudDialog } from './PlaudDialog';
 
@@ -25,6 +26,34 @@ describe('PlaudDialog', () => {
     expect(JSON.parse(String(added?.init?.body))).toEqual({
       provider: 'PLAUD', name: 'Team meetings', accountLabel: 'Sample Plaud account',
     });
+  });
+
+  it('retries only the import when the import failed after the source was added', async () => {
+    let syncs = 0;
+    const calls = stubApi({
+      'POST /api/recorders/plaud/sign-in': () => ({ body: { label: 'Sample Plaud account' } }),
+      'POST /api/sources': () => ({ status: 201, body: { id: 'rec-1' } }),
+      'POST /api/sources/rec-1/sync': () => (++syncs === 1
+        ? { status: 500, body: { code: 'request.failed' } }
+        : { body: { imported: 2, alreadyImported: 0 } }),
+    });
+    render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in to Plaud' }));
+    await screen.findByText('Sample Plaud account');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('2 meetings');
+    expect(calls.filter((call) => call.key === 'POST /api/sources')).toHaveLength(1);
+  });
+
+  it('has no accessibility violations on the sign-in step', async () => {
+    const { container } = render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+
+    expect(await accessibilityViolations(container)).toEqual([]);
   });
 
   it('asks for the sign-in before continuing', async () => {

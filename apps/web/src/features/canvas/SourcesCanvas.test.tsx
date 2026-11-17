@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { accessibilityViolations } from '../../a11y';
 import { PROVIDERS, stubApi } from '../../testing';
 import { SourcesCanvas } from './SourcesCanvas';
 
@@ -30,6 +31,35 @@ describe('SourcesCanvas', () => {
     expect(source).toHaveTextContent('Product specs');
     expect(source).toHaveTextContent('3 documents');
     expect(screen.getByTestId('rf__node-hub')).toHaveTextContent('Waiting for review3');
+  });
+
+  it('tells the person when a sync fails', async () => {
+    const plaud = { ...SOURCE, id: 'p1', provider: 'PLAUD', name: 'Team meetings', accountLabel: 'Sample' };
+    stubApi({
+      'GET /api/providers': () => ({ body: PROVIDERS }),
+      'GET /api/sources': () => ({ body: [plaud] }),
+      'GET /api/hub': () => ({ body: HUB }),
+      'GET /api/sources/p1/documents': () => ({ body: [] }),
+      'POST /api/sources/p1/sync': () => ({ status: 500, body: { code: 'request.failed' } }),
+    });
+    render(<SourcesCanvas />);
+    const node = await screen.findByTestId('rf__node-p1');
+
+    fireEvent.click(within(node).getByText('Sync now').closest('button')!);
+
+    expect(await within(node).findByText('Sync failed. Try again.')).toBeInTheDocument();
+  });
+
+  it('has no accessibility violations on the empty canvas', async () => {
+    stubApi({
+      'GET /api/providers': () => ({ body: PROVIDERS }),
+      'GET /api/sources': () => ({ body: [] }),
+      'GET /api/hub': () => ({ body: { ...HUB, sources: 0, documents: 0, pendingReview: 0 } }),
+    });
+    const { container } = render(<SourcesCanvas />);
+    await screen.findByText('Connect your first source');
+
+    expect(await accessibilityViolations(container)).toEqual([]);
   });
 
   it('invites the first connection when nothing is connected', async () => {

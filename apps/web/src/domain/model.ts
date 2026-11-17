@@ -49,4 +49,7 @@ export interface RecorderAccount {
   label: string;
 }
 
+/** Matches Source.MAX_NAME_LENGTH in the API. */
+export const MAX_SOURCE_NAME_LENGTH = 80;
+
 export const CATEGORIES: readonly Category[] = ['CAPTURE', 'REPO', 'STORAGE'];

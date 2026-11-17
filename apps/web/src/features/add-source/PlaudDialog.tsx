@@ -1,10 +1,12 @@
 import { useId, useState } from 'react';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import { Stepper } from '../../components/Stepper';
+import { MAX_SOURCE_NAME_LENGTH } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
+import { problemMessage } from '../../i18n/problems';
 
 type Step = 'account' | 'review' | 'result';
 const STEPS: Step[] = ['account', 'review'];
@@ -23,6 +25,8 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [imported, setImported] = useState(0);
+  /** Kept so a retry after a failed import does not add the source a second time. */
+  const [sourceId, setSourceId] = useState<string | null>(null);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -30,7 +34,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
     try {
       await action();
     } catch (error) {
-      setProblem(error instanceof ApiError && error.detail ? error.detail : t('error.generic'));
+      setProblem(problemMessage(error, t));
     } finally {
       setBusy(false);
     }
@@ -40,10 +44,18 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
 
   const next = () => (account ? setStep('review') : setProblem(t('plaud.account.required')));
 
-  const submit = () => run(async () => {
-    if (name.trim() === '') throw new ApiError(400, t('upload.name.required'));
-    const source = await api.addSource({ provider: 'PLAUD', name: name.trim(), accountLabel: account ?? '' });
-    setImported((await api.sync(source.id)).imported);
+  const submit = () => {
+    if (name.trim() === '') {
+      setProblem(t('upload.name.required'));
+      return;
+    }
+    void addAndImport();
+  };
+
+  const addAndImport = () => run(async () => {
+    const id = sourceId ?? (await api.addSource({ provider: 'PLAUD', name: name.trim(), accountLabel: account ?? '' })).id;
+    setSourceId(id);
+    setImported((await api.sync(id)).imported);
     setStep('result');
     onCaptured();
   });
@@ -90,7 +102,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
             <p className="lead">{t('plaud.review.lead')}</p>
             <div className="field">
               <label htmlFor={nameId}>{t('plaud.review.name')}</label>
-              <input id={nameId} type="text" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
+              <input id={nameId} type="text" value={name} maxLength={MAX_SOURCE_NAME_LENGTH} onChange={(event) => setName(event.target.value)} />
             </div>
             <dl className="summary">
               <div><dt>{t('plaud.review.account')}</dt><dd>{account}</dd></div>

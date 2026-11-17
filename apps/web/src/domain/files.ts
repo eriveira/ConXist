@@ -3,6 +3,8 @@
  * (conxist.capture in apps/api application.yml).
  */
 export const ACCEPTED_EXTENSIONS: readonly string[] = ['pdf', 'docx', 'md', 'markdown', 'txt'];
+/** For a file picker's accept attribute. */
+export const ACCEPT_ATTRIBUTE = ACCEPTED_EXTENSIONS.map((extension) => `.${extension}`).join(',');
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 export type FileProblem = 'empty' | 'too-large' | 'unsupported-type';

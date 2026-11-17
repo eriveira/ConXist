@@ -12,6 +12,7 @@ export type SourceNodeData = {
   documentCount: number;
   syncing: boolean;
   lastImported: number | null;
+  syncFailed: boolean;
   onAddFiles?: () => void;
   onSync?: () => void;
 };
@@ -23,7 +24,7 @@ export type HubFlowNode = Node<HubNodeData, 'hub'>;
 
 export function SourceNode({ data }: NodeProps<SourceFlowNode>) {
   const t = useT();
-  const { source, label, documentCount, syncing, lastImported, onAddFiles, onSync } = data;
+  const { source, label, documentCount, syncing, lastImported, syncFailed, onAddFiles, onSync } = data;
   return (
     <article className="node" aria-label={source.name}>
       <div className="nhead">
@@ -50,6 +51,7 @@ export function SourceNode({ data }: NodeProps<SourceFlowNode>) {
             {lastImported !== null && <span className="muted" role="status">· {t('node.synced', { count: lastImported })}</span>}
           </button>
         )}
+        {syncFailed && <p className="node-error" role="alert">{t('node.syncFailed')}</p>}
       </div>
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </article>

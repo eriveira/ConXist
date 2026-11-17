@@ -107,6 +107,24 @@ const en = {
   'plaud.result.lead': '{count} meetings are waiting for review in the hub.',
 
   'error.generic': 'Something went wrong. Try again.',
+  'node.syncFailed': 'Sync failed. Try again.',
+  'api.source.provider-required': 'Choose what to connect.',
+  'api.source.coming-soon': 'This source is coming soon.',
+  'api.source.name-required': 'Give the source a name.',
+  'api.source.name-too-long': 'Keep the name under 80 characters.',
+  'api.source.sign-in-required': 'Sign in first.',
+  'api.source.account-too-long': 'The account name is too long.',
+  'api.source.name-taken': 'A source with this name already exists. Choose another name.',
+  'api.source.not-found': 'This source no longer exists.',
+  'api.source.wrong-kind': 'This source does not accept this kind of capture.',
+  'api.document.empty': 'This file is empty.',
+  'api.document.too-large': 'This file is too large to upload.',
+  'api.document.unsupported-type': 'This file type is not supported yet. Upload a PDF, Word, Markdown or text file.',
+  'api.document.unreadable': 'We could not read the text in this file.',
+  'api.document.no-text': 'This file has no text we can read.',
+  'api.request.invalid': 'Some fields are missing or not valid.',
+  'api.request.conflict': 'This changed at the same time. Try again.',
+  'api.request.failed': 'Something went wrong. Try again.',
 };
 
 export type MessageKey = keyof typeof en;
@@ -221,6 +239,24 @@ const es: Messages = {
   'plaud.result.lead': '{count} reuniones esperan revisión en el hub.',
 
   'error.generic': 'Algo salió mal. Inténtalo de nuevo.',
+  'node.syncFailed': 'No se pudo sincronizar. Inténtalo de nuevo.',
+  'api.source.provider-required': 'Elige qué conectar.',
+  'api.source.coming-soon': 'Esta fuente llegará pronto.',
+  'api.source.name-required': 'Ponle un nombre a la fuente.',
+  'api.source.name-too-long': 'Usa un nombre de menos de 80 caracteres.',
+  'api.source.sign-in-required': 'Inicia sesión primero.',
+  'api.source.account-too-long': 'El nombre de la cuenta es demasiado largo.',
+  'api.source.name-taken': 'Ya existe una fuente con este nombre. Elige otro.',
+  'api.source.not-found': 'Esta fuente ya no existe.',
+  'api.source.wrong-kind': 'Esta fuente no acepta este tipo de captura.',
+  'api.document.empty': 'Este archivo está vacío.',
+  'api.document.too-large': 'Este archivo es demasiado grande para subirlo.',
+  'api.document.unsupported-type': 'Este tipo de archivo aún no es compatible. Sube un PDF, Word, Markdown o texto.',
+  'api.document.unreadable': 'No pudimos leer el texto de este archivo.',
+  'api.document.no-text': 'Este archivo no tiene texto que podamos leer.',
+  'api.request.invalid': 'Faltan campos o no son válidos.',
+  'api.request.conflict': 'Esto cambió al mismo tiempo. Inténtalo de nuevo.',
+  'api.request.failed': 'Algo salió mal. Inténtalo de nuevo.',
 };
 
 export type Language = 'en' | 'es';

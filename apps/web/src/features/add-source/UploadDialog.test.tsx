@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { accessibilityViolations } from '../../a11y';
 import { stubApi } from '../../testing';
+import { I18nProvider } from '../../i18n/i18n';
 import { UploadDialog } from './UploadDialog';
 
 const SOURCE = { id: 'src-1', category: 'CAPTURE', provider: 'UPLOAD', name: 'Specs', accountLabel: '', addedAt: '' };
@@ -54,7 +56,7 @@ describe('UploadDialog', () => {
 
   it('shows the reason the server gives for a refused file', async () => {
     stubApi({
-      'POST /api/sources/src-1/files': () => ({ status: 422, body: { detail: 'We could not read the text in this file.' } }),
+      'POST /api/sources/src-1/files': () => ({ status: 422, body: { code: 'document.unreadable', detail: 'We could not read the text in this file.' } }),
     });
     render(<UploadDialog existing={SOURCE as never} onClose={vi.fn()} onCaptured={vi.fn()} />);
 
@@ -67,7 +69,7 @@ describe('UploadDialog', () => {
   });
 
   it('keeps the person on the review step when the source cannot be added', async () => {
-    stubApi({ 'POST /api/sources': () => ({ status: 422, body: { detail: 'A source named "Specs" already exists.' } }) });
+    stubApi({ 'POST /api/sources': () => ({ status: 422, body: { code: 'source.name-taken', detail: 'A source named "Specs" already exists.' } }) });
     render(<UploadDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
 
     await continueTo();
@@ -77,6 +79,47 @@ describe('UploadDialog', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('already exists');
     expect(screen.getByRole('button', { name: 'Add to canvas' })).toBeEnabled();
+  });
+
+  it('has no accessibility violations on the files step', async () => {
+    const { container } = render(<UploadDialog existing={SOURCE as never} onClose={vi.fn()} onCaptured={vi.fn()} />);
+
+    await userEvent.upload(screen.getByTestId('file-input'), pdf());
+
+    expect(await accessibilityViolations(container)).toEqual([]);
+  });
+
+  it('shows the server reason in Spanish from its code', async () => {
+    stubApi({
+      'POST /api/sources/src-1/files': () => ({ status: 422, body: { code: 'document.unreadable', detail: 'We could not read the text in this file.' } }),
+    });
+    render(
+      <I18nProvider language="es"><UploadDialog existing={SOURCE as never} onClose={vi.fn()} onCaptured={vi.fn()} /></I18nProvider>,
+    );
+
+    await userEvent.upload(screen.getByTestId('file-input'), pdf());
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar al lienzo' }));
+
+    expect(await screen.findByText('No pudimos leer el texto de este archivo.')).toBeInTheDocument();
+  });
+
+  it('adds the source only once when the person tries again', async () => {
+    let uploads = 0;
+    const calls = stubApi({
+      'POST /api/sources': () => ({ status: 201, body: SOURCE }),
+      'POST /api/sources/src-1/files': () => (++uploads === 1
+        ? { status: 500, body: { code: 'request.failed' } }
+        : { status: 201, body: { id: 'doc-1' } }),
+    });
+    render(<UploadDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+    await continueTo();
+    await userEvent.upload(screen.getByTestId('file-input'), pdf());
+    await continueTo();
+    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('0 of 1');
+
+    expect(calls.filter((call) => call.key === 'POST /api/sources')).toHaveLength(1);
   });
 
   it('closes with Escape', async () => {

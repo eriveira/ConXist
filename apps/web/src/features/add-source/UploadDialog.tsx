@@ -1,11 +1,13 @@
 import { useId, useRef, useState } from 'react';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import { Stepper } from '../../components/Stepper';
-import type { Source } from '../../domain/model';
+import { ACCEPT_ATTRIBUTE } from '../../domain/files';
+import { MAX_SOURCE_NAME_LENGTH, type Source } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
+import { problemMessage } from '../../i18n/problems';
 import { useUploads, type PickedFile } from './useUploads';
 
 type Step = 'name' | 'files' | 'review' | 'result';
@@ -24,6 +26,8 @@ export function UploadDialog({ existing, onClose, onCaptured }: UploadDialogProp
   const [name, setName] = useState(t('upload.name.default'));
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Kept so a retry after a failed upload does not add the source a second time. */
+  const [createdId, setCreatedId] = useState<string | null>(existing?.id ?? null);
   const [sentCount, setSentCount] = useState(0);
   const uploads = useUploads();
   const index = steps.indexOf(step as Step);
@@ -44,12 +48,13 @@ export function UploadDialog({ existing, onClose, onCaptured }: UploadDialogProp
     setBusy(true);
     setProblem(null);
     try {
-      const sourceId = existing?.id ?? (await api.addSource({ provider: 'UPLOAD', name: name.trim() })).id;
+      const sourceId = createdId ?? (await api.addSource({ provider: 'UPLOAD', name: name.trim() })).id;
+      setCreatedId(sourceId);
       setSentCount(await uploads.sendAll(sourceId));
       setStep('result');
       onCaptured();
     } catch (error) {
-      setProblem(error instanceof ApiError && error.detail ? error.detail : t('error.generic'));
+      setProblem(problemMessage(error, t));
     } finally {
       setBusy(false);
     }
@@ -91,7 +96,7 @@ function NameStep({ name, onChange }: { name: string; onChange: (name: string) =
       <p className="lead">{t('upload.name.lead')}</p>
       <div className="field">
         <label htmlFor={id}>{t('upload.name.label')}</label>
-        <input id={id} type="text" value={name} maxLength={80} onChange={(event) => onChange(event.target.value)} />
+        <input id={id} type="text" value={name} maxLength={MAX_SOURCE_NAME_LENGTH} onChange={(event) => onChange(event.target.value)} />
       </div>
     </>
   );
@@ -119,7 +124,7 @@ function FilesStep({ files, onAdd, onRemove }: FilesStepProps) {
       >
         {t('upload.files.drop')}{' '}
         <button type="button" className="btn sm" onClick={() => input.current?.click()}>{t('upload.files.choose')}</button>
-        <input ref={input} type="file" multiple hidden accept=".pdf,.docx,.md,.markdown,.txt"
+        <input ref={input} type="file" multiple hidden accept={ACCEPT_ATTRIBUTE}
           data-testid="file-input" onChange={(event) => event.target.files && onAdd(event.target.files)} />
         <div className="limits">{t('upload.files.limits')}</div>
       </div>
@@ -172,7 +177,7 @@ function ResultStep({ files, sent }: { files: readonly PickedFile[]; sent: numbe
           <li key={item.key} className={item.status === 'failed' ? 'bad' : undefined}>
             <Icon name={item.status === 'done' ? 'check' : 'alert'} size={16} />
             <span className="fname">{item.file.name}
-              <small>{item.failure ?? t(STATUS_TEXT[item.status])}</small>
+              <small>{item.status === 'failed' ? problemMessage(item.failure, t) : t(STATUS_TEXT[item.status])}</small>
             </span>
           </li>
         ))}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, ApiError } from '../../api/client';
+import { api } from '../../api/client';
 import { problemWith, type FileProblem } from '../../domain/files';
 
 export type UploadStatus = 'waiting' | 'sending' | 'done' | 'failed';
@@ -9,8 +9,8 @@ export interface PickedFile {
   file: File;
   problem: FileProblem | null;
   status: UploadStatus;
-  /** The API's plain-language reason when the upload failed. */
-  failure: string | null;
+  /** Why the upload failed, shown in the person's language. */
+  failure: unknown;
 }
 
 let nextKey = 0;
@@ -43,7 +43,7 @@ export function useUploads() {
         update(item.key, { status: 'done' });
         sent++;
       } catch (error) {
-        update(item.key, { status: 'failed', failure: error instanceof ApiError ? error.detail : null });
+        update(item.key, { status: 'failed', failure: error });
       }
     }
     return sent;
