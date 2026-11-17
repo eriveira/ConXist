@@ -26,8 +26,12 @@ cd apps/api && mvn spring-boot:test-run
 cd apps/web && pnpm install && pnpm dev
 ```
 
-There is no sign-in yet, so the API listens on this machine only and is not
-deployable (ADR 0002). Plaud is a preview: it signs in to a sample account.
+There is no sign-in yet, so the API listens on this machine only, refuses to
+start otherwise, and is not deployable (ADR 0002). Plaud is a preview: it signs
+in to a sample account.
+
+**Do not upload real customer documents** until encryption at rest and sign-in
+land. Uploads are stored unencrypted under `apps/api/data/uploads`.
 
 ## Test it
 

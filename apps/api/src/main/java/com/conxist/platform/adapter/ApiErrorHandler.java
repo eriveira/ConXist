@@ -5,19 +5,24 @@ import com.conxist.platform.RuleViolation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
  * Turns failures into problem responses with a stable {@code code} the web app translates, and a plain English
- * {@code detail}. Unexpected failures are logged with the request id and answered with a generic message.
+ * {@code detail}. Requests the client got wrong keep their 4xx status; only unexpected failures are logged with a
+ * stack trace (the request id is in every log line).
  */
 @RestControllerAdvice
-class ApiErrorHandler {
+class ApiErrorHandler extends ResponseEntityExceptionHandler {
 
     static final String CODE = "code";
     private static final Logger log = LoggerFactory.getLogger(ApiErrorHandler.class);
@@ -30,16 +35,6 @@ class ApiErrorHandler {
     @ExceptionHandler(RuleViolation.class)
     ProblemDetail ruleViolation(RuleViolation violation) {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, violation.code(), violation.getMessage());
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    ProblemDetail invalidRequest(MethodArgumentNotValidException invalid) {
-        return problem(HttpStatus.BAD_REQUEST, "request.invalid", "Some fields are missing or not valid.");
-    }
-
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    ProblemDetail fileTooLarge(MaxUploadSizeExceededException tooLarge) {
-        return problem(HttpStatus.CONTENT_TOO_LARGE, "document.too-large", "This file is too large to upload.");
     }
 
     /** Two requests raced past a uniqueness check; the database constraint caught the second one. */
@@ -55,7 +50,20 @@ class ApiErrorHandler {
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "request.failed", "Something went wrong. Try again.");
     }
 
-    private static ProblemDetail problem(HttpStatus status, String code, String detail) {
+    /** Spring's own request errors (bad JSON, wrong id format, missing part, unknown path, too large). */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(Exception failure, Object body, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        log.info("Request refused with {}: {}", status.value(), failure.getClass().getSimpleName());
+        ProblemDetail problem = failure instanceof MaxUploadSizeExceededException
+                ? problem(status, "document.too-large", "This file is too large to upload.")
+                : status.value() == HttpStatus.NOT_FOUND.value()
+                        ? problem(status, "request.not-found", "There is nothing at this address.")
+                        : problem(status, "request.invalid", "Some fields are missing or not valid.");
+        return super.handleExceptionInternal(failure, problem, headers, status, request);
+    }
+
+    private static ProblemDetail problem(HttpStatusCode status, String code, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setProperty(CODE, code);
         return problem;

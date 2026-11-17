@@ -21,8 +21,8 @@ logging:
       console: ecs
 
 server:
-  # No sign-in yet (ADR 0002): the API only listens on this machine.
-  address: ${CONXIST_BIND_ADDRESS:127.0.0.1}
+  # No sign-in yet (ADR 0002): the API only listens on this machine, and refuses to start otherwise.
+  address: 127.0.0.1
   port: ${CONXIST_API_PORT:8080}
 
 conxist:

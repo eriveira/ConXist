@@ -50,4 +50,6 @@ The standards require Clean Architecture with an enforced dependency rule.
 - Hosting and the managed Postgres.
 - Auth provider for teams. Until it is chosen, the API runs for one configured
   workspace and is **not deployable**; every table already carries
-  `workspace_id` so tenant isolation can be enforced when auth lands.
+  `workspace_id` so tenant isolation can be enforced when auth lands. The API
+  refuses to start on a non-loopback address. Do not put real customer data in
+  it before encryption at rest and sign-in exist.

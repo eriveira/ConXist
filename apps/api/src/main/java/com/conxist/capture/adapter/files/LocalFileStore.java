@@ -31,4 +31,13 @@ public class LocalFileStore implements FileStore {
         }
         return key;
     }
+
+    @Override
+    public void delete(String key) {
+        try {
+            Files.deleteIfExists(root.resolve(key).normalize());
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Could not delete a stored file", failure);
+        }
+    }
 }

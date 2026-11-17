@@ -59,6 +59,13 @@ class TikaTextExtractorTest {
     }
 
     @Test
+    void drops_characters_the_database_cannot_store() {
+        byte[] text = "Hub\u0000 notes\u0007\tok\n".getBytes(UTF_8);
+
+        assertThat(extractor.extractText(text, "text/plain")).isEqualTo("Hub notes\tok");
+    }
+
+    @Test
     void rejects_a_file_with_no_text() {
         assertThatThrownBy(() -> extractor.extractText("   \n".getBytes(UTF_8), "text/plain"))
                 .isInstanceOf(RejectedDocument.class);

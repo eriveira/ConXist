@@ -118,6 +118,26 @@ class CaptureFlowIntegrationTest {
     }
 
     @Test
+    void answers_only_requests_addressed_to_this_machine() throws Exception {
+        mvc.perform(get("/api/sources").header("Host", "rebound.attacker.example")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/recorders/plaud/sign-in").header("Origin", "https://attacker.example"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/sources").header("Origin", "http://localhost:5173")).andExpect(status().isOk());
+    }
+
+    @Test
+    void requests_the_client_got_wrong_keep_a_4xx_status_and_a_code() throws Exception {
+        mvc.perform(get("/api/sources/{id}/documents", "not-a-uuid"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("request.invalid"));
+        mvc.perform(post("/api/sources").contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"NOPE\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("request.invalid"));
+        mvc.perform(post("/api/sources/{id}/files", UUID.randomUUID()).contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().is4xxClientError());
+        mvc.perform(get("/api/nothing-here"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("request.not-found"));
+    }
+
+    @Test
     void every_response_carries_a_request_id() throws Exception {
         mvc.perform(get("/api/providers")).andExpect(header().exists("X-Request-Id"));
         mvc.perform(get("/api/providers").header("X-Request-Id", "trace-12345678"))

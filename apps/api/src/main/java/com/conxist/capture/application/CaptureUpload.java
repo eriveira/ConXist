@@ -38,7 +38,13 @@ public final class CaptureUpload {
         CapturedDocument document = new CapturedDocument(UUID.randomUUID(), workspaceId, sourceId,
                 DocumentTitle.from(fileName), mediaType, content.length, text, DocumentOrigin.UPLOAD, storageKey,
                 context.clock().instant());
-        context.saveAndAnnounce(documents, document);
+        try {
+            context.saveAndAnnounce(documents, document);
+        } catch (RuntimeException failure) {
+            // A file with no document pointing to it could never be found or deleted again.
+            files.delete(storageKey);
+            throw failure;
+        }
         return DocumentSummary.of(document);
     }
 

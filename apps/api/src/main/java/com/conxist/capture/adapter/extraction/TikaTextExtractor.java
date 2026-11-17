@@ -33,11 +33,16 @@ public class TikaTextExtractor implements TextExtractor {
     @Override
     public String extractText(byte[] content, String mediaType) {
         String text = mediaType.startsWith("text/") ? decodeText(content) : parse(content);
-        String trimmed = text.strip();
+        String trimmed = withoutControlCharacters(text).strip();
         if (trimmed.isEmpty()) {
             throw new RejectedDocument("no-text", "This file has no text we can read.");
         }
         return trimmed.length() > maxCharacters ? trimmed.substring(0, maxCharacters) : trimmed;
+    }
+
+    /** PostgreSQL cannot store NUL, and other control characters (except tab and line breaks) carry no text. */
+    static String withoutControlCharacters(String text) {
+        return text.replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]", "");
     }
 
     private static String decodeText(byte[] content) {

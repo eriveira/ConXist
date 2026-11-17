@@ -63,13 +63,22 @@ final class CaptureFakes {
             stored.add(content);
             return "key-" + stored.size();
         }
+
+        @Override
+        public void delete(String key) {
+            stored.remove(Integer.parseInt(key.substring("key-".length())) - 1);
+        }
     }
 
     static final class Documents implements CapturedDocumentRepository {
         final List<CapturedDocument> saved = new ArrayList<>();
+        boolean failing;
 
         @Override
         public boolean saveIfNew(CapturedDocument document) {
+            if (failing) {
+                throw new IllegalStateException("database unavailable");
+            }
             boolean known = saved.stream().anyMatch(d -> d.sourceId().equals(document.sourceId())
                     && d.originReference().equals(document.originReference()));
             if (!known) {

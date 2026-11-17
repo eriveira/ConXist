@@ -54,6 +54,17 @@ class CaptureUploadTest {
     }
 
     @Test
+    void removes_the_stored_file_when_the_document_cannot_be_saved() {
+        SourceSummary uploads = sources.add(Provider.UPLOAD, "");
+        documents.failing = true;
+
+        assertThatThrownBy(() -> captureUpload.capture(uploads.id(), "notes.txt", NOTES))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(files.stored).isEmpty();
+        assertThat(events.isEmpty()).isTrue();
+    }
+
+    @Test
     void rejects_an_unknown_source() {
         assertThatThrownBy(() -> captureUpload.capture(UUID.randomUUID(), "notes.txt", NOTES))
                 .isInstanceOf(NotFound.class);
