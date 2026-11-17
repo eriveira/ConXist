@@ -1,4 +1,4 @@
-package com.conxist.platform.adapter;
+package com.conxist.platform.config;
 
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;

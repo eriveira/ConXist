@@ -23,6 +23,6 @@ public final class ReadHubOverview {
                 items.count(workspaceId, HubItemType.SOURCE),
                 items.count(workspaceId, HubItemType.DOCUMENT),
                 items.countWithStatus(workspaceId, HubItemStatus.PENDING_REVIEW),
-                items.latest(workspaceId, LATEST_ITEMS));
+                items.latest(workspaceId, LATEST_ITEMS).stream().map(HubItemView::of).toList());
     }
 }

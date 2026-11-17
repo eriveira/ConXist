@@ -26,10 +26,10 @@ public record Source(UUID id, UUID workspaceId, Provider provider, String name, 
 
     private static Provider requireAddable(Provider provider) {
         if (provider == null) {
-            throw new InvalidSource("Choose what to connect.");
+            throw new InvalidSource("provider-required", "Choose what to connect.");
         }
         if (!provider.canBeAdded()) {
-            throw new InvalidSource(provider.displayName() + " is coming soon.");
+            throw new InvalidSource("coming-soon", provider.displayName() + " is coming soon.");
         }
         return provider;
     }
@@ -37,10 +37,10 @@ public record Source(UUID id, UUID workspaceId, Provider provider, String name, 
     private static String requireName(String name) {
         String trimmed = Optional.ofNullable(name).map(String::strip).orElse("");
         if (trimmed.isEmpty()) {
-            throw new InvalidSource("Give the source a name.");
+            throw new InvalidSource("name-required", "Give the source a name.");
         }
         if (trimmed.length() > MAX_NAME_LENGTH) {
-            throw new InvalidSource("Keep the name under " + MAX_NAME_LENGTH + " characters.");
+            throw new InvalidSource("name-too-long", "Keep the name under " + MAX_NAME_LENGTH + " characters.");
         }
         return trimmed;
     }
@@ -48,10 +48,10 @@ public record Source(UUID id, UUID workspaceId, Provider provider, String name, 
     private static String requireAccount(Provider provider, String accountLabel) {
         String trimmed = Optional.ofNullable(accountLabel).map(String::strip).orElse("");
         if (provider.signInRequired() && trimmed.isEmpty()) {
-            throw new InvalidSource("Sign in to " + provider.displayName() + " first.");
+            throw new InvalidSource("sign-in-required", "Sign in to " + provider.displayName() + " first.");
         }
         if (trimmed.length() > MAX_ACCOUNT_LABEL_LENGTH) {
-            throw new InvalidSource("The account name is too long.");
+            throw new InvalidSource("account-too-long", "The account name is too long.");
         }
         return trimmed;
     }

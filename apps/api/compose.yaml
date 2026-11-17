@@ -1,4 +1,5 @@
-# Local PostgreSQL for `mvn spring-boot:run`. Listens on this machine only.
+# Optional: a long-lived local PostgreSQL for `mvn spring-boot:run` (data kept between runs).
+# For a throwaway database use `mvn spring-boot:test-run` instead (see README). Listens on this machine only.
 # Set CONXIST_DB_PASSWORD in your shell first; it is never stored in the repo.
 services:
   postgres:

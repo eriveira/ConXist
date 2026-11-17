@@ -1,23 +1,29 @@
 package com.conxist;
 
 import static org.awaitility.Awaitility.await;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.UUID;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -62,6 +68,62 @@ class CaptureFlowIntegrationTest {
                 .andExpect(jsonPath("$[0].text").doesNotExist());
         awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW");
         awaitHubItem(sourceId, "SOURCE", "CONNECTED");
+        mvc.perform(get("/api/hub"))
+                .andExpect(jsonPath("$.pendingReview").value(greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.latest[0].workspaceId").doesNotExist());
+    }
+
+    @Test
+    void a_source_of_another_workspace_is_out_of_reach() throws Exception {
+        UUID otherWorkspace = UUID.randomUUID();
+        UUID foreignSource = UUID.randomUUID();
+        jdbc.sql("""
+                insert into sources (id, workspace_id, provider, name, added_at)
+                values (:id, :workspaceId, 'UPLOAD', 'Their files', now())
+                """).param("id", foreignSource).param("workspaceId", otherWorkspace).update();
+        MockMultipartFile file = new MockMultipartFile("file", "notes.txt", "text/plain",
+                "Their notes".getBytes(StandardCharsets.UTF_8));
+
+        mvc.perform(multipart("/api/sources/{id}/files", foreignSource).file(file))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("source.not-found"));
+        mvc.perform(get("/api/sources/{id}/documents", foreignSource)).andExpect(jsonPath("$", hasSize(0)));
+        mvc.perform(get("/api/sources")).andExpect(jsonPath("$[?(@.name=='Their files')]").isEmpty());
+    }
+
+    @Test
+    void the_database_refuses_a_document_filed_under_another_workspaces_source() {
+        String sourceId = jdbc.sql("""
+                insert into sources (id, workspace_id, provider, name, added_at)
+                values (gen_random_uuid(), gen_random_uuid(), 'UPLOAD', 'Isolated', now()) returning id::text
+                """).query(String.class).single();
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                insert into captured_documents (id, workspace_id, source_id, title, media_type, size_bytes,
+                  text_content, origin, origin_reference, captured_at)
+                values (gen_random_uuid(), gen_random_uuid(), cast(:sourceId as uuid), 'x', 'text/plain', 1, 'x',
+                  'UPLOAD', 'k', now())
+                """).param("sourceId", sourceId).update())
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void a_second_source_with_the_same_name_is_refused_with_a_code() throws Exception {
+        addSource("{\"provider\":\"UPLOAD\",\"name\":\"Duplicated\"}");
+
+        mvc.perform(post("/api/sources").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"UPLOAD\",\"name\":\"duplicated\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("source.name-taken"));
+    }
+
+    @Test
+    void every_response_carries_a_request_id() throws Exception {
+        mvc.perform(get("/api/providers")).andExpect(header().exists("X-Request-Id"));
+        mvc.perform(get("/api/providers").header("X-Request-Id", "trace-12345678"))
+                .andExpect(header().string("X-Request-Id", "trace-12345678"));
+        mvc.perform(get("/api/providers").header("X-Request-Id", "bad id\nwith newline"))
+                .andExpect(header().string("X-Request-Id", not("bad id\nwith newline")));
     }
 
     @Test
@@ -83,7 +145,8 @@ class CaptureFlowIntegrationTest {
         mvc.perform(post("/api/sources").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"GITHUB\",\"name\":\"Code\",\"accountLabel\":\"me\"}"))
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.detail").value("GitHub is coming soon."));
+                .andExpect(jsonPath("$.detail").value("GitHub is coming soon."))
+                .andExpect(jsonPath("$.code").value("source.coming-soon"));
     }
 
     @Test

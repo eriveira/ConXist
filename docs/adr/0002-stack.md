@@ -33,6 +33,11 @@ The standards require Clean Architecture with an enforced dependency rule.
 - `ApplicationModules.verify()` fails the build on module cycles or access to
   another module's internals; ArchUnit fails it when a layer points outward.
 - Domain events between modules keep `capture` and `hub` independent.
+- A module may keep a read model fed by other modules' events (the hub's
+  `hub_items`). It is denormalised on purpose (an exception to 3NF) and has no
+  foreign key into another module's tables, so modules stay independent in the
+  database too. Inside a module, child rows reference their parent by
+  `(workspace_id, id)`, so a row cannot belong to another workspace's source.
 
 ## Consequences
 

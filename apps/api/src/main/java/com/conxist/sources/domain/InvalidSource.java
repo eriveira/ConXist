@@ -4,7 +4,7 @@ import com.conxist.platform.RuleViolation;
 
 public class InvalidSource extends RuleViolation {
 
-    public InvalidSource(String userMessage) {
-        super(userMessage);
+    public InvalidSource(String code, String userMessage) {
+        super("source." + code, userMessage);
     }
 }

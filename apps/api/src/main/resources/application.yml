@@ -7,11 +7,18 @@ spring:
     password: ${CONXIST_DB_PASSWORD:}
   servlet:
     multipart:
-      max-file-size: 25MB
-      max-request-size: 26MB
+      # One limit, set under conxist.capture.max-file-bytes.
+      max-file-size: ${conxist.capture.max-file-bytes}B
+      max-request-size: ${conxist.capture.max-file-bytes}B
   modulith:
     events:
       republish-outstanding-events-on-restart: true
+      completion-mode: delete
+
+logging:
+  structured:
+    format:
+      console: ecs
 
 server:
   # No sign-in yet (ADR 0002): the API only listens on this machine.
@@ -22,7 +29,7 @@ conxist:
   workspace:
     default-id: ${CONXIST_WORKSPACE_ID:00000000-0000-0000-0000-000000000001}
   capture:
-    max-file-bytes: 26214400
+    max-file-bytes: 26214400 # 25 MB
     max-text-characters: 2000000
     storage-root: ${CONXIST_STORAGE_ROOT:./data/uploads}
     accepted-media-types:

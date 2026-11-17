@@ -33,7 +33,7 @@ public final class AddSource {
         Source source = Source.add(UUID.randomUUID(), workspace.id(), draft, clock.instant());
         return unitOfWork.inTransaction(() -> {
             if (sources.nameTaken(source.workspaceId(), source.name())) {
-                throw new InvalidSource("A source named \"" + source.name() + "\" already exists.");
+                throw new InvalidSource("name-taken", "A source named \"" + source.name() + "\" already exists.");
             }
             sources.save(source);
             events.publish(new SourceAdded(source.id(), source.workspaceId(), source.provider(), source.name(),

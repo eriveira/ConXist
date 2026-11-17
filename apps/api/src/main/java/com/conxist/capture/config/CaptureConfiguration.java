@@ -1,6 +1,8 @@
 package com.conxist.capture.config;
 
 import java.time.Clock;
+import com.conxist.capture.adapter.extraction.TikaTextExtractor;
+import com.conxist.capture.adapter.files.LocalFileStore;
 import com.conxist.capture.application.CaptureContext;
 import com.conxist.capture.application.CaptureUpload;
 import com.conxist.capture.application.CapturedDocumentRepository;
@@ -21,6 +23,16 @@ import org.springframework.context.annotation.Configuration;
 /** Wires the capture use cases to their adapters. */
 @Configuration(proxyBeanMethods = false)
 class CaptureConfiguration {
+
+    @Bean
+    TextExtractor textExtractor(CaptureProperties properties) {
+        return new TikaTextExtractor(properties.maxTextCharacters());
+    }
+
+    @Bean
+    FileStore fileStore(CaptureProperties properties) {
+        return new LocalFileStore(properties.storageRoot());
+    }
 
     @Bean
     CaptureContext captureContext(CurrentWorkspace workspace, EventPublisher events, UnitOfWork unitOfWork,

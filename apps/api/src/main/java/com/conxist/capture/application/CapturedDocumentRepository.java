@@ -6,9 +6,8 @@ import com.conxist.capture.domain.CapturedDocument;
 
 public interface CapturedDocumentRepository {
 
-    void save(CapturedDocument document);
-
-    boolean contains(UUID sourceId, String originReference);
+    /** Saves the document unless its source already holds one with the same origin reference. */
+    boolean saveIfNew(CapturedDocument document);
 
     List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId);
 }

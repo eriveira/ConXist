@@ -4,7 +4,7 @@ import com.conxist.platform.RuleViolation;
 
 public class RejectedDocument extends RuleViolation {
 
-    public RejectedDocument(String userMessage) {
-        super(userMessage);
+    public RejectedDocument(String code, String userMessage) {
+        super("document." + code, userMessage);
     }
 }

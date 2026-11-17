@@ -49,7 +49,7 @@ final class CaptureFakes {
         @Override
         public String extractText(byte[] content, String mediaType) {
             if (unreadable) {
-                throw new RejectedDocument("We could not read the text in this file.");
+                throw new RejectedDocument("unreadable", "We could not read the text in this file.");
             }
             return new String(content, StandardCharsets.UTF_8);
         }
@@ -69,14 +69,13 @@ final class CaptureFakes {
         final List<CapturedDocument> saved = new ArrayList<>();
 
         @Override
-        public void save(CapturedDocument document) {
-            saved.add(document);
-        }
-
-        @Override
-        public boolean contains(UUID sourceId, String originReference) {
-            return saved.stream().anyMatch(d -> d.sourceId().equals(sourceId)
-                    && d.originReference().equals(originReference));
+        public boolean saveIfNew(CapturedDocument document) {
+            boolean known = saved.stream().anyMatch(d -> d.sourceId().equals(document.sourceId())
+                    && d.originReference().equals(document.originReference()));
+            if (!known) {
+                saved.add(document);
+            }
+            return !known;
         }
 
         @Override

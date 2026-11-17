@@ -22,14 +22,15 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
     }
 
     @Override
-    public void save(CapturedDocument document) {
-        jdbc.sql("""
+    public boolean saveIfNew(CapturedDocument document) {
+        return jdbc.sql("""
                 insert into captured_documents
                   (id, workspace_id, source_id, title, media_type, size_bytes, text_content, origin,
                    origin_reference, captured_at)
                 values
                   (:id, :workspaceId, :sourceId, :title, :mediaType, :sizeBytes, :text, :origin,
                    :originReference, :capturedAt)
+                on conflict (source_id, origin_reference) do nothing
                 """)
                 .param("id", document.id())
                 .param("workspaceId", document.workspaceId())
@@ -41,19 +42,7 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
                 .param("origin", document.origin().name())
                 .param("originReference", document.originReference())
                 .param("capturedAt", Timestamp.from(document.capturedAt()))
-                .update();
-    }
-
-    @Override
-    public boolean contains(UUID sourceId, String originReference) {
-        return jdbc.sql("""
-                select exists(select 1 from captured_documents
-                              where source_id = :sourceId and origin_reference = :originReference)
-                """)
-                .param("sourceId", sourceId)
-                .param("originReference", originReference)
-                .query(Boolean.class)
-                .single();
+                .update() == 1;
     }
 
     @Override

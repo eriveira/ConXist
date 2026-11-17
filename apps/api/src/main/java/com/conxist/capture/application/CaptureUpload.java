@@ -38,7 +38,8 @@ public final class CaptureUpload {
         CapturedDocument document = new CapturedDocument(UUID.randomUUID(), workspaceId, sourceId,
                 DocumentTitle.from(fileName), mediaType, content.length, text, DocumentOrigin.UPLOAD, storageKey,
                 context.clock().instant());
-        return context.saveAndAnnounce(documents, document);
+        context.saveAndAnnounce(documents, document);
+        return DocumentSummary.of(document);
     }
 
 }

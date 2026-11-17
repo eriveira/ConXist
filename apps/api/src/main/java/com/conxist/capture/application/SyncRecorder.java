@@ -33,11 +33,10 @@ public final class SyncRecorder {
         int imported = 0;
         int skipped = 0;
         for (Recording recording : recorder.recordings(source.accountLabel())) {
-            if (documents.contains(sourceId, recording.id())) {
-                skipped++;
-            } else {
-                context.saveAndAnnounce(documents, toDocument(sourceId, recording));
+            if (context.saveAndAnnounce(documents, toDocument(sourceId, recording))) {
                 imported++;
+            } else {
+                skipped++;
             }
         }
         return new SyncResult(imported, skipped);

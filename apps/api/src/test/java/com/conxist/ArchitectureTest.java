@@ -39,6 +39,13 @@ class ArchitectureTest {
     }
 
     @Test
+    void adapters_get_settings_as_plain_values_not_from_config() {
+        noClasses().that().resideInAPackage("..adapter..")
+                .should().dependOnClassesThat().resideInAPackage("..config..")
+                .check(classes);
+    }
+
+    @Test
     void published_module_apis_are_plain_java() {
         noClasses().that().resideInAnyPackage("com.conxist.platform", "com.conxist.sources", "com.conxist.capture")
                 .should().dependOnClassesThat().resideInAnyPackage(OUTER_RING)

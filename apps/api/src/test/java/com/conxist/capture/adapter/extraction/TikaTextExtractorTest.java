@@ -6,11 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import com.conxist.capture.config.CaptureProperties;
 import com.conxist.capture.domain.RejectedDocument;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -24,8 +21,7 @@ class TikaTextExtractorTest {
     private static final String SENTENCE = "Every source connects to the hub";
     private static final String DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-    private final TikaTextExtractor extractor = new TikaTextExtractor(
-            new CaptureProperties(1_000_000, Set.of("text/plain"), 10_000, Path.of("unused")));
+    private final TikaTextExtractor extractor = new TikaTextExtractor(10_000);
 
     @Test
     void reads_a_pdf() throws IOException {

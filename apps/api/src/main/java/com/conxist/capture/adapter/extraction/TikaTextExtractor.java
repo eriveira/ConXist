@@ -5,18 +5,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import com.conxist.capture.application.TextExtractor;
-import com.conxist.capture.config.CaptureProperties;
 import com.conxist.capture.domain.RejectedDocument;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 /** Reads PDF and Word files with Apache Tika; plain text and Markdown are read as UTF-8. */
-@Component
-class TikaTextExtractor implements TextExtractor {
+public class TikaTextExtractor implements TextExtractor {
 
     static final String UNREADABLE = "We could not read the text in this file.";
     private static final Logger log = LoggerFactory.getLogger(TikaTextExtractor.class);
@@ -24,8 +21,8 @@ class TikaTextExtractor implements TextExtractor {
     private final Tika tika = new Tika();
     private final int maxCharacters;
 
-    TikaTextExtractor(CaptureProperties properties) {
-        this.maxCharacters = properties.maxTextCharacters();
+    public TikaTextExtractor(int maxCharacters) {
+        this.maxCharacters = maxCharacters;
     }
 
     @Override
@@ -38,7 +35,7 @@ class TikaTextExtractor implements TextExtractor {
         String text = mediaType.startsWith("text/") ? decodeText(content) : parse(content);
         String trimmed = text.strip();
         if (trimmed.isEmpty()) {
-            throw new RejectedDocument("This file has no text we can read.");
+            throw new RejectedDocument("no-text", "This file has no text we can read.");
         }
         return trimmed.length() > maxCharacters ? trimmed.substring(0, maxCharacters) : trimmed;
     }
@@ -53,7 +50,7 @@ class TikaTextExtractor implements TextExtractor {
         } catch (IOException | TikaException failure) {
             // The file content is customer data, so only the failure type is logged.
             log.warn("Text extraction failed: {}", failure.getClass().getSimpleName());
-            throw new RejectedDocument(UNREADABLE);
+            throw new RejectedDocument("unreadable", UNREADABLE);
         }
     }
 }
