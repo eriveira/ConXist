@@ -41,6 +41,16 @@ jobs:
           cache: maven
       - run: mvn -B verify
 
+  api-dependencies:
+    # Known advisories in the API's Maven dependencies (OSV database). Fails on any match.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: >-
+          docker run --rm -v "$PWD:/src" ghcr.io/google/osv-scanner:v2.2.1
+          scan source --lockfile /src/apps/api/pom.xml
+
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 15
