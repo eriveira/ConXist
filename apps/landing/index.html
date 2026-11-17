@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: ConXist.ai brand v1.0 (Branding/tokens/conxist.css): light header with the logo on white, dark abyss hero with an electric glow, light bg body with white cards, pill buttons. The hero shows a meeting transcript being highlighted and routed. */
+/* Layout: ConXist.ai brand v1.0 (Branding/tokens/conxist.css): header that follows the theme (transparent logo on light, reversed logo on dark), dark abyss hero with an electric glow, light bg body with white cards, pill buttons. The hero shows a meeting transcript being highlighted and routed. */
 :root {
   --bg: #F5F7FB;
   --surface: #FFFFFF;
@@ -42,6 +42,7 @@
     --bg: #05070A; --surface: #0B1426; --ink: #EAF1FF; --ink-2: #DCE5F5; --muted: #9AA8BD; --line: #1C2A44;
     --accent: #4D9BFF; --accent-hover: #6AAEFF; --accent-ink: #000828; --accent-large: #4D9BFF; --accent-soft: rgba(77,155,255,.14);
     --live: #12C7B8; --teal: #3FD3C6; --err: #FF7A7E; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --header-bg: var(--surface); --header-ink: var(--ink); --header-muted: var(--muted);
     color-scheme: dark;
   }
 }
@@ -49,6 +50,7 @@
   --bg: #05070A; --surface: #0B1426; --ink: #EAF1FF; --ink-2: #DCE5F5; --muted: #9AA8BD; --line: #1C2A44;
   --accent: #4D9BFF; --accent-hover: #6AAEFF; --accent-ink: #000828; --accent-large: #4D9BFF; --accent-soft: rgba(77,155,255,.14);
   --live: #12C7B8; --teal: #3FD3C6; --err: #FF7A7E; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --header-bg: var(--surface); --header-ink: var(--ink); --header-muted: var(--muted);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -73,11 +75,15 @@ a { color: inherit; }
 .btn.quiet:hover { border-color: var(--muted); }
 
 /* header (dark, as on wdteams.com) */
-header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--header-bg); color: var(--header-ink); border-bottom: 1px solid #DDE3EC; }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--header-bg); color: var(--header-ink); border-bottom: 1px solid var(--line); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--header-bg); }
 .top .wrap { display: flex; align-items: center; gap: 28px; min-height: 68px; }
 .logo { display: flex; align-items: center; padding: 6px 0; }
 .logo img { height: 48px; width: auto; max-width: none; display: block; }
+.logo .logo-dark { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo .logo-light { display: none; } :root:not([data-theme="light"]) .logo .logo-dark { display: block; } }
+:root[data-theme="dark"] .logo .logo-light { display: none; }
+:root[data-theme="dark"] .logo .logo-dark { display: block; }
 nav.links { display: flex; gap: 22px; margin-left: auto; }
 nav.links a { text-decoration: none; color: var(--header-muted); font-weight: 500; font-size: 0.95rem; padding: 10px 0; }
 nav.links a:hover { color: var(--header-ink); }
@@ -173,7 +179,7 @@ td { color: var(--muted); } td:first-child { color: var(--ink); }
 .orch .row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .orch .row span { padding: 6px 12px; border-radius: 999px; background: var(--night-card); border: 1px solid var(--night-line); color: var(--night-ink); font-weight: 500; }
 .orch .box { border: 1px solid var(--glow); box-shadow: 0 0 24px rgba(63,211,255,.35); background: rgba(10,120,252,.18); color: var(--night-ink); border-radius: 12px; padding: 12px 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; }
-.orch .box img { width: 40px; height: 40px; border-radius: 10px; background: #FFFFFF; object-fit: contain; padding: 3px; }
+.orch .box img { width: 40px; height: 40px; object-fit: contain; }
 .orch .arrow { text-align: center; font: 500 0.75rem var(--mono); color: rgba(245,247,251,.5); }
 @media (max-width: 860px) { .int { grid-template-columns: 1fr; gap: 32px; } }
 
@@ -216,7 +222,7 @@ footer a { color: var(--night-ink); }
 
 <header class="top">
   <div class="wrap">
-    <a class="logo" href="#top" aria-label="ConXist.ai home"><img src="assets/conxist-logo-horizontal.png" alt="ConXist.ai" width="141" height="48"></a>
+    <a class="logo" href="#top" aria-label="ConXist.ai home"><img class="logo-light" src="assets/conxist-logo-horizontal-transparent.png" alt="ConXist.ai" width="163" height="48"><img class="logo-dark" src="assets/conxist-logo-horizontal-reversed.png" alt="ConXist.ai" width="163" height="48"></a>
     <nav class="links" aria-label="Sections">
       <a href="#how">How it works</a>
       <a href="#modules">Modules</a>
@@ -369,7 +375,7 @@ footer a { color: var(--night-ink); }
       <div class="orch" aria-label="Diagram: coding agents connect to the ConXist orchestrator, which connects to its modules and to your tools">
         <div class="row"><span>Claude</span><span>Codex</span><span>Your agents</span></div>
         <div class="arrow" aria-hidden="true">API / MCP</div>
-        <div class="box"><img src="assets/conxist-emblem.png" alt="">ConXist orchestrator</div>
+        <div class="box"><img src="assets/conxist-emblem-transparent.png" alt="">ConXist orchestrator</div>
         <div class="row"><span>Capture</span><span>Memory</span><span>Skills</span></div>
         <div class="arrow" aria-hidden="true">connects to</div>
         <div class="row"><span>Jira</span><span>GitHub</span><span>Drives</span><span>Local</span></div>
