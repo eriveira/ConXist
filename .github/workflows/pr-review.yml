@@ -1,0 +1,37 @@
+name: PR review (agent standards)
+
+# Second filter: runs the same reviewer agents the local engineering pass uses.
+# Off until the owner adds the CLAUDE_CODE_OAUTH_TOKEN secret and sets the
+# repository variable PR_REVIEW_ENABLED to true. Only comments; never pushes or merges.
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    if: vars.PR_REVIEW_ENABLED == 'true' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+            Follow .claude/agents/engineering-reviewer.md exactly, using the diff
+            origin/${{ github.base_ref }}...HEAD. If the diff touches auth, data, secrets,
+            prompts or tools, also follow .claude/agents/security-reviewer.md; if it touches
+            UI, also follow .claude/agents/ux-reviewer.md. Post one PR comment with the
+            findings (BLOCKER / FIX NOW / REFACTOR LATER) and the definition-of-done checklist.
+            Do not push, commit, approve or merge.
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git status:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

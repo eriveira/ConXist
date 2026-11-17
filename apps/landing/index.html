@@ -1,0 +1,492 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ConXist.ai</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: ConXist.ai brand v1.0 (Branding/tokens/conxist.css): light header with the logo on white, dark abyss hero with an electric glow, light bg body with white cards, pill buttons. The hero shows a meeting transcript being highlighted and routed. */
+:root {
+  --bg: #F5F7FB;
+  --surface: #FFFFFF;
+  --ink: #001332;
+  --ink-2: #151A22;
+  --muted: #5D6675;
+  --line: #DDE3EC;
+  --accent: #006AF9;          /* electric-600: buttons, links, small text */
+  --accent-hover: #0A5FD9;
+  --accent-ink: #FFFFFF;
+  --accent-large: #0A78FC;    /* electric: icons, large text */
+  --accent-soft: rgba(10,120,252,.10);
+  --live: #12C7B8;
+  --teal: #0E8F85;
+  --err: #E5484D;
+  --shadow: 0 1px 2px rgba(0,19,50,.06), 0 8px 24px rgba(0,19,50,.08);
+  /* dark bands stay dark in both themes */
+  --night: #000828;
+  --night-2: #0A2048;
+  --night-ink: #EAF1FF;
+  --night-muted: rgba(234,241,255,.72);
+  --night-line: rgba(234,241,255,.12);
+  --night-card: rgba(255,255,255,.05);
+  --glow: #3FD3FF;
+  --electric: #0A78FC;
+  --header-bg: #FFFFFF;
+  --header-ink: #001332;
+  --header-muted: #5D6675;
+  --font: "Red Hat Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #05070A; --surface: #0B1426; --ink: #EAF1FF; --ink-2: #DCE5F5; --muted: #9AA8BD; --line: #1C2A44;
+    --accent: #4D9BFF; --accent-hover: #6AAEFF; --accent-ink: #000828; --accent-large: #4D9BFF; --accent-soft: rgba(77,155,255,.14);
+    --live: #12C7B8; --teal: #3FD3C6; --err: #FF7A7E; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #05070A; --surface: #0B1426; --ink: #EAF1FF; --ink-2: #DCE5F5; --muted: #9AA8BD; --line: #1C2A44;
+  --accent: #4D9BFF; --accent-hover: #6AAEFF; --accent-ink: #000828; --accent-large: #4D9BFF; --accent-soft: rgba(77,155,255,.14);
+  --live: #12C7B8; --teal: #3FD3C6; --err: #FF7A7E; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--font); }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font); line-height: 1.1; text-wrap: balance; margin: 0; font-weight: 700; }
+h1 { font-size: clamp(2.3rem, 5.2vw, 3.8rem); letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.75rem, 3.2vw, 2.15rem); letter-spacing: -0.02em; }
+h3 { font-size: 1.15rem; letter-spacing: -0.01em; }
+p { margin: 0; }
+.lede { color: var(--muted); font-size: 1.1rem; font-weight: 500; max-width: 60ch; }
+.eyebrow { font-size: 0.85rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: 999px; font: 700 0.95rem var(--font); text-decoration: none; cursor: pointer; border: 1px solid transparent; transition: background .15s; }
+.btn.primary { background: #006AF9; color: #FFFFFF; }
+.btn.primary:hover { background: #0A5FD9; }
+.btn.ghost { background: rgba(255,255,255,.08); color: var(--night-ink); border-color: var(--night-line); }
+.btn.ghost:hover { background: rgba(255,255,255,.14); }
+.btn.quiet { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn.quiet:hover { border-color: var(--muted); }
+
+/* header (dark, as on wdteams.com) */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--header-bg); color: var(--header-ink); border-bottom: 1px solid #DDE3EC; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--header-bg); }
+.top .wrap { display: flex; align-items: center; gap: 28px; min-height: 68px; }
+.logo { display: flex; align-items: center; padding: 6px 0; }
+.logo img { height: 48px; width: auto; max-width: none; display: block; }
+nav.links { display: flex; gap: 22px; margin-left: auto; }
+nav.links a { text-decoration: none; color: var(--header-muted); font-weight: 500; font-size: 0.95rem; padding: 10px 0; }
+nav.links a:hover { color: var(--header-ink); }
+@media (max-width: 760px) { nav.links { display: none; } .top .btn { margin-left: auto; padding: 0 16px; } .logo img { height: 42px; } }
+
+section { padding-block: 80px; }
+.alt { background: var(--surface); }
+
+/* hero */
+.hero { background: radial-gradient(60% 60% at 70% 30%, rgba(10,120,252,.35) 0%, rgba(0,8,40,0) 70%), var(--night); color: var(--night-ink); position: relative; overflow: hidden; padding-block: 72px 88px; }
+.hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--night-line) 1px, transparent 1px), linear-gradient(90deg, var(--night-line) 1px, transparent 1px); background-size: 56px 56px; mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, #000 20%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, #000 20%, transparent 75%); opacity: .5; pointer-events: none; }
+.hero .wrap { position: relative; display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
+.hero .copy { display: grid; gap: 24px; min-width: 0; }
+.hero h1 .hl { color: #4D9BFF; }
+.hero .lede { color: var(--night-muted); }
+.hero .eyebrow { color: #7FB6FF; }
+.hero .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 920px) { .hero .wrap { grid-template-columns: 1fr; } }
+
+.demo { background: rgba(13,19,28,.85); border: 1px solid var(--night-line); border-radius: 16px; overflow: hidden; min-width: 0; margin: 0; box-shadow: 0 30px 60px -30px rgba(10,120,252,.5); backdrop-filter: blur(6px); }
+.demo-head { display: flex; justify-content: space-between; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--night-line); font: 500 0.78rem var(--mono); color: var(--night-muted); flex-wrap: wrap; }
+.rec { display: inline-flex; align-items: center; gap: 8px; }
+.rec::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--glow); box-shadow: 0 0 12px rgba(63,211,255,.7); }
+.lines { padding: 18px; display: grid; gap: 12px; font-size: 0.95rem; color: var(--night-muted); }
+.line { display: grid; grid-template-columns: 58px 1fr; gap: 10px; }
+.line time { font: 0.76rem/1.9 var(--mono); color: rgba(245,247,251,.45); font-variant-numeric: tabular-nums; }
+.line b { color: var(--night-ink); font-weight: 600; }
+.demo mark { background: rgba(10,120,252,.28); color: var(--night-ink); padding: 1px 3px; border-radius: 4px; box-shadow: inset 0 -2px 0 #4D9BFF; }
+.routed { border-top: 1px solid var(--night-line); padding: 14px 18px 16px; display: grid; gap: 10px; }
+.routed .eyebrow { font-size: 0.72rem; color: rgba(245,247,251,.5); }
+.out { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: baseline; font-size: 0.9rem; color: var(--night-ink); }
+.tag { font: 600 0.68rem var(--mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--night-card); border: 1px solid var(--night-line); color: #7FB6FF; text-align: center; }
+.out .t { min-width: 0; }
+.out code { font-family: var(--mono); font-size: 0.8em; color: rgba(245,247,251,.5); white-space: nowrap; }
+.review { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; background: rgba(255,255,255,.04); border-top: 1px solid var(--night-line); font-size: 0.82rem; color: var(--night-muted); flex-wrap: wrap; }
+.review strong { color: var(--night-ink); font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) {
+  .demo mark { animation: hl .8s ease-out both; }
+  .demo .l2 mark { animation-delay: .45s; } .demo .l3 mark { animation-delay: .9s; }
+  @keyframes hl { from { box-shadow: inset 0 0 0 transparent; background: transparent; } to { box-shadow: inset 0 -2px 0 #4D9BFF; background: rgba(10,120,252,.28); } }
+}
+
+.head { display: grid; gap: 12px; margin-bottom: 40px; max-width: 70ch; }
+
+/* problem */
+.cards3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 14px; padding: 26px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.alt .card { background: var(--bg); }
+.card p { color: var(--muted); }
+.icon { width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-large); display: grid; place-items: center; }
+.icon svg { width: 22px; height: 22px; }
+@media (max-width: 860px) { .cards3 { grid-template-columns: 1fr; } }
+
+/* pipeline */
+.pipe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.stage .step { font: 600 0.78rem var(--mono); color: var(--accent); letter-spacing: .02em; }
+.stage ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; color: var(--muted); }
+.stage li { display: flex; gap: 8px; align-items: baseline; }
+.stage li::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); transform: translateY(-2px); }
+.check { margin-top: 24px; display: flex; gap: 14px; align-items: center; padding: 16px 20px; border-radius: 14px; background: var(--accent-soft); color: var(--ink-2); max-width: 82ch; }
+.check svg { flex: none; width: 22px; height: 22px; color: var(--accent); }
+@media (max-width: 860px) { .pipe { grid-template-columns: 1fr; } }
+
+/* cycle */
+.cycle { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.cyc { padding: 16px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: grid; gap: 8px; min-width: 0; }
+.alt .cyc { background: var(--bg); }
+.cyc .n { font: 500 0.75rem var(--mono); color: var(--muted); }
+.cyc .name { font-weight: 700; }
+.pill { justify-self: start; font: 700 0.66rem var(--font); letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.cyc.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cyc.now .pill { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.cyc.next .pill { color: var(--teal); border-color: currentColor; }
+.cycle-note { margin-top: 18px; color: var(--muted); max-width: 72ch; }
+@media (max-width: 960px) { .cycle { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 500px) { .cycle { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* modules */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { font: 500 0.78rem var(--font); padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+/* integrations */
+.int { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+.int > * { min-width: 0; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+td:first-child { font-weight: 700; white-space: nowrap; }
+td { color: var(--muted); } td:first-child { color: var(--ink); }
+.orch { background: var(--night); color: var(--night-muted); border-radius: 16px; padding: 24px; display: grid; gap: 12px; font-size: 0.9rem; }
+.orch .row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.orch .row span { padding: 6px 12px; border-radius: 999px; background: var(--night-card); border: 1px solid var(--night-line); color: var(--night-ink); font-weight: 500; }
+.orch .box { border: 1px solid var(--glow); box-shadow: 0 0 24px rgba(63,211,255,.35); background: rgba(10,120,252,.18); color: var(--night-ink); border-radius: 12px; padding: 12px 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.orch .box img { width: 40px; height: 40px; border-radius: 10px; background: #FFFFFF; object-fit: contain; padding: 3px; }
+.orch .arrow { text-align: center; font: 500 0.75rem var(--mono); color: rgba(245,247,251,.5); }
+@media (max-width: 860px) { .int { grid-template-columns: 1fr; gap: 32px; } }
+
+/* builder */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.stat { display: grid; gap: 4px; padding-top: 16px; border-top: 2px solid var(--accent-large); min-width: 0; }
+.stat b { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat span { color: var(--muted); font-size: 0.92rem; }
+.builder-foot { margin-top: 28px; color: var(--muted); }
+@media (max-width: 860px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* cta */
+.cta { background: var(--night); color: var(--night-ink); }
+.cta .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+.cta .wrap > * { min-width: 0; }
+.cta .copy { display: grid; gap: 16px; }
+.cta .eyebrow { color: #7FB6FF; }
+.cta .lede, .cta li, .cta .note { color: var(--night-muted); }
+.cta ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+form { background: var(--surface); color: var(--ink); border-radius: 16px; padding: 28px; display: grid; gap: 18px; }
+.field { display: grid; gap: 6px; }
+label { font-weight: 600; font-size: 0.95rem; }
+label .opt { font-weight: 400; color: var(--muted); }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-height: 46px; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+textarea { min-height: 92px; resize: vertical; }
+.field[aria-invalid="true"] input, .field[aria-invalid="true"] select { border-color: var(--err); }
+.msg { color: var(--err); font-size: 0.88rem; }
+.form-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 0.88rem; color: var(--muted); }
+.sent { display: grid; gap: 12px; }
+.sent h3 { display: flex; gap: 10px; align-items: center; }
+.sent h3::before { content: "✓"; color: var(--live); font-weight: 800; }
+.sent p { color: var(--muted); }
+@media (max-width: 860px) { .cta .wrap { grid-template-columns: 1fr; gap: 32px; } }
+
+footer { background: var(--night); color: var(--night-muted); border-top: 1px solid var(--night-line); padding-block: 28px; font-size: 0.9rem; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+footer a { color: var(--night-ink); }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="ConXist.ai home"><img src="assets/conxist-logo-horizontal.png" alt="ConXist.ai" width="141" height="48"></a>
+    <nav class="links" aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#modules">Modules</a>
+      <a href="#integrations">Integrations</a>
+      <a href="#investors">Investors</a>
+    </nav>
+    <a class="btn primary" href="#contact">Become a design partner</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div class="copy">
+        <span class="eyebrow">For product and engineering teams</span>
+        <h1>Your meetings already wrote the <span class="hl">spec</span>.</h1>
+        <p class="lede">ConXist.ai captures what your team decides in meetings, chats and email, turns it into requirements and tickets, and keeps it as shared memory that your engineers and coding agents build from.</p>
+        <div class="ctas">
+          <a class="btn primary" href="#contact">Become a design partner <span aria-hidden="true">→</span></a>
+          <a class="btn ghost" href="#how">See how Capture works</a>
+        </div>
+      </div>
+
+      <figure class="demo" aria-label="Example: a planning meeting turned into a ticket, a requirement and a memory entry">
+        <div class="demo-head"><span class="rec">Sprint planning · recorded</span><span>Example</span></div>
+        <div class="lines">
+          <div class="line l1"><time>00:04:12</time><p><b>Ana (PM):</b> Customers keep asking. <mark>Export to CSV has to ship this sprint.</mark></p></div>
+          <div class="line l2"><time>00:06:47</time><p><b>Leo (Tech lead):</b> Fine, but <mark>exports over 10k rows run as a background job</mark>, not in the request.</p></div>
+          <div class="line l3"><time>00:09:03</time><p><b>Sara (CTO):</b> Agreed. <mark>All new jobs go through the queue service from now on.</mark></p></div>
+        </div>
+        <div class="routed">
+          <span class="eyebrow">Proposed by ConXist</span>
+          <div class="out"><span class="tag">Ticket</span><span class="t">Add CSV export to reports <code>→ Jira</code></span></div>
+          <div class="out"><span class="tag">Requirement</span><span class="t">Exports over 10,000 rows run asynchronously <code>→ Jira</code></span></div>
+          <div class="out"><span class="tag">Memory</span><span class="t">New background jobs use the queue service <code>→ GitHub</code></span></div>
+        </div>
+        <div class="review"><span><strong>3 items</strong> waiting for review</span><span>Nothing is written until a person approves</span></div>
+      </figure>
+    </div>
+  </section>
+
+  <section id="problem">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">The problem</span>
+        <h2>Decisions get made out loud and then lost.</h2>
+      </div>
+      <div class="cards3">
+        <div class="card"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6"/></svg></span><h3>The backlog lags the conversation</h3><p>Someone has to turn an hour of discussion into tickets and acceptance criteria. Details drop out, or the work never gets written down at all.</p></div>
+        <div class="card"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01"/></svg></span><h3>Coding agents start without context</h3><p>Claude, Codex and other agents write code fast, but they don't know the architecture rule your CTO set last Tuesday.</p></div>
+        <div class="card"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 7l-4 5 4 5M17 7l4 5-4 5"/></svg></span><h3>Every team builds to different criteria</h3><p>Design, architecture and product decisions live in people's heads and scattered docs, so each squad makes the same call differently.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" class="alt">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">Phase 1 · Capture</span>
+        <h2>From conversation to the right system, in three steps.</h2>
+        <p class="lede">Capture is the first ConXist module. It takes the raw material of product work and routes each piece to where your team already works.</p>
+      </div>
+      <div class="pipe">
+        <div class="card stage">
+          <span class="step">Step 1 · Collect</span>
+          <h3>Bring in every source</h3>
+          <ul><li>Meeting recordings</li><li>Team chats</li><li>Email threads</li><li>Notes and text</li></ul>
+        </div>
+        <div class="card stage">
+          <span class="step">Step 2 · Transcribe and classify</span>
+          <h3>Sort it by your categories</h3>
+          <p>Everything becomes a clean transcript in text or Markdown, then each decision is classified using the categories you set up for your company.</p>
+        </div>
+        <div class="card stage">
+          <span class="step">Step 3 · Route</span>
+          <h3>Send it where it belongs</h3>
+          <ul><li>Tickets and requirements to your issue tracker</li><li>General knowledge to shared memory</li><li>Documentation to your repositories</li></ul>
+        </div>
+      </div>
+      <p class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><span><strong>People stay in control.</strong> ConXist proposes, and the owner of each category approves. Changes to repositories arrive as pull requests you can review.</span></p>
+    </div>
+  </section>
+
+  <section id="cycle">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">Roadmap</span>
+        <h2>One module at a time, across the whole delivery cycle.</h2>
+      </div>
+      <div class="cycle" role="list">
+        <div class="cyc now" role="listitem"><span class="n">01</span><span class="name">Capture</span><span class="pill">Phase 1</span></div>
+        <div class="cyc next" role="listitem"><span class="n">02</span><span class="name">Shape</span><span class="pill">Next</span></div>
+        <div class="cyc" role="listitem"><span class="n">03</span><span class="name">Plan</span><span class="pill">Later</span></div>
+        <div class="cyc" role="listitem"><span class="n">04</span><span class="name">Build</span><span class="pill">Later</span></div>
+        <div class="cyc" role="listitem"><span class="n">05</span><span class="name">Verify</span><span class="pill">Later</span></div>
+        <div class="cyc" role="listitem"><span class="n">06</span><span class="name">Release</span><span class="pill">Later</span></div>
+        <div class="cyc" role="listitem"><span class="n">07</span><span class="name">Learn</span><span class="pill">Later</span></div>
+      </div>
+      <p class="cycle-note">Each stage has a human checkpoint before work moves on, and what the team learns after a release feeds back into Capture.</p>
+    </div>
+  </section>
+
+  <section id="modules" class="alt">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">Modules</span>
+        <h2>Adopt it in stages. Each module works on its own.</h2>
+      </div>
+      <div class="cards3">
+        <div class="card">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></span>
+          <h3>Repository memory</h3>
+          <p>Shared memory that lives next to your code, organized by discipline, so people and agents read the same source of truth.</p>
+          <div class="chips"><span class="chip">Mission</span><span class="chip">Branding</span><span class="chip">Design</span><span class="chip">Architecture</span><span class="chip">Knowledge</span><span class="chip">Vision</span></div>
+        </div>
+        <div class="card">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>
+          <h3>Agents</h3>
+          <p>Agents that do the routine work between stages, like drafting requirements from a transcript. They propose, and your team decides.</p>
+        </div>
+        <div class="card">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 4h6v4l3 3v9H6v-9l3-3z"/></svg></span>
+          <h3>Skills</h3>
+          <p>Reusable instructions that encode how your company works, so every agent and every squad applies the same development criteria.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="integrations">
+    <div class="wrap int">
+      <div>
+        <div class="head" style="margin-bottom:24px">
+          <span class="eyebrow">Integrations</span>
+          <h2>Works with the tools your team already uses.</h2>
+          <p class="lede">ConXist is a connected orchestrator. Your coding agents reach it over API or MCP without leaving their usual setup.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Type</th><th scope="col">Day one</th></tr></thead>
+            <tbody>
+              <tr><td>Meeting recorder</td><td>Plaud and similar recorders</td></tr>
+              <tr><td>Issue tracker</td><td>Jira</td></tr>
+              <tr><td>Code host</td><td>GitHub</td></tr>
+              <tr><td>Storage</td><td>Git repositories, shared drives or local folders, chosen at onboarding</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="orch" aria-label="Diagram: coding agents connect to the ConXist orchestrator, which connects to its modules and to your tools">
+        <div class="row"><span>Claude</span><span>Codex</span><span>Your agents</span></div>
+        <div class="arrow" aria-hidden="true">API / MCP</div>
+        <div class="box"><img src="assets/conxist-emblem.png" alt="">ConXist orchestrator</div>
+        <div class="row"><span>Capture</span><span>Memory</span><span>Skills</span></div>
+        <div class="arrow" aria-hidden="true">connects to</div>
+        <div class="row"><span>Jira</span><span>GitHub</span><span>Drives</span><span>Local</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="investors" class="alt">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">For investors</span>
+        <h2>The context layer for AI-assisted software teams.</h2>
+      </div>
+      <div class="cards3">
+        <div class="card"><h3>Why now</h3><p>Teams are adopting coding agents faster than they can give them context. The bottleneck has moved from writing code to knowing what to build and why.</p></div>
+        <div class="card"><h3>Business model</h3><p>One connected platform that companies adopt module by module, starting with Capture. Each module they add deepens the memory the team relies on.</p></div>
+        <div class="card"><h3>Who buys</h3><p>Product managers, tech leads and CTOs, who share the cost of lost decisions and inconsistent criteria.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="builder">
+    <div class="wrap">
+      <div class="head">
+        <span class="eyebrow">Built by WDTeams</span>
+        <h2>From a team that ships business platforms for a living.</h2>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>12+</b><span>years building software products and business platforms</span></div>
+        <div class="stat"><b>4</b><span>client products: three live, one in development</span></div>
+        <div class="stat"><b>6</b><span>service lines, from custom software to staffing</span></div>
+        <div class="stat"><b>2</b><span>countries: coordination in the US, engineering in Colombia</span></div>
+      </div>
+      <p class="builder-foot">Learn more at <a href="https://wdteams.com/" target="_blank" rel="noopener">wdteams.com</a>.</p>
+    </div>
+  </section>
+
+  <section class="cta" id="contact">
+    <div class="wrap">
+      <div class="copy">
+        <span class="eyebrow">Design partners</span>
+        <h2>Help shape Capture with your own meetings.</h2>
+        <p class="lede">We're working with a small group of product and engineering teams on the first release.</p>
+        <ul>
+          <li>Early access to Capture with your recorder, Jira and GitHub</li>
+          <li>Direct input on categories, routing and review rules</li>
+          <li>Founding-partner terms</li>
+        </ul>
+        <p class="note">Investor? Choose "Investor" as your role and we'll send the deck.</p>
+      </div>
+
+      <form id="lead" novalidate>
+        <div id="formBody" style="display:grid;gap:18px">
+          <div class="field" id="f-name"><label for="name">Name</label><input id="name" name="name" autocomplete="name"><span class="msg" id="name-msg" hidden></span></div>
+          <div class="field" id="f-email"><label for="email">Work email</label><input id="email" name="email" type="email" autocomplete="email" inputmode="email"><span class="msg" id="email-msg" hidden></span></div>
+          <div class="field" id="f-role"><label for="role">Role</label>
+            <select id="role" name="role">
+              <option value="">Choose your role</option>
+              <option>Product manager</option>
+              <option>Tech lead</option>
+              <option>CTO or engineering leader</option>
+              <option>Investor</option>
+              <option>Other</option>
+            </select><span class="msg" id="role-msg" hidden></span></div>
+          <div class="field"><label for="note">What do you want ConXist to capture? <span class="opt">(optional)</span></label><textarea id="note" name="note"></textarea></div>
+          <div class="form-foot"><button class="btn primary" type="submit" id="submitBtn">Request early access</button><span>We reply within two working days.</span></div>
+        </div>
+        <div class="sent" id="sent" hidden aria-live="polite">
+          <h3 id="sentTitle">Request received</h3>
+          <p id="sentText"></p>
+          <p><em>Preview page: requests are not stored yet.</em></p>
+          <div><a class="btn quiet" href="#how">Read how Capture works</a></div>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap"><span>© 2026 ConXist.ai · a <a href="https://wdteams.com/" target="_blank" rel="noopener">WDTeams</a> product</span><span>Capture is in development with design partners.</span></div>
+</footer>
+
+<script>
+(function () {
+  var form = document.getElementById('lead');
+  function setErr(id, text) {
+    var f = document.getElementById('f-' + id), m = document.getElementById(id + '-msg');
+    if (text) { f.setAttribute('aria-invalid', 'true'); m.textContent = text; m.hidden = false; }
+    else { f.removeAttribute('aria-invalid'); m.hidden = true; }
+    return !text;
+  }
+  function check() {
+    var name = document.getElementById('name').value.trim();
+    var email = document.getElementById('email').value.trim().toLowerCase();
+    var role = document.getElementById('role').value;
+    var ok = setErr('name', name ? '' : 'Enter your name so we know who to reply to.');
+    ok = setErr('email', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? '' : 'Enter an email like name@company.com.') && ok;
+    ok = setErr('role', role ? '' : 'Choose the role closest to yours.') && ok;
+    return { ok: ok, name: name, email: email, role: role };
+  }
+  ['name', 'email', 'role'].forEach(function (id) {
+    document.getElementById(id).addEventListener('blur', function () {
+      if (document.getElementById('f-' + id).hasAttribute('aria-invalid')) check();
+    });
+  });
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var r = check();
+    if (!r.ok) { var bad = form.querySelector('[aria-invalid="true"] input, [aria-invalid="true"] select'); if (bad) bad.focus(); return; }
+    document.getElementById('formBody').hidden = true;
+    document.getElementById('sentTitle').textContent = 'Thanks, ' + r.name.split(' ')[0] + '. Request received.';
+    document.getElementById('sentText').textContent = r.role === 'Investor'
+      ? 'We will send the investor deck to ' + r.email + '.'
+      : 'We will write to ' + r.email + ' to set up a 30-minute call about your team’s meetings and backlog.';
+    document.getElementById('sent').hidden = false;
+  });
+})();
+</script>
+
+</body></html>

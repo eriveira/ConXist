@@ -1,0 +1,61 @@
+/* ConXist.ai design tokens v1.0 (2026-11-16)
+   Generated from Branding/tokens/tokens.json. Edit the JSON first, then mirror here.
+   Font: <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"> */
+:root {
+  /* brand */
+  --cx-abyss: #000828;
+  --cx-ink: #001332;
+  --cx-navy: #0A2048;
+  --cx-electric: #0A78FC;
+  --cx-electric-600: #006AF9;
+  --cx-sky: #0098FD;
+  --cx-glow: #3FD3FF;
+  /* neutral */
+  --cx-white: #FFFFFF;
+  --cx-bg: #F5F7FB;
+  --cx-bg-alt: #F0F3F7;
+  --cx-line: #DDE3EC;
+  --cx-muted: #5D6675;
+  --cx-text: #151A22;
+  --cx-night: #05070A;
+  /* status */
+  --cx-success: #12C7B8;
+  --cx-warning: #F5A524;
+  --cx-danger: #E5484D;
+  --cx-info: #0A78FC;
+  /* gradients */
+  --cx-x-stroke: linear-gradient(135deg, #0098FD 0%, #0A78FC 50%, #006AF9 100%);
+  --cx-hero-dark: radial-gradient(60% 60% at 50% 30%, rgba(10,120,252,.35) 0%, rgba(0,8,40,0) 70%), #000828;
+  /* type */
+  --cx-font: 'Red Hat Display', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cx-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* shape */
+  --cx-radius-sm: 8px;
+  --cx-radius-md: 14px;
+  --cx-radius-lg: 20px;
+  --cx-radius-pill: 999px;
+  --cx-shadow-card: 0 1px 2px rgba(0,19,50,.06), 0 8px 24px rgba(0,19,50,.08);
+  --cx-shadow-glow: 0 0 24px rgba(63,211,255,.45);
+  /* semantic (light) */
+  --cx-surface: var(--cx-bg);
+  --cx-surface-raised: var(--cx-white);
+  --cx-fg: var(--cx-ink);
+  --cx-fg-muted: var(--cx-muted);
+  --cx-accent: var(--cx-electric);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cx-surface: var(--cx-night);
+    --cx-surface-raised: #0B1426;
+    --cx-fg: #EAF1FF;
+    --cx-fg-muted: #9AA8BD;
+    --cx-accent: #4D9BFF;
+  }
+}
+:root[data-theme="dark"] {
+  --cx-surface: var(--cx-night);
+  --cx-surface-raised: #0B1426;
+  --cx-fg: #EAF1FF;
+  --cx-fg-muted: #9AA8BD;
+  --cx-accent: #4D9BFF;
+}
