@@ -165,6 +165,10 @@ section { padding-block: 80px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .chip { font: 500 0.78rem var(--font); padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 
+.status { display: inline-block; margin-left: 4px; font: 700 0.62rem var(--font); letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; vertical-align: 1px; }
+.status.live { color: var(--teal); border-color: currentColor; }
+.status.preview { color: var(--accent); border-color: currentColor; }
+td .status { margin-left: 0; }
 /* integrations */
 .int { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
 .int > * { min-width: 0; }
@@ -289,16 +293,16 @@ footer a { color: var(--night-ink); }
         <div class="card stage">
           <span class="step">Step 1 · Collect</span>
           <h3>Bring in every source</h3>
-          <ul><li>Meeting recordings</li><li>Team chats</li><li>Email threads</li><li>Notes and text</li></ul>
+          <ul><li>Files you upload: PDF, Word, Markdown and text <span class="status live">Available</span></li><li>Meeting recordings from Plaud <span class="status preview">Preview</span></li><li>Email threads <span class="status">Coming soon</span></li><li>Team chats <span class="status">Coming soon</span></li></ul>
         </div>
         <div class="card stage">
           <span class="step">Step 2 · Transcribe and classify</span>
-          <h3>Sort it by your categories</h3>
+          <h3>Sort it by your categories <span class="status">Coming soon</span></h3>
           <p>Everything becomes a clean transcript in text or Markdown, then each decision is classified using the categories you set up for your company.</p>
         </div>
         <div class="card stage">
           <span class="step">Step 3 · Route</span>
-          <h3>Send it where it belongs</h3>
+          <h3>Send it where it belongs <span class="status">Coming soon</span></h3>
           <ul><li>Tickets and requirements to your issue tracker</li><li>General knowledge to shared memory</li><li>Documentation to your repositories</li></ul>
         </div>
       </div>
@@ -358,16 +362,18 @@ footer a { color: var(--night-ink); }
         <div class="head" style="margin-bottom:24px">
           <span class="eyebrow">Integrations</span>
           <h2>Works with the tools your team already uses.</h2>
-          <p class="lede">ConXist is a connected orchestrator. Your coding agents reach it over API or MCP without leaving their usual setup.</p>
+          <p class="lede">Every source connects to one ConXist hub, where what it captures waits for review. ConXist is a connected orchestrator. Your coding agents reach it over API or MCP without leaving their usual setup.</p>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">Type</th><th scope="col">Day one</th></tr></thead>
+            <thead><tr><th scope="col">Type</th><th scope="col">Phase 1</th><th scope="col">Status</th></tr></thead>
             <tbody>
-              <tr><td>Meeting recorder</td><td>Plaud and similar recorders</td></tr>
-              <tr><td>Issue tracker</td><td>Jira</td></tr>
-              <tr><td>Code host</td><td>GitHub</td></tr>
-              <tr><td>Storage</td><td>Git repositories, shared drives or local folders, chosen at onboarding</td></tr>
+              <tr><td>File upload</td><td>PDF, Word, Markdown, text</td><td><span class="status live">Available</span></td></tr>
+              <tr><td>Meeting recorder</td><td>Plaud</td><td><span class="status preview">Preview</span></td></tr>
+              <tr><td>Email</td><td>Forwarded threads</td><td><span class="status">Coming soon</span></td></tr>
+              <tr><td>Code host</td><td>GitHub, Bitbucket</td><td><span class="status">Coming soon</span></td></tr>
+              <tr><td>Storage</td><td>Cloudflare R2, Amazon S3, Google Drive, iCloud, OneDrive and SharePoint, Confluence</td><td><span class="status">Coming soon</span></td></tr>
+              <tr><td>Issue tracker</td><td>Jira</td><td><span class="status">Coming soon</span></td></tr>
             </tbody>
           </table>
         </div>
