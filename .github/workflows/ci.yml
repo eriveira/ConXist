@@ -1,0 +1,58 @@
+name: CI
+
+# Required check on every pull request. Steps that need a package.json are skipped
+# until the project has code. Read-only: never deploys.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - id: node
+        run: echo "present=$([ -f package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - if: steps.node.outputs.present == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.node.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm audit --audit-level high
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm run --if-present lint
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm run --if-present typecheck
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm run --if-present test
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm run --if-present test:architecture
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm run --if-present test:brand
+      - if: steps.node.outputs.present == 'true'
+        run: pnpm run --if-present build
