@@ -125,6 +125,7 @@ const en = {
   'api.request.invalid': 'Some fields are missing or not valid.',
   'api.request.conflict': 'This changed at the same time. Try again.',
   'api.request.failed': 'Something went wrong. Try again.',
+  'api.request.not-found': 'There is nothing at this address.',
 };
 
 export type MessageKey = keyof typeof en;
@@ -257,6 +258,7 @@ const es: Messages = {
   'api.request.invalid': 'Faltan campos o no son válidos.',
   'api.request.conflict': 'Esto cambió al mismo tiempo. Inténtalo de nuevo.',
   'api.request.failed': 'Algo salió mal. Inténtalo de nuevo.',
+  'api.request.not-found': 'No hay nada en esta dirección.',
 };
 
 export type Language = 'en' | 'es';
