@@ -48,6 +48,11 @@ conxist:
     sync-interval: ${CONXIST_PLAUD_SYNC_INTERVAL:5m}
     connect-timeout: 10s
     read-timeout: 30s
+    account:
+      # A person's own Plaud account: Plaud's MCP server and its sign-in (OAuth). See docs/adr/0005-plaud-sign-in.md.
+      mcp-url: ${CONXIST_PLAUD_MCP_URL:https://mcp.plaud.ai/mcp}
+      # Where Plaud's sign-in page sends the person back: this API's callback, on this machine.
+      redirect-uri: ${CONXIST_PLAUD_REDIRECT_URI:http://127.0.0.1:${server.port}/api/recorders/plaud/callback}
   secrets:
     # 32 random bytes, base64: openssl rand -base64 32. Required; there is no default on purpose.
     encryption-key: ${CONXIST_SECRETS_KEY:}

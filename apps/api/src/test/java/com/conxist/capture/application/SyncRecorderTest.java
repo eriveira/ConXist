@@ -32,7 +32,10 @@ class SyncRecorderTest {
     private final CaptureFakes.Connections connections = new CaptureFakes.Connections();
     private final CaptureFakes.Documents documents = new CaptureFakes.Documents();
     private final RecordedEvents events = new RecordedEvents();
-    private final SyncRecorder syncRecorder = new SyncRecorder(sources, plaud, connections, documents,
+    private final CaptureFakes.Account account = new CaptureFakes.Account();
+    private final CaptureFakes.AccountConnections accountConnections = new CaptureFakes.AccountConnections();
+    private final SyncRecorder syncRecorder = new SyncRecorder(sources, plaud, connections, account,
+            accountConnections, documents,
             new CaptureContext(FixedWorkspace.standard(), events, new ImmediateUnitOfWork(), TestClock.fixed()),
             2_000_000);
 

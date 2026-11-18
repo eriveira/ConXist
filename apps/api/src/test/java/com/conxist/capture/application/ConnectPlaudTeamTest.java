@@ -41,7 +41,7 @@ class ConnectPlaudTeamTest {
 
         ConnectionView view = connect.connect(source.id(), "client_acme", key.keyId(), StartFrom.LAST_7_DAYS, true);
 
-        assertThat(view.teamName()).isEqualTo("Acme Engineering");
+        assertThat(view.label()).isEqualTo("Acme Engineering");
         assertThat(view.status()).isEqualTo(ConnectionStatus.ACTIVE);
         assertThat(connections.bySource.get(source.id())).satisfies(c -> {
             assertThat(c.clientId()).isEqualTo("client_acme");

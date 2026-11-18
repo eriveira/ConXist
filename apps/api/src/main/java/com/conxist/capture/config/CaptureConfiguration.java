@@ -16,6 +16,10 @@ import com.conxist.capture.adapter.secrets.SecretBox;
 import com.conxist.capture.application.ConnectPlaudTeam;
 import com.conxist.capture.application.ListRecorderConnections;
 import com.conxist.capture.application.PlaudTeam;
+import com.conxist.capture.application.SignInToPlaud;
+import com.conxist.capture.application.PlaudAccountConnections;
+import com.conxist.capture.application.PlaudAccounts;
+import com.conxist.capture.adapter.plaudaccount.PlaudMcpAccounts;
 import com.conxist.capture.application.PlaudTeamConnections;
 import com.conxist.capture.application.SyncRecorder;
 import com.conxist.capture.application.TextExtractor;
@@ -71,14 +75,30 @@ class CaptureConfiguration {
 
     @Bean
     PlaudTeam plaudTeam(PlaudProperties plaud, JdbcRecorderKeys keys, Clock clock) {
+        return new PlaudTeamClient(plaudHttp(plaud), plaud.apiBaseUrl(), plaud.tokenUrl(), plaud.tokenAudience(),
+                plaud.pageSize(), keys, clock);
+    }
+
+    @Bean
+    PlaudAccounts plaudAccounts(PlaudProperties plaud, JdbcClient jdbc, SecretBox box, Clock clock) {
+        return PlaudMcpAccounts.create(plaudHttp(plaud), plaud.account().mcpUrl(), plaud.account().redirectUri(),
+                clock, jdbc, box);
+    }
+
+    @Bean
+    SignInToPlaud signInToPlaud(SourceCatalog catalog, PlaudAccounts plaud, PlaudAccountConnections accounts,
+            PlaudTeamConnections teams, CaptureContext context) {
+        return new SignInToPlaud(catalog, plaud, accounts, teams, context);
+    }
+
+    /** Plaud's APIs: timeouts, and no redirects, so a token is never sent to another host. */
+    private static RestClient plaudHttp(PlaudProperties plaud) {
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .connectTimeout(plaud.connectTimeout())
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build());
         requests.setReadTimeout(plaud.readTimeout());
-        RestClient http = RestClient.builder().requestFactory(requests).build();
-        return new PlaudTeamClient(http, plaud.apiBaseUrl(), plaud.tokenUrl(), plaud.tokenAudience(),
-                plaud.pageSize(), keys, clock);
+        return RestClient.builder().requestFactory(requests).build();
     }
 
     @Bean
@@ -89,13 +109,16 @@ class CaptureConfiguration {
 
     @Bean
     SyncRecorder syncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
-            CapturedDocumentRepository documents, CaptureContext context, CaptureProperties capture) {
-        return new SyncRecorder(catalog, plaud, connections, documents, context, capture.maxTextCharacters());
+            PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, CapturedDocumentRepository documents,
+            CaptureContext context, CaptureProperties capture) {
+        return new SyncRecorder(catalog, plaud, connections, plaudAccounts, accounts, documents, context,
+                capture.maxTextCharacters());
     }
 
     @Bean
-    ListRecorderConnections listRecorderConnections(PlaudTeamConnections connections, CurrentWorkspace workspace) {
-        return new ListRecorderConnections(connections, workspace);
+    ListRecorderConnections listRecorderConnections(PlaudTeamConnections connections,
+            PlaudAccountConnections accounts, CurrentWorkspace workspace) {
+        return new ListRecorderConnections(connections, accounts, workspace);
     }
 
     @Bean

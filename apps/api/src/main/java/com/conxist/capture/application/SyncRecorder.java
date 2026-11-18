@@ -1,24 +1,25 @@
 package com.conxist.capture.application;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 import java.util.UUID;
-import com.conxist.capture.DocumentOrigin;
 import com.conxist.capture.application.PlaudTeam.ChangePage;
 import com.conxist.capture.application.PlaudTeam.Credential;
 import com.conxist.capture.application.PlaudTeam.TeamFile;
 import com.conxist.capture.application.PlaudTeam.Transcript;
-import com.conxist.capture.domain.CapturedDocument;
 import com.conxist.capture.domain.ConnectionStatus;
-import com.conxist.capture.domain.DocumentTitle;
-import com.conxist.capture.domain.MeetingText;
+import com.conxist.capture.domain.PlaudAccountConnection;
 import com.conxist.capture.domain.PlaudTeamConnection;
 import com.conxist.platform.RuleViolation;
 import com.conxist.sources.Provider;
 import com.conxist.sources.SourceCatalog;
 
 /**
- * Reads a Plaud Team's change feed from where the last sync stopped and imports each new meeting's transcript (and
+ * Syncs a meeting recorder source: a person's own Plaud account through {@link SyncPlaudAccount}, or a Plaud Team.
+ * For a Team it reads the change feed from where the last sync stopped and imports each new meeting's transcript (and
  * summaries, if chosen) as a document waiting for review. Meetings already imported, recorded before the chosen start,
  * deleted, or still being transcribed are skipped; a meeting whose transcript arrives later shows up again in the feed.
  * The checkpoint is saved only after the whole feed was read, so an interrupted sync repeats safely.
@@ -32,40 +33,55 @@ public final class SyncRecorder {
     private final CaptureSources sources;
     private final PlaudTeam plaud;
     private final PlaudTeamConnections connections;
-    private final CapturedDocumentRepository documents;
     private final CaptureContext context;
-    private final int maxTextCharacters;
+    private final MeetingImport meetings;
+    private final PlaudAccountConnections accounts;
+    private final SyncPlaudAccount accountSync;
 
     public SyncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
-            CapturedDocumentRepository documents, CaptureContext context, int maxTextCharacters) {
-        this.maxTextCharacters = maxTextCharacters;
+            PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, CapturedDocumentRepository documents,
+            CaptureContext context, int maxTextCharacters) {
+        this.meetings = new MeetingImport(documents, context, maxTextCharacters);
+        this.accounts = accounts;
+        this.accountSync = new SyncPlaudAccount(plaudAccounts, accounts, meetings, context);
         this.sources = new CaptureSources(catalog);
         this.plaud = plaud;
         this.connections = connections;
-        this.documents = documents;
         this.context = context;
     }
 
     public SyncResult sync(UUID sourceId) {
         sources.require(sourceId, Provider.PLAUD);
-        PlaudTeamConnection connection = connections.find(context.workspace().id(), sourceId)
+        UUID workspaceId = context.workspace().id();
+        Optional<PlaudTeamConnection> team = connections.find(workspaceId, sourceId);
+        if (team.isPresent()) {
+            return run(team.get());
+        }
+        PlaudAccountConnection account = accounts.find(workspaceId, sourceId)
                 .orElseThrow(() -> new RuleViolation("plaud.not-connected", "Connect this source to Plaud first."));
-        return run(connection);
+        return accountSync.run(account);
     }
 
     /** The scheduled check: every active connection of the workspace. One failing Team does not stop the others. */
     public List<SourceSync> syncAll() {
-        return connections.findAll(context.workspace().id()).stream()
+        UUID workspaceId = context.workspace().id();
+        Stream<Map.Entry<UUID, Supplier<SyncResult>>> teams = connections.findAll(workspaceId).stream()
                 .filter(connection -> connection.status() == ConnectionStatus.ACTIVE)
-                .map(connection -> {
+                .map(connection -> Map.entry(connection.sourceId(), () -> run(connection)));
+        Stream<Map.Entry<UUID, Supplier<SyncResult>>> personal = accounts.findAll(workspaceId).stream()
+                .filter(connection -> connection.status() == ConnectionStatus.ACTIVE)
+                .map(connection -> Map.entry(connection.sourceId(), () -> accountSync.run(connection)));
+        return Stream.concat(teams, personal)
+                .map(entry -> {
+                    UUID sourceId = entry.getKey();
                     try {
-                        return new SourceSync(connection.sourceId(), run(connection), null);
+                        return new SourceSync(sourceId, entry.getValue().get(), null);
                     } catch (RuleViolation problem) {
-                        return new SourceSync(connection.sourceId(), null, problem.code());
+                        return new SourceSync(sourceId, null, problem.code());
                     } catch (RuntimeException failure) {
                         log.log(System.Logger.Level.WARNING, "Recorder source {0} failed: {1}",
-                                connection.sourceId(), failure.getClass().getSimpleName());
-                        return new SourceSync(connection.sourceId(), null, SYNC_FAILED);
+                                sourceId, failure.getClass().getSimpleName());
+                        return new SourceSync(sourceId, null, SYNC_FAILED);
                     }
                 })
                 .toList();
@@ -121,7 +137,7 @@ public final class SyncRecorder {
             tally.waiting++;
             return;
         }
-        if (documents.exists(connection.workspaceId(), connection.sourceId(), file.id())) {
+        if (meetings.alreadyImported(connection.workspaceId(), connection.sourceId(), file.id())) {
             tally.alreadyImported++;
             return;
         }
@@ -131,13 +147,8 @@ public final class SyncRecorder {
         }
         List<String> summaries = connection.includeSummaries() && file.hasSummary()
                 ? plaud.summaries(credential, file.id()) : List.of();
-        DocumentTitle title = DocumentTitle.ofMeeting(file.title());
-        String text = MeetingText.compose(title.value(), file.recordedAt(), transcript.language(), summaries,
-                transcript.lines(), maxTextCharacters);
-        CapturedDocument document = new CapturedDocument(UUID.randomUUID(), connection.workspaceId(),
-                connection.sourceId(), title, MeetingText.MEDIA_TYPE, text.getBytes(StandardCharsets.UTF_8).length,
-                text, DocumentOrigin.RECORDING, file.id(), context.clock().instant());
-        if (context.saveAndAnnounce(documents, document)) {
+        if (meetings.save(connection.workspaceId(), connection.sourceId(), file.id(), file.title(),
+                file.recordedAt(), transcript, summaries)) {
             tally.imported++;
         } else {
             tally.alreadyImported++;

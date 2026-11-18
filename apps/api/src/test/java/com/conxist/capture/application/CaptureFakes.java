@@ -2,6 +2,7 @@ package com.conxist.capture.application;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,7 +10,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.domain.CapturedDocument;
+import com.conxist.capture.application.PlaudTeam.Transcript;
 import com.conxist.capture.domain.MeetingText.Line;
+import com.conxist.capture.domain.PlaudAccountConnection;
 import com.conxist.capture.domain.PlaudTeamConnection;
 import com.conxist.capture.domain.RejectedDocument;
 import com.conxist.sources.Provider;
@@ -134,6 +137,116 @@ final class CaptureFakes {
         @Override
         public List<PlaudTeamConnection> findAll(UUID workspaceId) {
             return bySource.values().stream().filter(c -> c.workspaceId().equals(workspaceId)).toList();
+        }
+    }
+
+    static final class AccountConnections implements PlaudAccountConnections {
+        final Map<UUID, PlaudAccountConnection> bySource = new HashMap<>();
+
+        @Override
+        public void save(PlaudAccountConnection connection) {
+            bySource.put(connection.sourceId(), connection);
+        }
+
+        @Override
+        public Optional<PlaudAccountConnection> find(UUID workspaceId, UUID sourceId) {
+            return Optional.ofNullable(bySource.get(sourceId)).filter(c -> c.workspaceId().equals(workspaceId));
+        }
+
+        @Override
+        public List<PlaudAccountConnection> findAll(UUID workspaceId) {
+            return bySource.values().stream().filter(c -> c.workspaceId().equals(workspaceId)).toList();
+        }
+    }
+
+    /** A person's Plaud account: sign-ins that finish when told, and recordings listed by date in pages of 2. */
+    static final class Account implements PlaudAccounts {
+        static final int PAGE_SIZE = 2;
+        final Map<UUID, SignIn> signIns = new HashMap<>();
+        final Map<UUID, UUID> attached = new HashMap<>();
+        final List<AccountFile> files = new ArrayList<>();
+        final Map<String, Transcript> transcripts = new HashMap<>();
+        final List<LocalDate> datesAsked = new ArrayList<>();
+        boolean signedOut;
+        boolean down;
+        int transcriptCalls;
+
+        AccountFile record(String id, String title, Instant recordedAt, boolean transcribed) {
+            AccountFile file = new AccountFile(id, title, recordedAt);
+            files.add(file);
+            if (transcribed) {
+                transcripts.put(id, new Transcript(null, List.of(new Line("Alex", 0, "Text of " + title))));
+            }
+            return file;
+        }
+
+        UUID signedIn(String label) {
+            UUID id = UUID.randomUUID();
+            signIns.put(id, new SignIn(id, SignInStatus.SIGNED_IN, label));
+            return id;
+        }
+
+        @Override
+        public SignInStart startSignIn(UUID workspaceId) {
+            if (down) {
+                throw new Unavailable("down");
+            }
+            UUID id = UUID.randomUUID();
+            signIns.put(id, new SignIn(id, SignInStatus.WAITING, null));
+            return new SignInStart(id, java.net.URI.create("https://plaud.test/authorize?state=" + id));
+        }
+
+        @Override
+        public void finishSignIn(String state, String code, String error) {
+            UUID id = UUID.fromString(state);
+            signIns.put(id, error == null ? new SignIn(id, SignInStatus.SIGNED_IN, "alex@acme.test")
+                    : new SignIn(id, SignInStatus.CANCELLED, null));
+        }
+
+        @Override
+        public Optional<SignIn> signIn(UUID workspaceId, UUID signInId) {
+            return Optional.ofNullable(signIns.get(signInId));
+        }
+
+        @Override
+        public void attach(UUID workspaceId, UUID signInId, UUID sourceId) {
+            signIns.remove(signInId);
+            attached.put(sourceId, signInId);
+        }
+
+        private void check() {
+            if (down) {
+                throw new Unavailable("down");
+            }
+            if (signedOut) {
+                throw new AccessDenied("signed out");
+            }
+        }
+
+        @Override
+        public FilePage files(UUID sourceId, LocalDate from, int page) {
+            check();
+            datesAsked.add(from);
+            List<AccountFile> matching = files.stream()
+                    .filter(f -> !LocalDate.ofInstant(f.recordedAt(), java.time.ZoneOffset.UTC).isBefore(from))
+                    .sorted(java.util.Comparator.comparing(AccountFile::recordedAt).reversed())
+                    .toList();
+            int start = Math.min(matching.size(), (page - 1) * PAGE_SIZE);
+            int end = Math.min(matching.size(), page * PAGE_SIZE);
+            return new FilePage(matching.subList(start, end), end - start == PAGE_SIZE);
+        }
+
+        @Override
+        public Optional<Transcript> transcript(UUID sourceId, String fileId) {
+            check();
+            transcriptCalls++;
+            return Optional.ofNullable(transcripts.get(fileId));
+        }
+
+        @Override
+        public List<String> notes(UUID sourceId, String fileId) {
+            check();
+            return List.of("Notes of " + fileId);
         }
     }
 

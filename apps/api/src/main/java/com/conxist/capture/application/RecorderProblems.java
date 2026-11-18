@@ -19,6 +19,15 @@ final class RecorderProblems {
                 + "admin to check the key, then press Retry. Meetings already imported stay.");
     }
 
+    static RuleViolation signedOut() {
+        return new InvalidRecorderLink("signed-out", "Plaud signed ConXist out of this account. Sign in with Plaud "
+                + "again to keep importing. Meetings already imported stay.");
+    }
+
+    static RuleViolation signInNotFinished() {
+        return new InvalidRecorderLink("sign-in-not-finished", "Sign in with Plaud first, then press Add.");
+    }
+
     static RuleViolation unavailable() {
         return new InvalidRecorderLink("unavailable", "Plaud is not answering right now. Try again in a minute.");
     }
