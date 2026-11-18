@@ -13,6 +13,8 @@ export type SourceNodeData = {
   syncing: boolean;
   lastImported: number | null;
   syncFailed: boolean;
+  /** On narrow screens the hub sits below the sources, so edges leave and enter on the left. */
+  narrow: boolean;
   onAddFiles?: () => void;
   onSync?: () => void;
 };
@@ -24,7 +26,7 @@ export type HubFlowNode = Node<HubNodeData, 'hub'>;
 
 export function SourceNode({ data }: NodeProps<SourceFlowNode>) {
   const t = useT();
-  const { source, label, documentCount, syncing, lastImported, syncFailed, onAddFiles, onSync } = data;
+  const { source, label, documentCount, syncing, lastImported, syncFailed, narrow, onAddFiles, onSync } = data;
   return (
     <article className="node" aria-label={source.name}>
       <div className="nhead">
@@ -38,8 +40,9 @@ export function SourceNode({ data }: NodeProps<SourceFlowNode>) {
       <div className="nbody">
         <div className="nrow">
           <span>{t('node.documents', { count: documentCount })}</span>
-          <Pill tone={syncing ? 'busy' : 'live'}>{syncing ? t('node.syncing') : t('node.connected')}</Pill>
+          <SourceStatus syncing={syncing} failed={syncFailed} />
         </div>
+        {lastImported !== null && !syncFailed && <p className="nrow muted" role="status">{lastImported === 0 ? t('node.upToDate') : t('node.synced', { count: lastImported })}</p>}
         {onAddFiles && (
           <button type="button" className="btn sm block nodrag" onClick={onAddFiles}>
             <Icon name="upload" size={16} /> {t('node.addFiles')}
@@ -48,14 +51,20 @@ export function SourceNode({ data }: NodeProps<SourceFlowNode>) {
         {onSync && (
           <button type="button" className="btn sm block nodrag" onClick={onSync} disabled={syncing}>
             <Icon name="sync" size={16} /> {t('node.sync')}
-            {lastImported !== null && <span className="muted" role="status">· {t('node.synced', { count: lastImported })}</span>}
           </button>
         )}
         {syncFailed && <p className="node-error" role="alert">{t('node.syncFailed')}</p>}
       </div>
-      <Handle type="source" position={Position.Right} isConnectable={false} />
+      <Handle type="source" position={narrow ? Position.Left : Position.Right} isConnectable={false} />
     </article>
   );
+}
+
+function SourceStatus({ syncing, failed }: { syncing: boolean; failed: boolean }) {
+  const t = useT();
+  if (syncing) return <Pill tone="busy">{t('node.syncing')}</Pill>;
+  if (failed) return <Pill tone="error">{t('node.syncFailedShort')}</Pill>;
+  return <Pill tone="live">{t('node.connected')}</Pill>;
 }
 
 export function HubNode({ data }: NodeProps<HubFlowNode>) {

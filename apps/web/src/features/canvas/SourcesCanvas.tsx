@@ -3,6 +3,7 @@ import { Background, Controls, ReactFlow, ReactFlowProvider, useNodesState, useR
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { layoutCanvas } from '../../domain/layout';
+import { useNarrowScreen } from './useNarrowScreen';
 import type { Provider, Source } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import { AddMenu } from '../add-source/AddMenu';
@@ -15,6 +16,9 @@ import { useWorkspace, type WorkspaceState } from './useWorkspace';
 const HUB_ID = 'hub';
 const NODE_TYPES = { source: SourceNode, hub: HubNode };
 const FIT_VIEW = { maxZoom: 1, padding: 0.3 };
+/** On a phone, fitting every node would shrink text below a readable size; people scroll instead. */
+const NARROW_MIN_ZOOM = 0.85;
+const DEFAULT_MIN_ZOOM = 0.5;
 
 type OpenDialog = { kind: 'upload'; existing?: Source } | { kind: 'plaud' } | null;
 type Ready = Extract<WorkspaceState, { status: 'ready' }>;
@@ -74,6 +78,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [imported, setImported] = useState<Record<string, number>>({});
   const [failed, setFailed] = useState<string | null>(null);
+  const narrow = useNarrowScreen();
 
   async function sync(source: Source) {
     setSyncing(source.id);
@@ -95,7 +100,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
   );
 
   const target = useMemo<FlowNode[]>(() => {
-    const layout = layoutCanvas(workspace.sources);
+    const layout = layoutCanvas(workspace.sources, narrow ? 'down' : 'across');
     const sourceNodes: SourceFlowNode[] = workspace.sources.map((source) => ({
       id: source.id,
       type: 'source',
@@ -107,6 +112,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
         syncing: syncing === source.id,
         lastImported: imported[source.id] ?? null,
         syncFailed: failed === source.id,
+        narrow,
         onAddFiles: source.provider === 'UPLOAD' ? () => onAddFiles(source) : undefined,
         onSync: source.provider === 'PLAUD' ? () => void sync(source) : undefined,
       },
@@ -114,7 +120,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
     const hub: HubFlowNode = { id: HUB_ID, type: 'hub', position: layout.hub, data: { hub: workspace.hub } };
     return [...sourceNodes, hub];
     // sync and onAddFiles change identity each render; the data they close over is listed.
-  }, [workspace, providerLabels, syncing, imported, failed]);
+  }, [workspace, providerLabels, syncing, imported, failed, narrow]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(target);
   const dragged = useRef(new Map<string, { x: number; y: number }>());
@@ -130,7 +136,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
     // Bring a newly added source into view once React Flow has placed it.
     const frame = window.requestAnimationFrame(() => void fitView(FIT_VIEW));
     return () => window.cancelAnimationFrame(frame);
-  }, [sourceCount, fitView]);
+  }, [sourceCount, narrow, fitView]);
 
   useEffect(() => {
     const refit = () => void fitView(FIT_VIEW);
@@ -138,9 +144,19 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
     return () => window.removeEventListener('resize', refit);
   }, [fitView]);
 
+  const ariaLabels = useMemo(() => ({
+    'controls.ariaLabel': t('canvas.controls'),
+    'controls.zoomIn.ariaLabel': t('canvas.zoomIn'),
+    'controls.zoomOut.ariaLabel': t('canvas.zoomOut'),
+    'controls.fitView.ariaLabel': t('canvas.fitView'),
+    'controls.interactive.ariaLabel': t('canvas.interactive'),
+  }), [t]);
+
   const edges = useMemo<Edge[]>(
-    () => workspace.sources.map((source) => ({ id: `${source.id}-hub`, source: source.id, target: HUB_ID, className: 'live' })),
-    [workspace.sources],
+    () => workspace.sources.map((source) => ({
+      id: `${source.id}-hub`, source: source.id, target: HUB_ID, className: 'live', type: narrow ? 'smoothstep' : 'default',
+    })),
+    [workspace.sources, narrow],
   );
 
   return (
@@ -153,9 +169,11 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
       nodesConnectable={false}
       fitView
       fitViewOptions={FIT_VIEW}
+      minZoom={narrow ? NARROW_MIN_ZOOM : DEFAULT_MIN_ZOOM}
+      ariaLabelConfig={ariaLabels}
     >
       <Background gap={22} size={1.4} />
-      <Controls showInteractive={false} />
+      <Controls showInteractive={false} position={narrow ? 'top-right' : 'bottom-left'} />
     </ReactFlow>
   );
 }

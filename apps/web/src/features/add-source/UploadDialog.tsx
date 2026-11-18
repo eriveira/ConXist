@@ -74,13 +74,14 @@ export function UploadDialog({ existing, onClose, onCaptured }: UploadDialogProp
 
   return (
     <Dialog title={existing?.name ?? t('upload.title')} subtitle={t('upload.subtitle')} icon={<Icon name="upload" />}
-      closeLabel={t('dialog.close')} onClose={onClose} footer={footer}>
+      closeLabel={t('dialog.close')} onClose={onClose} footer={footer} step={step} closable={!busy}>
       {step !== 'result' && <Stepper steps={steps.map((id) => t(`upload.step.${id}` as MessageKey))} current={index} />}
       <div className="m-body">
         {problem && <p className="alert error" role="alert"><Icon name="alert" size={18} />{problem}</p>}
         {step === 'name' && <NameStep name={name} onChange={setName} />}
         {step === 'files' && <FilesStep files={uploads.files} onAdd={uploads.add} onRemove={uploads.remove} />}
-        {step === 'review' && <ReviewStep name={existing?.name ?? name.trim()} files={uploads.ready} />}
+        {step === 'review' && <ReviewStep name={existing?.name ?? name.trim()} files={uploads.ready} skipped={uploads.files.length - uploads.ready.length} />}
+        {busy && <SendingList files={uploads.ready} />}
         {step === 'result' && <ResultStep files={uploads.files} sent={sentCount} />}
       </div>
     </Dialog>
@@ -146,7 +147,7 @@ function FilesStep({ files, onAdd, onRemove }: FilesStepProps) {
   );
 }
 
-function ReviewStep({ name, files }: { name: string; files: readonly PickedFile[] }) {
+function ReviewStep({ name, files, skipped }: { name: string; files: readonly PickedFile[]; skipped: number }) {
   const t = useT();
   return (
     <>
@@ -155,6 +156,7 @@ function ReviewStep({ name, files }: { name: string; files: readonly PickedFile[
       <dl className="summary">
         <div><dt>{t('upload.name.label')}</dt><dd>{name}</dd></div>
         <div><dt>{t('upload.step.files')}</dt><dd>{t('upload.review.files', { count: files.length })}</dd></div>
+        {skipped > 0 && <div><dt>{t('upload.review.skipped')}</dt><dd>{t('upload.review.files', { count: skipped })}</dd></div>}
         <div><dt>{t('dialog.feeds')}</dt><dd>{t('hub.title')}</dd></div>
       </dl>
     </>
@@ -165,13 +167,30 @@ const STATUS_TEXT: Record<PickedFile['status'], MessageKey> = {
   waiting: 'upload.status.waiting', sending: 'upload.status.sending', done: 'upload.status.done', failed: 'error.generic',
 };
 
+/** Shown while files go up, so a long upload does not look stuck. */
+function SendingList({ files }: { files: readonly PickedFile[] }) {
+  const t = useT();
+  return (
+    <ul className="files" aria-live="polite">
+      {files.map((item) => (
+        <li key={item.key}>
+          <Icon name="file" size={16} />
+          <span className="fname">{item.file.name}<small>{t(STATUS_TEXT[item.status])}</small></span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ResultStep({ files, sent }: { files: readonly PickedFile[]; sent: number }) {
   const t = useT();
   const attempted = files.filter((item) => item.problem === null);
+  const skipped = files.length - attempted.length;
   return (
     <>
       <h3>{t('upload.result.heading')}</h3>
       <p className="lead" role="status">{t('upload.result.lead', { done: sent, total: attempted.length })}</p>
+      {skipped > 0 && <p className="muted">{t('upload.result.skipped', { count: skipped })}</p>}
       <ul className="files">
         {attempted.map((item) => (
           <li key={item.key} className={item.status === 'failed' ? 'bad' : undefined}>

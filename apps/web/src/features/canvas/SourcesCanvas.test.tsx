@@ -48,6 +48,7 @@ describe('SourcesCanvas', () => {
     fireEvent.click(within(node).getByText('Sync now').closest('button')!);
 
     expect(await within(node).findByText('Sync failed. Try again.')).toBeInTheDocument();
+    expect(within(node).getByText('Sync failed')).toHaveClass('pill', 'error');
   });
 
   it('has no accessibility violations on the empty canvas', async () => {

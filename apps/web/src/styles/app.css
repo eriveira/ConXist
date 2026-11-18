@@ -44,6 +44,7 @@ button { cursor: pointer; }
   .top { gap: 8px; padding: 0 12px; }
   .logo-chip img { height: 28px; }
   .pick select { padding: 0 6px; font-size: 14px; }
+  .react-flow__controls-button { width: 44px; height: 44px; }
 }
 
 /* buttons and pills */
@@ -181,8 +182,9 @@ button { cursor: pointer; }
 .m-head .x:hover { background: var(--cx-surface); }
 .stepper { display: flex; gap: 6px; padding: 0 20px 14px; margin: 0; list-style: none; border-bottom: 1px solid var(--cx-border); }
 .stepper li { flex: 1; min-width: 0; }
-.stepper .bar { display: block; height: 4px; border-radius: var(--cx-radius-pill); background: var(--cx-border); margin-bottom: 6px; }
-.stepper .done .bar { background: var(--cx-success); }
+.stepper .bar { display: block; height: 4px; border-radius: var(--cx-radius-pill); background: var(--cx-input-border); margin-bottom: 6px; }
+.stepper .done .bar { background: var(--cx-ok-fg); }
+.stepper .lbl svg { vertical-align: -2px; margin-right: 3px; color: var(--cx-ok-fg); }
 .stepper .cur .bar { background: var(--cx-accent); }
 .stepper .lbl { display: block; font-size: 12px; font-weight: 700; color: var(--cx-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stepper .cur .lbl { color: var(--cx-fg); }
@@ -194,7 +196,7 @@ button { cursor: pointer; }
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
 .field label { font-size: 13px; font-weight: 700; }
 .field input[type=text] {
-  height: 42px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); padding: 0 12px;
+  height: 44px; border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); padding: 0 12px;
   background: var(--cx-surface); width: 100%;
 }
 .account {

@@ -67,14 +67,14 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
       {step === 'review' && <button type="button" className="btn ghost" onClick={() => setStep('account')} disabled={busy}>{t('dialog.backStep')}</button>}
       <span className="grow" />
       {step === 'account'
-        ? <button type="button" className="btn primary" onClick={next}>{t('dialog.next')}</button>
+        ? <button type="button" className={account ? 'btn primary' : 'btn'} onClick={next}>{t('dialog.next')}</button>
         : <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? t('dialog.adding') : t('dialog.add')}</button>}
     </>
   );
 
   return (
     <Dialog title={t('plaud.title')} subtitle={t('plaud.subtitle')} icon={<Icon name="mic" />}
-      closeLabel={t('dialog.close')} onClose={onClose} footer={footer}>
+      closeLabel={t('dialog.close')} onClose={onClose} footer={footer} step={step} closable={!busy}>
       {step !== 'result' && <Stepper steps={[t('plaud.step.account'), t('plaud.step.review')]} current={STEPS.indexOf(step)} />}
       <div className="m-body">
         {problem && <p className="alert error" role="alert"><Icon name="alert" size={18} />{problem}</p>}

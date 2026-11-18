@@ -1,4 +1,4 @@
-import { HUB_COLUMN_X, ROW_GAP, layoutCanvas } from './layout';
+import { HUB_COLUMN_X, HUB_GAP_BELOW, ROW_GAP, layoutCanvas } from './layout';
 import type { Source } from './model';
 
 const source = (id: string, addedAt: string): Source =>
@@ -15,5 +15,14 @@ describe('layoutCanvas', () => {
 
   it('puts the hub alone at the origin when nothing is connected', () => {
     expect(layoutCanvas([]).hub).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('layoutCanvas on a narrow screen', () => {
+  it('puts the hub below the last source', () => {
+    const layout = layoutCanvas([source('a', '2026-11-17T09:00:00Z'), source('b', '2026-11-17T10:00:00Z')], 'down');
+
+    expect(layout.sources.get('b')).toEqual({ x: 0, y: ROW_GAP });
+    expect(layout.hub).toEqual({ x: 0, y: 2 * ROW_GAP + HUB_GAP_BELOW });
   });
 });

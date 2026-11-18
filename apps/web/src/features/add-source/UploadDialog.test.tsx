@@ -30,7 +30,7 @@ describe('UploadDialog', () => {
     await continueTo();
     await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('1 of 1 files are waiting for review');
+    expect(await screen.findByRole('status')).toHaveTextContent('1 of 1 file is waiting for review');
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ provider: 'UPLOAD', name: 'Specs' });
     expect(calls.map((call) => call.key)).toEqual(['POST /api/sources', 'POST /api/sources/src-1/files']);
     expect(onCaptured).toHaveBeenCalled();
@@ -65,7 +65,7 @@ describe('UploadDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
 
     expect(await screen.findByText('We could not read the text in this file.')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('0 of 1 files');
+    expect(screen.getByRole('status')).toHaveTextContent('0 of 1 file is waiting');
   });
 
   it('keeps the person on the review step when the source cannot be added', async () => {
