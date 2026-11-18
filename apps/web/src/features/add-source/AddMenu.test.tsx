@@ -36,7 +36,7 @@ describe('AddMenu', () => {
     await userEvent.click(screen.getByRole('button', { name: /Capture/ }));
 
     expect(screen.getByRole('button', { name: /Email forwarding/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Meeting recorder/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Meeting recorder.*Preview/ })).toBeEnabled();
   });
 
   it('steps back with Escape, then closes and returns focus to the Add button', async () => {

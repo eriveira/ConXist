@@ -77,7 +77,7 @@ export function SourcesPage() {
       </div>
       {sources.length === 0 ? (
         <div className="empty">
-          <span className="nico"><Icon name="mic" /></span>
+          <span className="nico"><Icon name="plus" /></span>
           <h2>{t('sources.empty.title')}</h2>
           <p>{t('sources.empty.body')}</p>
         </div>

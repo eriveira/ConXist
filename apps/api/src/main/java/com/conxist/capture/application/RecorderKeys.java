@@ -8,6 +8,9 @@ import java.util.UUID;
  */
 public interface RecorderKeys {
 
+    /** Every key id ConXist makes: {@code cx-} and 16 hex digits. */
+    String KEY_ID_PATTERN = "cx-[0-9a-f]{16}";
+
     PublicKey create(UUID workspaceId);
 
     boolean exists(UUID workspaceId, String keyId);

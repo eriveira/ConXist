@@ -2,6 +2,7 @@ package com.conxist.sources;
 
 import static com.conxist.sources.Availability.COMING_SOON;
 import static com.conxist.sources.Availability.LIVE;
+import static com.conxist.sources.Availability.PREVIEW;
 import static com.conxist.sources.SourceCategory.CAPTURE;
 import static com.conxist.sources.SourceCategory.REPO;
 import static com.conxist.sources.SourceCategory.STORAGE;
@@ -9,7 +10,8 @@ import static com.conxist.sources.SourceCategory.STORAGE;
 /** Every provider in the Phase 1 scope set by the owner (AGENTS.md). */
 public enum Provider {
     UPLOAD(CAPTURE, LIVE, "File upload", false),
-    PLAUD(CAPTURE, LIVE, "Plaud", true),
+    /** Preview until one real Plaud Team signs in (ADR 0003); the code path itself is the live one. */
+    PLAUD(CAPTURE, PREVIEW, "Plaud", true),
     EMAIL(CAPTURE, COMING_SOON, "Email", false),
     GITHUB(REPO, COMING_SOON, "GitHub", true),
     BITBUCKET(REPO, COMING_SOON, "Bitbucket", true),

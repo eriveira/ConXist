@@ -215,7 +215,7 @@ class CaptureFlowIntegrationTest {
         mvc.perform(get("/api/providers"))
                 .andExpect(jsonPath("$", hasSize(11)))
                 .andExpect(jsonPath("$[?(@.provider=='UPLOAD')].availability").value("LIVE"))
-                .andExpect(jsonPath("$[?(@.provider=='PLAUD')].availability").value("LIVE"));
+                .andExpect(jsonPath("$[?(@.provider=='PLAUD')].availability").value("PREVIEW"));
     }
 
     private String addSource(String json) throws Exception {

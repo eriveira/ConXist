@@ -58,7 +58,7 @@ public final class ConnectPlaudTeam {
         if (keyId == null || !keys.exists(context.workspace().id(), keyId)) {
             throw new NotFound("plaud.key-not-found", "This key no longer exists. Close this and start again.");
         }
-        return new Credential(PlaudTeamConnection.cleanClientId(clientId), keyId);
+        return new Credential(context.workspace().id(), PlaudTeamConnection.cleanClientId(clientId), keyId);
     }
 
     private String teamName(Credential credential) {

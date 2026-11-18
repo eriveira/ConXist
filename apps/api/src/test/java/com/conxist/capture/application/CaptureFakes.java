@@ -149,6 +149,12 @@ final class CaptureFakes {
         boolean denying;
         boolean down;
         boolean checkpointExpired;
+        /** After a checkpoint expires, refuse the key on the re-read from the start. */
+        boolean denyAfterExpiry;
+        /** Fails the way an unexpected bug would, not like Plaud refusing. */
+        boolean broken;
+        /** Says there is more but never moves the cursor. */
+        boolean stuckCursor;
 
         TeamFile record(String id, String title, Instant recordedAt) {
             TeamFile file = new TeamFile(id, title, false, recordedAt, true, true);
@@ -161,6 +167,9 @@ final class CaptureFakes {
         private void check(Credential credential) {
             if (down) {
                 throw new Unavailable("down");
+            }
+            if (broken) {
+                throw new IllegalStateException("broken");
             }
             if (denying || !CLIENT_ID.equals(credential.clientId())) {
                 throw new AccessDenied("invalid_client");
@@ -180,7 +189,11 @@ final class CaptureFakes {
             checkpointsAsked.add(checkpoint);
             if (checkpointExpired && checkpoint != null) {
                 checkpointExpired = false;
+                denying = denyAfterExpiry;
                 throw new CheckpointExpired();
+            }
+            if (stuckCursor) {
+                return new ChangePage(List.of(), cursor == null ? "0" : cursor, null, true);
             }
             int start = (checkpoint == null ? 0 : Integer.parseInt(checkpoint)) + (cursor == null ? 0 : Integer.parseInt(cursor));
             int end = Math.min(feed.size(), start + pageSize);

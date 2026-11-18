@@ -3,6 +3,7 @@ package com.conxist.capture.application;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import com.conxist.capture.domain.MeetingText.Line;
 
 /**
@@ -19,12 +20,13 @@ public interface PlaudTeam {
     /** One page of the change feed, oldest change first. A null checkpoint reads the feed from the start. */
     ChangePage changes(Credential credential, String checkpoint, String cursor);
 
-    /** Empty when the recording was deleted in Plaud after it appeared in the feed. */
+    /** Empty when the recording was deleted in Plaud after it appeared in the feed, or this credential may not read it. */
     Optional<Transcript> transcript(Credential credential, String fileId);
 
     List<String> summaries(Credential credential, String fileId);
 
-    record Credential(String clientId, String keyId) {
+    /** Which workspace's key signs in, so the key store can check the key belongs to it. */
+    record Credential(UUID workspaceId, String clientId, String keyId) {
     }
 
     record ChangePage(List<TeamFile> files, String nextCursor, String nextCheckpoint, boolean hasMore) {

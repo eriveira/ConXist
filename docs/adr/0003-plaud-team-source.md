@@ -1,4 +1,4 @@
-# 0003. Plaud Team workspaces as the first live recorder source
+# 0003. Plaud Team workspaces as the first real recorder source
 
 - Status: **Accepted**
 - Date: 2026-11-18
@@ -51,6 +51,21 @@ asked for Plaud to become the first real source. Plaud offers four ways in
    source cards, and React Flow is removed.
 
 ## Consequences
+
+- Plaud shows as **Preview** in the app and on the product page until one real
+  Plaud Team signs in. The code path is the real one; only the fake Plaud has
+  answered it so far.
+- Imported meeting text is stored unencrypted, like uploads (README warning).
+  Encrypting captured text at rest is the next security slice, and comes before
+  any real customer Team is connected. Private keys are already sealed.
+- Untrusted transcript text is kept to one line per utterance, speakers are
+  cleaned, summaries are quoted, and meetings stop at
+  `conxist.capture.max-text-characters`, so spoken text cannot forge document
+  structure that later steps or agents would trust. No MCP or agent tool reads
+  these documents yet.
+- A refusal on one recording (a member's private file) skips that recording; only
+  a refusal on the workspace or the feed pauses the connection. One failing Team
+  never stops the scheduled sync of the others.
 
 - Live use needs a Plaud Team Client ID from Plaud, which Plaud's docs do not
   explain how to get. The token `aud` value is configurable

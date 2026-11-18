@@ -24,6 +24,8 @@ export function SourceCard(props: SourceCardProps) {
   const { source, label, documentCount, connection, syncing, lastImported, syncProblem, now, onAddFiles, onSync } = props;
   const recorder = source.provider === 'PLAUD';
   const paused = connection?.status === 'PAUSED';
+  /** A recorder source whose Plaud connection never finished (the dialog was closed after a failure). */
+  const unlinked = recorder && !connection;
   const subtitle = recorder ? connection?.teamName ?? source.accountLabel : source.accountLabel;
   return (
     <article className={paused || syncProblem ? 'node err' : 'node'} aria-label={source.name}>
@@ -38,9 +40,10 @@ export function SourceCard(props: SourceCardProps) {
       <div className="nbody">
         <div className="nrow">
           <span>{recorder ? t('node.meetings', { count: documentCount }) : t('node.documents', { count: documentCount })}</span>
-          <SourceStatus syncing={syncing} failed={syncProblem !== null} paused={paused} />
+          <SourceStatus syncing={syncing} failed={syncProblem !== null} paused={paused} unlinked={unlinked} />
         </div>
-        {recorder && (
+        {unlinked && <p className="nrow muted">{t('node.unlinked')}</p>}
+        {recorder && !unlinked && (
           <div className="nrow">
             <span>{checkedText(connection, now, t)}</span>
             {onSync && (
@@ -76,8 +79,9 @@ function checkedText(connection: RecorderConnection | undefined, now: Date, t: T
   return t('node.checked', { when });
 }
 
-function SourceStatus({ syncing, failed, paused }: { syncing: boolean; failed: boolean; paused: boolean }) {
+function SourceStatus({ syncing, failed, paused, unlinked }: { syncing: boolean; failed: boolean; paused: boolean; unlinked: boolean }) {
   const t = useT();
+  if (unlinked) return <Pill tone="soon">{t('node.notConnected')}</Pill>;
   if (syncing) return <Pill tone="busy">{t('node.syncing')}</Pill>;
   if (paused) return <Pill tone="error">{t('node.paused')}</Pill>;
   if (failed) return <Pill tone="error">{t('node.syncFailedShort')}</Pill>;

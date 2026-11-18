@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
@@ -25,9 +25,11 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   const t = useT();
   const nameId = useId();
   const clientFieldId = useId();
+  const soonId = useId();
+  const pemRef = useRef<HTMLPreElement>(null);
   const [step, setStep] = useState<Step>('door');
   const [key, setKey] = useState<RecorderKey | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no');
   const [clientId, setClientId] = useState('');
   const [team, setTeam] = useState<string | null>(null);
   const [startFrom, setStartFrom] = useState<StartFrom>('LAST_30_DAYS');
@@ -39,6 +41,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   /** Kept so a retry after a failure does not add or connect the source a second time. */
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [linked, setLinked] = useState(false);
+  const [keyFailed, setKeyFailed] = useState(false);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -46,6 +49,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
     try {
       await action();
     } catch (error) {
+      if (step === 'connect' && !key) setKeyFailed(true);
       setProblem(problemMessage(error, t));
     } finally {
       setBusy(false);
@@ -53,17 +57,19 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   }
 
   useEffect(() => {
-    if (step === 'connect' && !key && !busy && !problem) void run(async () => setKey(await api.createPlaudKey()));
-    // run is recreated every render; the step and key decide whether a key is needed.
-  }, [step, key]);
+    if (step === 'connect' && !key && !keyFailed) void run(async () => setKey(await api.createPlaudKey())).then(() => undefined);
+    // run is recreated every render; the step, the key and a failed attempt decide whether a key is needed.
+  }, [step, key, keyFailed]);
 
   async function copyKey() {
     if (!key) return;
     try {
       await navigator.clipboard.writeText(key.pem);
-      setCopied(true);
+      setCopied('yes');
     } catch {
-      setCopied(false);
+      setCopied('failed');
+      const selection = window.getSelection();
+      if (pemRef.current && selection) selection.selectAllChildren(pemRef.current);
     }
   }
 
@@ -73,6 +79,11 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
       return;
     }
     void run(async () => setTeam((await api.testPlaudTeam(clientId.trim(), key?.keyId ?? '')).teamName));
+  };
+
+  const retryKey = () => {
+    setProblem(null);
+    setKeyFailed(false);
   };
 
   const changeClientId = (value: string) => {
@@ -126,7 +137,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
         <button type="button" className="btn ghost" onClick={back} disabled={busy}>{t('dialog.backStep')}</button>
         <span className="grow" />
         {step === 'connect' && (
-          <button type="button" className={team ? 'btn' : 'btn primary'} onClick={test} disabled={busy || !key}>
+          <button type="button" className={team ? 'btn' : 'btn primary'} onClick={test} disabled={busy || !key || clientId.trim() === ''}>
             {busy && key ? t('plaud.testing') : t('plaud.test')}
           </button>
         )}
@@ -152,13 +163,13 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
             <h3>{t('plaud.door.heading')}</h3>
             <p className="lead">{t('plaud.door.lead')}</p>
             <div className="doors">
-              <button type="button" className="door" disabled aria-describedby={`${nameId}-soon`}>
+              <button type="button" className="door" disabled aria-describedby={soonId}>
                 <span className="nico"><Icon name="mic" /></span>
                 <span className="mtext">
                   <span className="mname">{t('plaud.door.personal')}</span>
                   <span className="mdesc">{t('plaud.door.personal.desc')}</span>
                 </span>
-                <span id={`${nameId}-soon`}><Pill tone="soon">{t('add.soon')}</Pill></span>
+                <span id={soonId}><Pill tone="soon">{t('add.soon')}</Pill></span>
               </button>
               <button type="button" className="door" onClick={() => setStep('connect')}>
                 <span className="nico"><Icon name="team" /></span>
@@ -193,14 +204,17 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
                   <div className="keyrow">
                     <b>{t('plaud.key.title')}</b>
                     <button type="button" className="btn sm" onClick={() => void copyKey()} disabled={!key}>
-                      <Icon name={copied ? 'check' : 'copy'} size={16} /> {copied ? t('plaud.key.copied') : t('plaud.key.copy')}
+                      <Icon name={copied === 'yes' ? 'check' : 'copy'} size={16} /> {copied === 'yes' ? t('plaud.key.copied') : t('plaud.key.copy')}
                     </button>
                   </div>
                   {key ? (
                     <>
-                      <pre className="pem" tabIndex={0} aria-label={t('plaud.key.title')}>{key.pem}</pre>
+                      <pre ref={pemRef} className="pem" tabIndex={0} aria-label={t('plaud.key.title')}>{key.pem}</pre>
+                      {copied === 'failed' && <small className="copy-failed" role="status">{t('plaud.key.copyFailed')}</small>}
                       <small>{t('plaud.key.note', { keyId: key.keyId })}</small>
                     </>
+                  ) : keyFailed ? (
+                    <button type="button" className="btn sm" onClick={retryKey}>{t('sources.retry')}</button>
                   ) : (
                     <small role="status">{t('plaud.key.loading')}</small>
                   )}
@@ -256,7 +270,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
         {step === 'result' && (
           <>
             <h3>{t('plaud.result.heading')}</h3>
-            <p className="lead" role="status">{t('plaud.result.lead', { count: result.imported })}</p>
+            <p className="lead" role="status">{result.imported === 0 ? t('plaud.result.none') : t('plaud.result.lead', { count: result.imported })}</p>
             {result.waiting > 0 && <p className="note"><Icon name="info" size={16} /><span>{t('plaud.result.waiting', { count: result.waiting })}</span></p>}
           </>
         )}

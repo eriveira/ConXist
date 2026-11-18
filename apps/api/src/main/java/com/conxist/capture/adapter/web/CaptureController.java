@@ -3,6 +3,7 @@ package com.conxist.capture.adapter.web;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import com.conxist.capture.application.RecorderKeys;
 import com.conxist.capture.application.CaptureUpload;
 import com.conxist.capture.application.ConnectPlaudTeam;
 import com.conxist.capture.application.ConnectPlaudTeam.TeamCheck;
@@ -17,6 +18,7 @@ import com.conxist.capture.domain.PlaudTeamConnection;
 import com.conxist.capture.domain.StartFrom;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
@@ -91,12 +93,12 @@ class CaptureController {
 
     record TeamCredentialRequest(
             @NotBlank @Size(max = PlaudTeamConnection.MAX_CLIENT_ID_LENGTH) String clientId,
-            @NotBlank @Size(max = 40) String keyId) {
+            @NotBlank @Pattern(regexp = RecorderKeys.KEY_ID_PATTERN) String keyId) {
     }
 
     record ConnectRequest(
             @NotBlank @Size(max = PlaudTeamConnection.MAX_CLIENT_ID_LENGTH) String clientId,
-            @NotBlank @Size(max = 40) String keyId,
+            @NotBlank @Pattern(regexp = RecorderKeys.KEY_ID_PATTERN) String keyId,
             @NotNull StartFrom startFrom,
             boolean includeSummaries) {
     }

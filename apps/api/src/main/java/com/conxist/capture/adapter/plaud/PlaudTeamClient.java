@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import com.conxist.capture.application.PlaudTeam;
 import com.conxist.capture.domain.MeetingText.Line;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -20,6 +21,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -32,6 +34,12 @@ public final class PlaudTeamClient implements PlaudTeam {
 
     private static final Logger log = LoggerFactory.getLogger(PlaudTeamClient.class);
     private static final Duration TOKEN_MARGIN = Duration.ofSeconds(60);
+    /** Used when Plaud's token answer has no {@code expires_in}: short, so a guess never outlives the real token. */
+    private static final long DEFAULT_TOKEN_LIFETIME_SECONDS = 300;
+    /** Plaud file ids go into URLs and the database, so anything else is skipped. */
+    private static final Pattern FILE_ID = Pattern.compile("[A-Za-z0-9_-]{1,128}");
+    /** Cursors and checkpoints are opaque, but are stored and sent back, so they are bounded. */
+    private static final int MAX_POSITION_LENGTH = 2048;
     private static final String ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
     private final RestClient http;
@@ -56,8 +64,9 @@ public final class PlaudTeamClient implements PlaudTeam {
 
     @Override
     public String teamName(Credential credential) {
-        WorkspacesJson workspaces = get(credential, url("/team/workspaces").build().toUri(), WorkspacesJson.class);
-        return workspaces.data().stream().findFirst().map(WorkspaceJson::name)
+        WorkspacesJson workspaces = getRequired(credential, url("/team/workspaces").build().toUri(),
+                WorkspacesJson.class);
+        return orEmpty(workspaces.data()).stream().findFirst().map(WorkspaceJson::name)
                 .orElseThrow(() -> new AccessDenied("credential reads no workspace"));
     }
 
@@ -70,12 +79,14 @@ public final class PlaudTeamClient implements PlaudTeam {
         if (cursor != null) {
             uri.queryParam("cursor", cursor);
         }
-        FilesJson page = get(credential, uri.encode().build().toUri(), FilesJson.class);
-        List<TeamFile> files = page.data().stream()
+        FilesJson page = getRequired(credential, uri.encode().build().toUri(), FilesJson.class);
+        List<TeamFile> files = orEmpty(page.data()).stream()
+                .filter(f -> f.id() != null && FILE_ID.matcher(f.id()).matches())
                 .map(f -> new TeamFile(f.id(), f.title(), "deleted".equals(f.status()), f.recorded_at(),
                         Boolean.TRUE.equals(f.has_transcript()), Boolean.TRUE.equals(f.has_summary())))
                 .toList();
-        return new ChangePage(files, page.next_cursor(), page.next_checkpoint(), Boolean.TRUE.equals(page.has_more()));
+        return new ChangePage(files, position(page.next_cursor()), position(page.next_checkpoint()),
+                Boolean.TRUE.equals(page.has_more()));
     }
 
     @Override
@@ -92,7 +103,7 @@ public final class PlaudTeamClient implements PlaudTeam {
     public List<String> summaries(Credential credential, String fileId) {
         URI uri = url("/team-files/items/{id}/summaries").buildAndExpand(fileId).encode().toUri();
         return getUnlessGone(credential, uri, SummariesJson.class)
-                .map(s -> s.data().stream().map(SummaryJson::content).filter(c -> c != null && !c.isBlank()).toList())
+                .map(s -> orEmpty(s.data()).stream().map(SummaryJson::content).filter(c -> c != null && !c.isBlank()).toList())
                 .orElse(List.of());
     }
 
@@ -100,11 +111,38 @@ public final class PlaudTeamClient implements PlaudTeam {
         return UriComponentsBuilder.fromUri(apiBase).path(path);
     }
 
+    private static String position(String value) {
+        if (value != null && value.length() > MAX_POSITION_LENGTH) {
+            throw new Unavailable("feed position too long");
+        }
+        return value;
+    }
+
+    private static <T> List<T> orEmpty(List<T> values) {
+        return values == null ? List.of() : values;
+    }
+
+    /** One recording: gone, or not readable by this credential (a member's private file), means skip it. */
     private <T> Optional<T> getUnlessGone(Credential credential, URI uri, Class<T> type) {
         try {
-            return Optional.of(get(credential, uri, type));
-        } catch (Gone gone) {
+            return Optional.ofNullable(get(credential, uri, type));
+        } catch (Gone | Forbidden skipped) {
             return Optional.empty();
+        }
+    }
+
+    /** Workspace and feed calls: a refusal there means the whole connection lost access. */
+    private <T> T getRequired(Credential credential, URI uri, Class<T> type) {
+        try {
+            T body = get(credential, uri, type);
+            if (body == null) {
+                throw new Unavailable("empty answer");
+            }
+            return body;
+        } catch (Gone gone) {
+            throw new Unavailable("not found");
+        } catch (Forbidden forbidden) {
+            throw new AccessDenied(forbidden.getMessage());
         }
     }
 
@@ -138,14 +176,14 @@ public final class PlaudTeamClient implements PlaudTeam {
         form.add("grant_type", "client_credentials");
         form.add("client_assertion_type", ASSERTION_TYPE);
         form.add("client_assertion", ClientAssertion.sign(credential.clientId(), credential.keyId(), audience, now,
-                keys.privateKey(credential.keyId())));
+                keys.privateKey(credential.workspaceId(), credential.keyId())));
         TokenJson issued = send(() -> http.post().uri(tokenUrl).contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .accept(MediaType.APPLICATION_JSON).body(form).retrieve().body(TokenJson.class),
                 PlaudTeamClient::tokenError);
         if (issued == null || issued.access_token() == null) {
             throw new Unavailable("token response without a token");
         }
-        long lifetime = issued.expires_in() == null ? 300 : issued.expires_in();
+        long lifetime = issued.expires_in() == null ? DEFAULT_TOKEN_LIFETIME_SECONDS : issued.expires_in();
         Token token = new Token(issued.access_token(), now.plusSeconds(lifetime).minus(TOKEN_MARGIN));
         tokens.put(credential, token);
         return token.value();
@@ -160,6 +198,9 @@ public final class PlaudTeamClient implements PlaudTeam {
         } catch (ResourceAccessException unreachable) {
             log.warn("Plaud is unreachable: {}", unreachable.getClass().getSimpleName());
             throw new Unavailable("unreachable");
+        } catch (RestClientException unreadable) {
+            log.warn("Plaud answer could not be read: {}", unreadable.getClass().getSimpleName());
+            throw new Unavailable("unreadable answer");
         }
     }
 
@@ -178,7 +219,7 @@ public final class PlaudTeamClient implements PlaudTeam {
         log.info("Plaud answered {} {}", status, code);
         return switch (status) {
             case 401 -> new StaleToken();
-            case 403 -> new AccessDenied(code);
+            case 403 -> new Forbidden(code);
             case 404 -> new Gone();
             case 410 -> new CheckpointExpired();
             default -> new Unavailable(status + " " + code);
@@ -205,6 +246,12 @@ public final class PlaudTeamClient implements PlaudTeam {
     }
 
     private static final class Gone extends RuntimeException {
+    }
+
+    private static final class Forbidden extends RuntimeException {
+        Forbidden(String code) {
+            super(code);
+        }
     }
 
     // Wire formats, named as Plaud names its JSON fields.

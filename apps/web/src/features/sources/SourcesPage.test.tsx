@@ -56,6 +56,17 @@ describe('SourcesPage', () => {
     expect(await within(card('Team meetings')).findByText('1 new')).toBeInTheDocument();
   });
 
+  it('shows a recorder whose Plaud connection never finished as not connected, without Sync', async () => {
+    workspace({ 'GET /api/recorders/plaud/connections': () => ({ body: [] }) });
+    render(<SourcesPage />);
+    await screen.findByRole('heading', { name: 'Team meetings' });
+    const plaud = card('Team meetings');
+
+    expect(within(plaud).getByText('Not connected')).toHaveClass('pill', 'soon');
+    expect(plaud).toHaveTextContent('Add the meeting recorder again');
+    expect(within(plaud).queryByRole('button', { name: 'Sync' })).not.toBeInTheDocument();
+  });
+
   it('tells the person when a sync fails', async () => {
     workspace({ 'POST /api/sources/p1/sync': () => ({ status: 503, body: { code: 'plaud.unavailable' } }) });
     render(<SourcesPage />);

@@ -45,8 +45,8 @@ Sources page does not show it for now, owner decision 2026-11-17).
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
-- Capture has file upload (live) and Plaud Team workspaces (live, through
-  Plaud's Enterprise API; see `docs/adr/0003-plaud-team-source.md`) on the
+- Capture has file upload (live) and Plaud Team workspaces (preview: built on
+  Plaud's Enterprise API, not yet tried with a real Plaud Team; see `docs/adr/0003-plaud-team-source.md`) on the
   Sources page. Personal "Sign in with Plaud" shows as coming soon, as do Repo
   and Storage. The API needs `CONXIST_SECRETS_KEY` (32 bytes, Base64) to start;
   `mvn spring-boot:test-run` runs a fake Plaud that accepts Client ID `demo-team`.

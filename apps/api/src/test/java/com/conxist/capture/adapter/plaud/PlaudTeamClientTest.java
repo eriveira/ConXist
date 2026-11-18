@@ -8,6 +8,7 @@ import java.security.KeyPairGenerator;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import com.conxist.capture.application.PlaudTeam;
 import com.conxist.capture.application.PlaudTeam.ChangePage;
 import com.conxist.capture.application.PlaudTeam.Credential;
@@ -21,7 +22,8 @@ import org.springframework.web.client.RestClient;
 
 class PlaudTeamClientTest {
 
-    private static final Credential CREDENTIAL = new Credential("client_acme", "cx-00000000000000aa");
+    private static final Credential CREDENTIAL = new Credential(UUID.randomUUID(), "client_acme",
+            "cx-00000000000000aa");
 
     private FakePlaudServer fake;
     private PlaudTeamClient client;
@@ -34,7 +36,7 @@ class PlaudTeamClientTest {
         fake = FakePlaudServer.strict();
         fake.register(CREDENTIAL.clientId(), JdbcRecorderKeys.pem(pair.getPublic().getEncoded()));
         client = new PlaudTeamClient(RestClient.create(), fake.apiBase(), fake.tokenUrl(), FakePlaudServer.AUDIENCE,
-                2, keyId -> pair.getPrivate(), Clock.systemUTC());
+                2, (workspaceId, keyId) -> pair.getPrivate(), Clock.systemUTC());
     }
 
     @AfterEach
@@ -49,7 +51,8 @@ class PlaudTeamClientTest {
 
     @Test
     void a_client_id_plaud_does_not_know_is_access_denied() {
-        assertThatThrownBy(() -> client.teamName(new Credential("client_other", CREDENTIAL.keyId())))
+        assertThatThrownBy(() -> client.teamName(new Credential(CREDENTIAL.workspaceId(), "client_other",
+                CREDENTIAL.keyId())))
                 .isInstanceOf(PlaudTeam.AccessDenied.class);
     }
 
@@ -59,7 +62,7 @@ class PlaudTeamClientTest {
         generator.initialize(2048);
         KeyPair other = generator.generateKeyPair();
         PlaudTeamClient wrongKey = new PlaudTeamClient(RestClient.create(), fake.apiBase(), fake.tokenUrl(),
-                FakePlaudServer.AUDIENCE, 2, keyId -> other.getPrivate(), Clock.systemUTC());
+                FakePlaudServer.AUDIENCE, 2, (workspaceId, keyId) -> other.getPrivate(), Clock.systemUTC());
 
         assertThatThrownBy(() -> wrongKey.teamName(CREDENTIAL)).isInstanceOf(PlaudTeam.AccessDenied.class);
     }

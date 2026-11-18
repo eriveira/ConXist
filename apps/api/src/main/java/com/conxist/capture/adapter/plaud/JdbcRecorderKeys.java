@@ -13,6 +13,8 @@ import java.time.Clock;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.conxist.capture.application.RecorderKeys;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -21,6 +23,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * key id; the public key is stored as PEM so it can be shown again.
  */
 public final class JdbcRecorderKeys implements RecorderKeys, PrivateKeys {
+
+    private static final Logger log = LoggerFactory.getLogger(JdbcRecorderKeys.class);
 
     private static final int RSA_BITS = 2048;
     private static final String KEY_ID_PREFIX = "cx-";
@@ -63,10 +67,13 @@ public final class JdbcRecorderKeys implements RecorderKeys, PrivateKeys {
                 .single();
     }
 
-    /** For signing only; callers never keep or log it. */
+    /** For signing only; callers never keep or log it. Each read is logged with the key id, never the key. */
     @Override
-    public PrivateKey privateKey(String keyId) {
-        byte[] sealed = jdbc.sql("select private_key_sealed from recorder_keys where key_id = :keyId")
+    public PrivateKey privateKey(UUID workspaceId, String keyId) {
+        log.info("Recorder key {} opened to sign a sign-in request", keyId);
+        byte[] sealed = jdbc.sql("select private_key_sealed from recorder_keys"
+                        + " where workspace_id = :workspaceId and key_id = :keyId")
+                .param("workspaceId", workspaceId)
                 .param("keyId", keyId)
                 .query(byte[].class)
                 .optional()

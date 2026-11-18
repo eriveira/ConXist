@@ -84,8 +84,8 @@ class CaptureConfiguration {
 
     @Bean
     SyncRecorder syncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
-            CapturedDocumentRepository documents, CaptureContext context) {
-        return new SyncRecorder(catalog, plaud, connections, documents, context);
+            CapturedDocumentRepository documents, CaptureContext context, CaptureProperties capture) {
+        return new SyncRecorder(catalog, plaud, connections, documents, context, capture.maxTextCharacters());
     }
 
     @Bean

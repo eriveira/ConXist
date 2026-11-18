@@ -33,7 +33,8 @@ class SyncRecorderTest {
     private final CaptureFakes.Documents documents = new CaptureFakes.Documents();
     private final RecordedEvents events = new RecordedEvents();
     private final SyncRecorder syncRecorder = new SyncRecorder(sources, plaud, connections, documents,
-            new CaptureContext(FixedWorkspace.standard(), events, new ImmediateUnitOfWork(), TestClock.fixed()));
+            new CaptureContext(FixedWorkspace.standard(), events, new ImmediateUnitOfWork(), TestClock.fixed()),
+            2_000_000);
 
     @Test
     void imports_each_new_meeting_with_its_summary_as_a_document_waiting_for_review() {
@@ -119,6 +120,42 @@ class SyncRecorderTest {
 
         assertThat(result).isEqualTo(new SyncResult(0, 1, 0));
         assertThat(plaud.checkpointsAsked).endsWith("1", (String) null);
+    }
+
+    @Test
+    void pauses_the_connection_when_plaud_refuses_the_key_while_reading_again_from_the_start() {
+        SourceSummary source = connected(StartFrom.LAST_30_DAYS, false);
+        plaud.record("f1", "One", RECENT);
+        syncRecorder.sync(source.id());
+        plaud.checkpointExpired = true;
+        plaud.denyAfterExpiry = true;
+
+        assertThatThrownBy(() -> syncRecorder.sync(source.id()))
+                .isInstanceOf(RuleViolation.class)
+                .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.access-lost");
+        assertThat(connections.bySource.get(source.id()).status()).isEqualTo(ConnectionStatus.PAUSED);
+    }
+
+    @Test
+    void stops_and_keeps_the_checkpoint_when_the_feed_says_more_but_the_cursor_does_not_move() {
+        SourceSummary source = connected(StartFrom.LAST_30_DAYS, false);
+        plaud.stuckCursor = true;
+
+        assertThatThrownBy(() -> syncRecorder.sync(source.id()))
+                .isInstanceOf(RuleViolation.class)
+                .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.unavailable");
+        assertThat(connections.bySource.get(source.id()).lastCheckedAt()).isNull();
+    }
+
+    @Test
+    void the_scheduled_check_keeps_going_after_an_unexpected_failure() {
+        SourceSummary source = connected(StartFrom.LAST_30_DAYS, false);
+        plaud.broken = true;
+
+        assertThat(syncRecorder.syncAll()).singleElement().satisfies(sync -> {
+            assertThat(sync.sourceId()).isEqualTo(source.id());
+            assertThat(sync.problemCode()).isEqualTo(SyncRecorder.SYNC_FAILED);
+        });
     }
 
     @Test

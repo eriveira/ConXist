@@ -93,15 +93,13 @@ describe('PlaudDialog', () => {
     expect(calls.filter((call) => call.key === 'POST /api/sources/rec-1/plaud-team')).toHaveLength(1);
   });
 
-  it('asks for the Client ID before testing', async () => {
+  it('keeps Test off until a Client ID is pasted', async () => {
     plaudRoutes();
     render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: /Connect a Plaud Team/ }));
     await screen.findByText(/BEGIN PUBLIC KEY/);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Test' }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Paste the Client ID first.');
+    expect(screen.getByRole('button', { name: 'Test' })).toBeDisabled();
   });
 
   it('has no accessibility violations on the two doors or the connect step', async () => {
@@ -112,5 +110,25 @@ describe('PlaudDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: /Connect a Plaud Team/ }));
     await screen.findByText(/BEGIN PUBLIC KEY/);
     expect(await accessibilityViolations(document.body)).toEqual([]);
+  });
+});
+
+describe('PlaudDialog key', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('offers a retry when ConXist could not make a key', async () => {
+    let attempts = 0;
+    stubApi({
+      'POST /api/recorders/plaud/keys': () => (++attempts === 1
+        ? { status: 500, body: { code: 'request.failed' } }
+        : { status: 201, body: KEY }),
+    });
+    render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: /Connect a Plaud Team/ }));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText(/BEGIN PUBLIC KEY/)).toBeInTheDocument();
+    expect(attempts).toBe(2);
   });
 });

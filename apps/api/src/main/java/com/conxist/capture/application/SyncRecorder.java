@@ -25,14 +25,20 @@ import com.conxist.sources.SourceCatalog;
  */
 public final class SyncRecorder {
 
+    /** A guard against a feed that never ends: more pages than any real Team has in one sync. */
+    static final int MAX_PAGES_PER_SYNC = 1000;
+    private static final System.Logger log = System.getLogger(SyncRecorder.class.getName());
+
     private final CaptureSources sources;
     private final PlaudTeam plaud;
     private final PlaudTeamConnections connections;
     private final CapturedDocumentRepository documents;
     private final CaptureContext context;
+    private final int maxTextCharacters;
 
     public SyncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
-            CapturedDocumentRepository documents, CaptureContext context) {
+            CapturedDocumentRepository documents, CaptureContext context, int maxTextCharacters) {
+        this.maxTextCharacters = maxTextCharacters;
         this.sources = new CaptureSources(catalog);
         this.plaud = plaud;
         this.connections = connections;
@@ -56,17 +62,26 @@ public final class SyncRecorder {
                         return new SourceSync(connection.sourceId(), run(connection), null);
                     } catch (RuleViolation problem) {
                         return new SourceSync(connection.sourceId(), null, problem.code());
+                    } catch (RuntimeException failure) {
+                        log.log(System.Logger.Level.WARNING, "Recorder source {0} failed: {1}",
+                                connection.sourceId(), failure.getClass().getSimpleName());
+                        return new SourceSync(connection.sourceId(), null, SYNC_FAILED);
                     }
                 })
                 .toList();
     }
 
+    /** Reads from the saved checkpoint; if Plaud says it expired, reads once more from the start. */
     private SyncResult run(PlaudTeamConnection connection) {
-        Credential credential = new Credential(connection.clientId(), connection.keyId());
+        Credential credential = new Credential(connection.workspaceId(), connection.clientId(), connection.keyId());
         try {
-            return readFeed(connection, credential);
-        } catch (PlaudTeam.CheckpointExpired expired) {
-            return readFeed(connection.withoutCheckpoint(), credential);
+            try {
+                return readFeed(connection, credential);
+            } catch (PlaudTeam.CheckpointExpired expired) {
+                return readFeed(connection.withoutCheckpoint(), credential);
+            }
+        } catch (PlaudTeam.CheckpointExpired expiredAgain) {
+            throw RecorderProblems.unavailable();
         } catch (PlaudTeam.AccessDenied denied) {
             connections.save(connection.paused(context.clock().instant()));
             throw RecorderProblems.accessLost();
@@ -79,14 +94,22 @@ public final class SyncRecorder {
         Tally tally = new Tally();
         String cursor = null;
         ChangePage page;
+        int pages = 0;
         do {
+            if (++pages > MAX_PAGES_PER_SYNC) {
+                throw new PlaudTeam.Unavailable("feed did not end");
+            }
             page = plaud.changes(credential, connection.checkpoint(), cursor);
             for (TeamFile file : page.files()) {
                 importFile(connection, credential, file, tally);
             }
+            if (page.hasMore() && (page.nextCursor() == null || page.nextCursor().equals(cursor))) {
+                throw new PlaudTeam.Unavailable("feed cursor did not move");
+            }
             cursor = page.nextCursor();
         } while (page.hasMore());
-        connections.save(connection.checked(page.nextCheckpoint(), context.clock().instant()));
+        String checkpoint = page.nextCheckpoint() != null ? page.nextCheckpoint() : connection.checkpoint();
+        connections.save(connection.checked(checkpoint, context.clock().instant()));
         return tally.result();
     }
 
@@ -110,7 +133,7 @@ public final class SyncRecorder {
                 ? plaud.summaries(credential, file.id()) : List.of();
         DocumentTitle title = DocumentTitle.ofMeeting(file.title());
         String text = MeetingText.compose(title.value(), file.recordedAt(), transcript.language(), summaries,
-                transcript.lines());
+                transcript.lines(), maxTextCharacters);
         CapturedDocument document = new CapturedDocument(UUID.randomUUID(), connection.workspaceId(),
                 connection.sourceId(), title, MeetingText.MEDIA_TYPE, text.getBytes(StandardCharsets.UTF_8).length,
                 text, DocumentOrigin.RECORDING, file.id(), context.clock().instant());
@@ -135,6 +158,9 @@ public final class SyncRecorder {
     public record SyncResult(int imported, int alreadyImported, int waitingForTranscript) {
     }
 
+    /** {@code problemCode} is set when the sync failed; {@link #SYNC_FAILED} for a failure ConXist did not expect. */
     public record SourceSync(UUID sourceId, SyncResult result, String problemCode) {
     }
+
+    public static final String SYNC_FAILED = "plaud.sync-failed";
 }
