@@ -28,6 +28,11 @@ final class RecorderProblems {
         return new InvalidRecorderLink("sign-in-not-finished", "Sign in with Plaud first, then press Add.");
     }
 
+    static RuleViolation otherAccount() {
+        return new InvalidRecorderLink("other-account", "That is a different Plaud account. Sign in with the account "
+                + "this source was connected to, or add another meeting recorder for this one.");
+    }
+
     static RuleViolation unavailable() {
         return new InvalidRecorderLink("unavailable", "Plaud is not answering right now. Try again in a minute.");
     }

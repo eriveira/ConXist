@@ -6,12 +6,17 @@ import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { AddMenu } from '../add-source/AddMenu';
 import { PlaudDialog } from '../add-source/PlaudDialog';
+import { SignInAgainDialog } from '../add-source/SignInAgainDialog';
 import { providerName } from '../add-source/providerText';
 import { UploadDialog } from '../add-source/UploadDialog';
 import { SourceCard } from './SourceCard';
 import { useWorkspace } from './useWorkspace';
 
-type OpenDialog = { kind: 'upload'; existing?: Source } | { kind: 'plaud' } | null;
+type OpenDialog =
+  | { kind: 'upload'; existing?: Source }
+  | { kind: 'plaud' }
+  | { kind: 'sign-in-again'; source: Source; accountLabel: string }
+  | null;
 /** How often "Checked 2 min ago" is brought up to date while the page is open. */
 const CLOCK_TICK_MS = 30_000;
 
@@ -96,6 +101,7 @@ export function SourcesPage() {
               now={now}
               onAddFiles={source.provider === 'UPLOAD' ? () => setDialog({ kind: 'upload', existing: source }) : undefined}
               onSync={source.provider === 'PLAUD' && state.connections[source.id] ? () => void sync(source) : undefined}
+              onSignInAgain={() => setDialog({ kind: 'sign-in-again', source, accountLabel: state.connections[source.id]?.label ?? source.accountLabel })}
             />
           ))}
         </div>
@@ -104,6 +110,10 @@ export function SourcesPage() {
         <UploadDialog existing={dialog.existing} onClose={() => setDialog(null)} onCaptured={refresh} />
       )}
       {dialog?.kind === 'plaud' && <PlaudDialog onClose={() => setDialog(null)} onCaptured={refresh} />}
+      {dialog?.kind === 'sign-in-again' && (
+        <SignInAgainDialog source={dialog.source} accountLabel={dialog.accountLabel}
+          onClose={() => setDialog(null)} onCaptured={refresh} />
+      )}
     </section>
   );
 }

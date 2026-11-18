@@ -74,7 +74,10 @@ public final class SignInToPlaud {
         UUID workspaceId = context.workspace().id();
         PlaudAccountConnection connection = connections.find(workspaceId, sourceId)
                 .orElseThrow(() -> new RuleViolation("plaud.not-connected", "Connect this source to Plaud first."));
-        signedIn(signInId);
+        if (!connection.accountLabel().equalsIgnoreCase(signedIn(signInId).accountLabel())) {
+            // A different account would mix its meetings into this source and break "each meeting imported once".
+            throw RecorderProblems.otherAccount();
+        }
         PlaudAccountConnection active = connection.checked(connection.readThrough(), context.clock().instant());
         context.unitOfWork().inTransaction(() -> {
             plaud.attach(workspaceId, signInId, sourceId);

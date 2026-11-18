@@ -7,7 +7,7 @@ import { SourcesPage } from './SourcesPage';
 const UPLOAD = { id: 's1', category: 'CAPTURE', provider: 'UPLOAD', name: 'Product specs', accountLabel: '', addedAt: '2026-11-17T10:00:00Z' };
 const PLAUD = { id: 'p1', category: 'CAPTURE', provider: 'PLAUD', name: 'Team meetings', accountLabel: 'Acme Engineering', addedAt: '2026-11-18T10:00:00Z' };
 const CONNECTION = {
-  sourceId: 'p1', teamName: 'Acme Engineering', startFrom: 'LAST_30_DAYS', includeSummaries: true,
+  sourceId: 'p1', kind: 'TEAM', label: 'Acme Engineering', startFrom: 'LAST_30_DAYS', includeSummaries: true,
   status: 'ACTIVE', lastCheckedAt: new Date(Date.now() - 2 * 60_000).toISOString(),
 };
 
@@ -104,5 +104,27 @@ describe('SourcesPage', () => {
     workspace({ 'GET /api/sources': () => ({ body: [] }), 'GET /api/recorders/plaud/connections': () => ({ body: [] }) });
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Connect your first source')).toBeInTheDocument();
+  });
+
+  it('asks the person to sign in again when Plaud signed ConXist out of their account', async () => {
+    workspace({
+      'POST /api/recorders/plaud/sign-ins': () => ({ status: 201, body: { signInId: 'si-2', authorizationUrl: 'https://plaud.test/authorize' } }),
+      'GET /api/recorders/plaud/sign-ins/si-2': () => ({ body: { id: 'si-2', status: 'SIGNED_IN', accountLabel: 'alex@acme.test' } }),
+      'POST /api/sources/p1/plaud-account/sign-in': () => ({ body: { ...CONNECTION, kind: 'ACCOUNT', status: 'ACTIVE' } }),
+      'POST /api/sources/p1/sync': () => ({ body: { imported: 0, alreadyImported: 0, waitingForTranscript: 0 } }),
+    }, { ...CONNECTION, kind: 'ACCOUNT', label: 'alex@acme.test', status: 'PAUSED' });
+    const popup = { opener: {}, location: { href: '' }, close: vi.fn() };
+    vi.stubGlobal('open', vi.fn(() => popup));
+    render(<SourcesPage />);
+
+    await screen.findByRole('heading', { name: 'Team meetings' });
+    expect(card('Team meetings')).toHaveTextContent('Plaud signed ConXist out of this account.');
+    expect(within(card('Team meetings')).queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument();
+    await userEvent.click(within(card('Team meetings')).getByRole('button', { name: /Sign in again/ }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Plaud signed ConXist out of alex@acme.test.');
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByText(/Signed in again/, {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(popup.location.href).toBe('https://plaud.test/authorize');
   });
 });

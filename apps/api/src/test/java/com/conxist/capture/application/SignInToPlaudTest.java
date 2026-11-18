@@ -95,6 +95,17 @@ class SignInToPlaudTest {
     }
 
     @Test
+    void signing_in_again_with_another_account_is_refused_and_the_source_stays_paused() {
+        SourceSummary source = sources.add(Provider.PLAUD, "");
+        connections.save(PlaudAccountConnection.connect(source.id(), FixedWorkspace.WORKSPACE_ID, "alex@acme.test",
+                StartFrom.LAST_30_DAYS, true, TestClock.NOW).paused(TestClock.NOW));
+
+        assertThatThrownBy(() -> signIn.reconnect(source.id(), account.signedIn("sam@acme.test")))
+                .hasMessageContaining("different Plaud account");
+        assertThat(connections.bySource.get(source.id()).status()).isEqualTo(ConnectionStatus.PAUSED);
+    }
+
+    @Test
     void says_plaud_is_not_answering_when_a_sign_in_cannot_start() {
         account.down = true;
 

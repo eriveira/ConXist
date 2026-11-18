@@ -55,13 +55,32 @@ export interface TeamCheck {
   teamName: string;
 }
 
+/** Where a recorder source reads from: a Plaud Team workspace, or one person's Plaud account. */
+export type ConnectionKind = 'TEAM' | 'ACCOUNT';
+
 export interface RecorderConnection {
   sourceId: string;
-  teamName: string;
+  kind: ConnectionKind;
+  /** The Team's name, or the account's email for a personal account. */
+  label: string;
   startFrom: StartFrom;
   includeSummaries: boolean;
   status: 'ACTIVE' | 'PAUSED';
   lastCheckedAt: string | null;
+}
+
+/** A sign-in on Plaud's own page. WAITING until the person finishes there; the browser asks again every few seconds. */
+export type SignInStatus = 'WAITING' | 'SIGNED_IN' | 'CANCELLED' | 'FAILED';
+
+export interface SignInStart {
+  signInId: string;
+  authorizationUrl: string;
+}
+
+export interface PlaudSignIn {
+  id: string;
+  status: SignInStatus;
+  accountLabel: string | null;
 }
 
 /** Matches Source.MAX_NAME_LENGTH in the API. */
