@@ -1,7 +1,6 @@
 name: CI
 
-# Required check on every pull request. Steps that need a package.json are skipped
-# until the project has code. Read-only: never deploys.
+# Required check on every pull request. Read-only: never deploys.
 
 on:
   pull_request:
@@ -26,33 +25,54 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build:
+  api:
+    # Unit, architecture (Spring Modulith + ArchUnit) and PostgreSQL integration tests (Testcontainers).
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
-      - id: node
-        run: echo "present=$([ -f package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-      - if: steps.node.outputs.present == 'true'
-        uses: pnpm/action-setup@v4
-      - if: steps.node.outputs.present == 'true'
-        uses: actions/setup-node@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: mvn -B verify
+
+  api-dependencies:
+    # Known advisories in the API's Maven dependencies (OSV database). Fails on any match.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: >-
+          docker run --rm -v "$PWD:/src" ghcr.io/google/osv-scanner:v2.2.1
+          scan source --lockfile /src/apps/api/pom.xml
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm install --frozen-lockfile
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm audit --audit-level high
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm run --if-present lint
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm run --if-present typecheck
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm run --if-present test
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm run --if-present test:architecture
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm run --if-present test:brand
-      - if: steps.node.outputs.present == 'true'
-        run: pnpm run --if-present build
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # Any high advisory blocks. Ignored, with a reason, in apps/web/package.json (pnpm.auditConfig):
+      # GHSA-fc5q-39xc-vjpf (picomatch, used by Vite at build time; no fixed release yet, 2026-11-17).
+      - run: pnpm audit --audit-level high
+      - run: pnpm run typecheck
+      - run: pnpm run test:architecture
+      - run: pnpm run test:brand
+      - run: pnpm run test
+      - run: pnpm run build

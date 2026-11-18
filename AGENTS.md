@@ -21,7 +21,8 @@ For any change, follow the `build-flow` skill (`.claude/skills/build-flow/`).
 A modular AI platform for development and product teams. It captures work
 information (meeting recordings, documents, repositories), turns it into
 requirements, and keeps a shared memory that coding agents reach through MCP.
-Phase 1 is Capture. Every source connects to one ConXist hub.
+Phase 1 is Capture. Every source connects to one ConXist hub (an API module; the
+canvas does not show it for now, owner decision 2026-11-17).
 
 ## What is in this repository
 
@@ -33,15 +34,21 @@ Phase 1 is Capture. Every source connects to one ConXist hub.
 - `.claude/`: the build-flow skill, reviewer agents and UI hook, copied from the
   shared standards.
 
-The application layout (`apps/web`, `apps/api`, `apps/mcp`, `packages/…`) is
-proposed in `docs/adr/0002-stack.md` and does not exist until the owner accepts it.
+- `apps/api/`: the API. Spring Boot with Spring Modulith; each top-level package
+  is a module (`platform`, `sources`, `capture`, `hub`) with `domain`,
+  `application`, `adapter` and `config` inside. Modules talk through their root
+  package (API) and events. See `docs/adr/0002-stack.md` (accepted).
+- `apps/web/`: the web app (React Flow sources canvas). `domain` and `api` stay
+  free of React; screens live in `features`.
 
 ## Current state (2026-11-17)
 
-- No application code yet. The owner's rule: **mock first**. The sources canvas
-  is being designed as HTML mocks (shared folder `App/mocks/`); no app code
-  until a mock is approved.
-- Nothing is deployed. Hosting is not decided.
+- The owner's rule: **mock first**. New screens are designed as HTML mocks
+  (shared folder `App/mocks/`) before app code.
+- Slice 1 of Capture is built: file upload (live) and Plaud (preview, sample
+  sign-in) on the sources canvas; Repo and Storage show as coming soon.
+- No sign-in yet: the API is single-workspace and listens on 127.0.0.1 only.
+  Nothing is deployed. Hosting is not decided.
 
 ## Brand
 
@@ -82,6 +89,16 @@ proposed in `docs/adr/0002-stack.md` and does not exist until the owner accepts 
 
 ## Commands
 
-None yet. When the stack is accepted, list here the commands for install, dev,
-test, lint, typecheck, architecture test, brand test and build, and keep them
-matching `.github/workflows/ci.yml`.
+Keep these matching `.github/workflows/ci.yml`.
+
+| What | API (`apps/api`) | Web (`apps/web`) |
+|---|---|---|
+| Install | (Maven resolves on build) | `pnpm install` |
+| Dev | `mvn spring-boot:test-run` (PostgreSQL in Docker) | `pnpm dev` |
+| Test | `mvn verify` | `pnpm test` |
+| Typecheck | (compiled by `mvn verify`) | `pnpm typecheck` |
+| Architecture test | `mvn test -Dtest=ArchitectureTest` | `pnpm test:architecture` |
+| Brand test | n/a | `pnpm test:brand` (also checks the product page budget) |
+| Build | `mvn package` | `pnpm build` |
+
+No linter is set up yet.

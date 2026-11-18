@@ -19,7 +19,7 @@
   --accent-large: #0A78FC;    /* electric: icons, large text */
   --accent-soft: rgba(10,120,252,.10);
   --live: #12C7B8;
-  --teal: #0E8F85;
+  --teal: #0A7A71;
   --err: #E5484D;
   --shadow: 0 1px 2px rgba(0,19,50,.06), 0 8px 24px rgba(0,19,50,.08);
   /* dark bands stay dark in both themes */
@@ -165,6 +165,10 @@ section { padding-block: 80px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .chip { font: 500 0.78rem var(--font); padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 
+.status { display: inline-block; margin-left: 4px; font: 700 0.75rem var(--font); letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; vertical-align: 1px; }
+.status.live { color: var(--teal); border-color: currentColor; }
+.status.preview { color: var(--accent); border-color: currentColor; background: var(--accent-soft); }
+td .status { margin-left: 0; }
 /* integrations */
 .int { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
 .int > * { min-width: 0; }
@@ -239,7 +243,7 @@ footer a { color: var(--night-ink); }
       <div class="copy">
         <span class="eyebrow">For product and engineering teams</span>
         <h1>Your meetings already wrote the <span class="hl">spec</span>.</h1>
-        <p class="lede">ConXist.ai captures what your team decides in meetings, chats and email, turns it into requirements and tickets, and keeps it as shared memory that your engineers and coding agents build from.</p>
+        <p class="lede">ConXist.ai captures what your team decides in meetings and documents. Next, it will turn those decisions into requirements and tickets, and keep them as shared memory that your engineers and coding agents build from.</p>
         <div class="ctas">
           <a class="btn primary" href="#contact">Become a design partner <span aria-hidden="true">→</span></a>
           <a class="btn ghost" href="#how">See how Capture works</a>
@@ -283,26 +287,26 @@ footer a { color: var(--night-ink); }
       <div class="head">
         <span class="eyebrow">Phase 1 · Capture</span>
         <h2>From conversation to the right system, in three steps.</h2>
-        <p class="lede">Capture is the first ConXist module. It takes the raw material of product work and routes each piece to where your team already works.</p>
+        <p class="lede">Capture is the first ConXist module. It takes in the raw material of product work today. Next, it will route each piece to where your team already works.</p>
       </div>
       <div class="pipe">
         <div class="card stage">
           <span class="step">Step 1 · Collect</span>
           <h3>Bring in every source</h3>
-          <ul><li>Meeting recordings</li><li>Team chats</li><li>Email threads</li><li>Notes and text</li></ul>
+          <ul><li>Files you upload: PDF, Word, Markdown and text <span class="status live">Available</span></li><li>Meeting recordings from Plaud <span class="status preview">Preview</span></li><li>Email threads <span class="status">Coming soon</span></li><li>Team chats <span class="status">Coming soon</span></li></ul>
         </div>
         <div class="card stage">
           <span class="step">Step 2 · Transcribe and classify</span>
-          <h3>Sort it by your categories</h3>
+          <h3>Sort it by your categories <span class="status">Coming soon</span></h3>
           <p>Everything becomes a clean transcript in text or Markdown, then each decision is classified using the categories you set up for your company.</p>
         </div>
         <div class="card stage">
           <span class="step">Step 3 · Route</span>
-          <h3>Send it where it belongs</h3>
+          <h3>Send it where it belongs <span class="status">Coming soon</span></h3>
           <ul><li>Tickets and requirements to your issue tracker</li><li>General knowledge to shared memory</li><li>Documentation to your repositories</li></ul>
         </div>
       </div>
-      <p class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><span><strong>People stay in control.</strong> ConXist proposes, and the owner of each category approves. Changes to repositories arrive as pull requests you can review.</span></p>
+      <p class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><span><strong>People stay in control.</strong> ConXist proposes, and the owner of each category approves. Changes to repositories will arrive as pull requests you can review.</span></p>
     </div>
   </section>
 
@@ -329,23 +333,24 @@ footer a { color: var(--night-ink); }
     <div class="wrap">
       <div class="head">
         <span class="eyebrow">Modules</span>
-        <h2>Adopt it in stages. Each module works on its own.</h2>
+        <h2>Adopt it in stages. Each module will work on its own.</h2>
+        <p class="lede">Capture is the first module. Memory, Agents and Skills follow. <span class="status">Coming soon</span></p>
       </div>
       <div class="cards3">
         <div class="card">
           <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></span>
-          <h3>Repository memory</h3>
+          <h3>Repository memory <span class="status">Coming soon</span></h3>
           <p>Shared memory that lives next to your code, organized by discipline, so people and agents read the same source of truth.</p>
           <div class="chips"><span class="chip">Mission</span><span class="chip">Branding</span><span class="chip">Design</span><span class="chip">Architecture</span><span class="chip">Knowledge</span><span class="chip">Vision</span></div>
         </div>
         <div class="card">
           <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>
-          <h3>Agents</h3>
+          <h3>Agents <span class="status">Coming soon</span></h3>
           <p>Agents that do the routine work between stages, like drafting requirements from a transcript. They propose, and your team decides.</p>
         </div>
         <div class="card">
           <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 4h6v4l3 3v9H6v-9l3-3z"/></svg></span>
-          <h3>Skills</h3>
+          <h3>Skills <span class="status">Coming soon</span></h3>
           <p>Reusable instructions that encode how your company works, so every agent and every squad applies the same development criteria.</p>
         </div>
       </div>
@@ -358,27 +363,29 @@ footer a { color: var(--night-ink); }
         <div class="head" style="margin-bottom:24px">
           <span class="eyebrow">Integrations</span>
           <h2>Works with the tools your team already uses.</h2>
-          <p class="lede">ConXist is a connected orchestrator. Your coding agents reach it over API or MCP without leaving their usual setup.</p>
+          <p class="lede">Every source flows into one ConXist workspace. Reviewing what each source captures is coming soon. ConXist is a connected orchestrator. Your coding agents will reach it over API or MCP without leaving their usual setup. <span class="status">Coming soon</span></p>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th scope="col">Type</th><th scope="col">Day one</th></tr></thead>
+            <thead><tr><th scope="col">Type</th><th scope="col">Phase 1</th><th scope="col">Status</th></tr></thead>
             <tbody>
-              <tr><td>Meeting recorder</td><td>Plaud and similar recorders</td></tr>
-              <tr><td>Issue tracker</td><td>Jira</td></tr>
-              <tr><td>Code host</td><td>GitHub</td></tr>
-              <tr><td>Storage</td><td>Git repositories, shared drives or local folders, chosen at onboarding</td></tr>
+              <tr><td>File upload</td><td>PDF, Word, Markdown, text</td><td><span class="status live">Available</span></td></tr>
+              <tr><td>Meeting recorder</td><td>Plaud</td><td><span class="status preview">Preview</span></td></tr>
+              <tr><td>Email</td><td>Forwarded threads</td><td><span class="status">Coming soon</span></td></tr>
+              <tr><td>Code host</td><td>GitHub, Bitbucket</td><td><span class="status">Coming soon</span></td></tr>
+              <tr><td>Storage</td><td>Cloudflare R2, Amazon S3, Google Drive, iCloud, OneDrive and SharePoint, Confluence</td><td><span class="status">Coming soon</span></td></tr>
+              <tr><td>Issue tracker</td><td>Jira</td><td><span class="status">Coming soon</span></td></tr>
             </tbody>
           </table>
         </div>
       </div>
       <div class="orch" aria-label="Diagram: coding agents connect to the ConXist orchestrator, which connects to its modules and to your tools">
         <div class="row"><span>Claude</span><span>Codex</span><span>Your agents</span></div>
-        <div class="arrow" aria-hidden="true">API / MCP</div>
+        <div class="arrow" aria-hidden="true">API / MCP · soon</div>
         <div class="box"><img src="assets/conxist-emblem-reversed.png" alt="">ConXist orchestrator</div>
         <div class="row"><span>Capture</span><span>Memory</span><span>Skills</span></div>
         <div class="arrow" aria-hidden="true">connects to</div>
-        <div class="row"><span>Jira</span><span>GitHub</span><span>Drives</span><span>Local</span></div>
+        <div class="row"><span>Uploads</span><span>Plaud</span><span>Jira · soon</span><span>GitHub · soon</span><span>Drives · soon</span></div>
       </div>
     </div>
   </section>
@@ -420,7 +427,7 @@ footer a { color: var(--night-ink); }
         <h2>Help shape Capture with your own meetings.</h2>
         <p class="lede">We're working with a small group of product and engineering teams on the first release.</p>
         <ul>
-          <li>Early access to Capture with your recorder, Jira and GitHub</li>
+          <li>Early access to Capture with your uploads and Plaud recorder, then Jira and GitHub as they arrive</li>
           <li>Direct input on categories, routing and review rules</li>
           <li>Founding-partner terms</li>
         </ul>
