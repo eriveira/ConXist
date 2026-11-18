@@ -106,7 +106,6 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
             </div>
             <dl className="summary">
               <div><dt>{t('plaud.review.account')}</dt><dd>{account}</dd></div>
-              <div><dt>{t('dialog.feeds')}</dt><dd>{t('hub.title')}</dd></div>
             </dl>
           </>
         )}

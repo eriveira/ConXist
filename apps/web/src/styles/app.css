@@ -87,7 +87,6 @@ button { cursor: pointer; }
   --xy-controls-box-shadow: var(--cx-shadow-card);
   --xy-attribution-background-color: transparent;
 }
-.react-flow__edge.live path { stroke: var(--cx-electric); stroke-width: 2.2; }
 .react-flow__handle { width: 12px; height: 12px; border-width: 2px; }
 .react-flow__attribution a { color: var(--cx-fg-muted); }
 .canvas-tl { position: absolute; left: 16px; top: 16px; z-index: 8; }
@@ -120,16 +119,6 @@ button { cursor: pointer; }
 .ncat { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--cx-fg-muted); }
 .nbody { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
 .nrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--cx-fg-muted); }
-.node.hub { width: 288px; border-color: color-mix(in srgb, var(--cx-electric) 45%, var(--cx-border)); }
-.node.hub .nico { background: transparent; width: 46px; height: 46px; }
-.node.hub .nico img { width: 40px; }
-.node.hub .ntitle { font-size: 16px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0; padding: 0 12px 12px; }
-.stats div { background: var(--cx-surface); border-radius: var(--cx-radius-sm); padding: 8px; }
-.stats dt { font-size: 11px; color: var(--cx-fg-muted); line-height: 1.2; }
-.stats dd { margin: 2px 0 0; font-size: 18px; font-weight: 800; }
-.stats .attention { background: var(--cx-warn-bg); }
-.stats .attention dt, .stats .attention dd { color: var(--cx-warn-fg); }
 
 /* add menu */
 .add { position: relative; }

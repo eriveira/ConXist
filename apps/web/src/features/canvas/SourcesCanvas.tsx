@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Background, Controls, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow, type Edge } from '@xyflow/react';
+import { Background, Controls, ReactFlow, ReactFlowProvider, useNodesState, useReactFlow } from '@xyflow/react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
-import { layoutCanvas } from '../../domain/layout';
+import { WIDE_COLUMNS, layoutSources } from '../../domain/layout';
 import { useNarrowScreen } from './useNarrowScreen';
 import type { Provider, Source } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
@@ -10,11 +10,10 @@ import { AddMenu } from '../add-source/AddMenu';
 import { PlaudDialog } from '../add-source/PlaudDialog';
 import { providerName } from '../add-source/providerText';
 import { UploadDialog } from '../add-source/UploadDialog';
-import { HubNode, SourceNode, type HubFlowNode, type SourceFlowNode } from './nodes';
+import { SourceNode, type SourceFlowNode } from './nodes';
 import { useWorkspace, type WorkspaceState } from './useWorkspace';
 
-const HUB_ID = 'hub';
-const NODE_TYPES = { source: SourceNode, hub: HubNode };
+const NODE_TYPES = { source: SourceNode };
 const FIT_VIEW = { maxZoom: 1, padding: 0.3 };
 /** On a phone, fitting every node would shrink text below a readable size; people scroll instead. */
 const NARROW_MIN_ZOOM = 0.85;
@@ -22,7 +21,6 @@ const DEFAULT_MIN_ZOOM = 0.5;
 
 type OpenDialog = { kind: 'upload'; existing?: Source } | { kind: 'plaud' } | null;
 type Ready = Extract<WorkspaceState, { status: 'ready' }>;
-type FlowNode = SourceFlowNode | HubFlowNode;
 
 export function SourcesCanvas() {
   const t = useT();
@@ -99,12 +97,12 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
     [workspace.providers, t],
   );
 
-  const target = useMemo<FlowNode[]>(() => {
-    const layout = layoutCanvas(workspace.sources, narrow ? 'down' : 'across');
-    const sourceNodes: SourceFlowNode[] = workspace.sources.map((source) => ({
+  const target = useMemo<SourceFlowNode[]>(() => {
+    const layout = layoutSources(workspace.sources, narrow ? 1 : WIDE_COLUMNS);
+    return workspace.sources.map((source) => ({
       id: source.id,
       type: 'source',
-      position: layout.sources.get(source.id) ?? { x: 0, y: 0 },
+      position: layout.get(source.id) ?? { x: 0, y: 0 },
       data: {
         source,
         label: providerLabels.get(source.provider) ?? source.provider,
@@ -112,17 +110,14 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
         syncing: syncing === source.id,
         lastImported: imported[source.id] ?? null,
         syncFailed: failed === source.id,
-        narrow,
         onAddFiles: source.provider === 'UPLOAD' ? () => onAddFiles(source) : undefined,
         onSync: source.provider === 'PLAUD' ? () => void sync(source) : undefined,
       },
     }));
-    const hub: HubFlowNode = { id: HUB_ID, type: 'hub', position: layout.hub, data: { hub: workspace.hub } };
-    return [...sourceNodes, hub];
     // sync and onAddFiles change identity each render; the data they close over is listed.
   }, [workspace, providerLabels, syncing, imported, failed, narrow]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(target);
+  const [nodes, setNodes, onNodesChange] = useNodesState<SourceFlowNode>(target);
   const dragged = useRef(new Map<string, { x: number; y: number }>());
   const { fitView } = useReactFlow();
   const sourceCount = workspace.sources.length;
@@ -152,17 +147,10 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
     'controls.interactive.ariaLabel': t('canvas.interactive'),
   }), [t]);
 
-  const edges = useMemo<Edge[]>(
-    () => workspace.sources.map((source) => ({
-      id: `${source.id}-hub`, source: source.id, target: HUB_ID, className: 'live', type: narrow ? 'smoothstep' : 'default',
-    })),
-    [workspace.sources, narrow],
-  );
 
   return (
     <ReactFlow
       nodes={nodes}
-      edges={edges}
       nodeTypes={NODE_TYPES}
       onNodesChange={onNodesChange}
       onNodeDragStop={(_, node) => dragged.current.set(node.id, node.position)}

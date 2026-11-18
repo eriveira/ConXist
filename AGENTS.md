@@ -21,7 +21,8 @@ For any change, follow the `build-flow` skill (`.claude/skills/build-flow/`).
 A modular AI platform for development and product teams. It captures work
 information (meeting recordings, documents, repositories), turns it into
 requirements, and keeps a shared memory that coding agents reach through MCP.
-Phase 1 is Capture. Every source connects to one ConXist hub.
+Phase 1 is Capture. Every source connects to one ConXist hub (an API module; the
+canvas does not show it for now, owner decision 2026-11-17).
 
 ## What is in this repository
 

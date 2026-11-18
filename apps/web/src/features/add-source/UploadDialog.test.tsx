@@ -15,7 +15,7 @@ async function continueTo() {
 describe('UploadDialog', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('adds the source, sends each file and reports what reached the hub', async () => {
+  it('adds the source, sends each file and reports what was added', async () => {
     const calls = stubApi({
       'POST /api/sources': () => ({ status: 201, body: SOURCE }),
       'POST /api/sources/src-1/files': () => ({ status: 201, body: { id: 'doc-1' } }),

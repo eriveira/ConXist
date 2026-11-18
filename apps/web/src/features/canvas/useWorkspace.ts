@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
-import type { HubOverview, Provider, Source } from '../../domain/model';
+import type { Provider, Source } from '../../domain/model';
 
 export type WorkspaceState =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; providers: Provider[]; sources: Source[]; documentCounts: Record<string, number>; hub: HubOverview };
-
-/** The hub counts are filled by an event listener a moment after a capture, so they are read again shortly after. */
-export const HUB_SETTLE_MS = 800;
+  | { status: 'ready'; providers: Provider[]; sources: Source[]; documentCounts: Record<string, number> };
 
 async function loadWorkspace(): Promise<WorkspaceState> {
-  const [providers, sources, hub] = await Promise.all([api.providers(), api.sources(), api.hub()]);
+  const [providers, sources] = await Promise.all([api.providers(), api.sources()]);
   const counts = await Promise.all(sources.map(async (source) => [source.id, (await api.documents(source.id)).length]));
-  return { status: 'ready', providers, sources, hub, documentCounts: Object.fromEntries(counts) };
+  return { status: 'ready', providers, sources, documentCounts: Object.fromEntries(counts) };
 }
 
 export function useWorkspace() {
@@ -32,11 +29,7 @@ export function useWorkspace() {
     void reload();
   }, [reload]);
 
-  /** Reloads now, and once more after the hub has caught up with the events just published. */
-  const refreshAfterCapture = useCallback(() => {
-    void reload();
-    window.setTimeout(() => void reload(), HUB_SETTLE_MS);
-  }, [reload]);
+  const refreshAfterCapture = useCallback(() => void reload(), [reload]);
 
   useEffect(() => {
     void reload();

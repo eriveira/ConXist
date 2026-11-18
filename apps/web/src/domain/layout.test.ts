@@ -1,28 +1,27 @@
-import { HUB_COLUMN_X, HUB_GAP_BELOW, ROW_GAP, layoutCanvas } from './layout';
+import { COLUMN_GAP, ROW_GAP, layoutSources } from './layout';
 import type { Source } from './model';
 
 const source = (id: string, addedAt: string): Source =>
   ({ id, addedAt, category: 'CAPTURE', provider: 'UPLOAD', name: id, accountLabel: '' });
 
-describe('layoutCanvas', () => {
-  it('stacks sources oldest first and centres the hub on them', () => {
-    const layout = layoutCanvas([source('b', '2026-11-17T10:00:00Z'), source('a', '2026-11-17T09:00:00Z')]);
+const FOUR = [
+  source('d', '2026-11-17T12:00:00Z'), source('a', '2026-11-17T09:00:00Z'),
+  source('c', '2026-11-17T11:00:00Z'), source('b', '2026-11-17T10:00:00Z'),
+];
 
-    expect(layout.sources.get('a')).toEqual({ x: 0, y: 0 });
-    expect(layout.sources.get('b')).toEqual({ x: 0, y: ROW_GAP });
-    expect(layout.hub).toEqual({ x: HUB_COLUMN_X, y: ROW_GAP / 2 });
+describe('layoutSources', () => {
+  it('fills rows of three, oldest first', () => {
+    const layout = layoutSources(FOUR);
+
+    expect(layout.get('a')).toEqual({ x: 0, y: 0 });
+    expect(layout.get('c')).toEqual({ x: 2 * COLUMN_GAP, y: 0 });
+    expect(layout.get('d')).toEqual({ x: 0, y: ROW_GAP });
   });
 
-  it('puts the hub alone at the origin when nothing is connected', () => {
-    expect(layoutCanvas([]).hub).toEqual({ x: 0, y: 0 });
-  });
-});
+  it('stacks sources in one column on a narrow screen', () => {
+    const layout = layoutSources(FOUR, 1);
 
-describe('layoutCanvas on a narrow screen', () => {
-  it('puts the hub below the last source', () => {
-    const layout = layoutCanvas([source('a', '2026-11-17T09:00:00Z'), source('b', '2026-11-17T10:00:00Z')], 'down');
-
-    expect(layout.sources.get('b')).toEqual({ x: 0, y: ROW_GAP });
-    expect(layout.hub).toEqual({ x: 0, y: 2 * ROW_GAP + HUB_GAP_BELOW });
+    expect(layout.get('b')).toEqual({ x: 0, y: ROW_GAP });
+    expect(layout.get('d')).toEqual({ x: 0, y: 3 * ROW_GAP });
   });
 });

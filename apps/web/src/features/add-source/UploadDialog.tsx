@@ -157,7 +157,6 @@ function ReviewStep({ name, files, skipped }: { name: string; files: readonly Pi
         <div><dt>{t('upload.name.label')}</dt><dd>{name}</dd></div>
         <div><dt>{t('upload.step.files')}</dt><dd>{t('upload.review.files', { count: files.length })}</dd></div>
         {skipped > 0 && <div><dt>{t('upload.review.skipped')}</dt><dd>{t('upload.review.files', { count: skipped })}</dd></div>}
-        <div><dt>{t('dialog.feeds')}</dt><dd>{t('hub.title')}</dd></div>
       </dl>
     </>
   );

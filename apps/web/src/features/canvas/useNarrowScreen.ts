@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** Below this width the canvas stacks the hub under the sources instead of beside them. */
+/** Below this width the canvas stacks sources in one column. */
 export const NARROW_SCREEN_QUERY = '(max-width: 559px)';
 
 function matches(): boolean {

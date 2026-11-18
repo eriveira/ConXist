@@ -1,5 +1,5 @@
 import type {
-  CapturedDocument, HubOverview, Provider, ProviderId, RecorderAccount, Source, SyncResult,
+  CapturedDocument, Provider, ProviderId, RecorderAccount, Source, SyncResult,
 } from '../domain/model';
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
@@ -47,7 +47,6 @@ export interface NewSource {
 export const api = {
   providers: () => request<Provider[]>('/api/providers'),
   sources: () => request<Source[]>('/api/sources'),
-  hub: () => request<HubOverview>('/api/hub'),
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),
   addSource: (source: NewSource) => postJson<Source>('/api/sources', source),
   uploadFile: (sourceId: string, file: File) => {

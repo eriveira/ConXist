@@ -16,7 +16,7 @@ describe('translations', () => {
     expect(translator('en')('upload.review.files', { count: 1 })).toBe('1 file');
     expect(translator('en')('upload.review.files', { count: 2 })).toBe('2 files');
     expect(translator('es')('upload.review.files', { count: 1 })).toBe('1 archivo');
-    expect(translator('en')('upload.result.lead', { done: 1, total: 1 })).toBe('1 of 1 file is waiting for review in the hub.');
+    expect(translator('en')('upload.result.lead', { done: 1, total: 1 })).toBe('1 of 1 file is waiting for review.');
   });
 
   it('has a plural form for every singular one', () => {

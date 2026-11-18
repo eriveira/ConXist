@@ -10,18 +10,16 @@ class NoResizeObserver {
   disconnect() {}
 }
 
-const HUB = { sources: 1, documents: 3, pendingReview: 3, latest: [] };
 const SOURCE = { id: 's1', category: 'CAPTURE', provider: 'UPLOAD', name: 'Product specs', accountLabel: '', addedAt: '2026-11-17T10:00:00Z' };
 
 describe('SourcesCanvas', () => {
   beforeEach(() => vi.stubGlobal('ResizeObserver', NoResizeObserver));
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows each source wired to the hub with its counts', async () => {
+  it('shows each source with its document count', async () => {
     stubApi({
       'GET /api/providers': () => ({ body: PROVIDERS }),
       'GET /api/sources': () => ({ body: [SOURCE] }),
-      'GET /api/hub': () => ({ body: HUB }),
       'GET /api/sources/s1/documents': () => ({ body: [{}, {}, {}] }),
     });
     render(<SourcesCanvas />);
@@ -30,7 +28,7 @@ describe('SourcesCanvas', () => {
     const source = await screen.findByTestId('rf__node-s1');
     expect(source).toHaveTextContent('Product specs');
     expect(source).toHaveTextContent('3 documents');
-    expect(screen.getByTestId('rf__node-hub')).toHaveTextContent('Waiting for review3');
+    expect(screen.queryByTestId('rf__node-hub')).not.toBeInTheDocument();
   });
 
   it('tells the person when a sync fails', async () => {
@@ -38,7 +36,6 @@ describe('SourcesCanvas', () => {
     stubApi({
       'GET /api/providers': () => ({ body: PROVIDERS }),
       'GET /api/sources': () => ({ body: [plaud] }),
-      'GET /api/hub': () => ({ body: HUB }),
       'GET /api/sources/p1/documents': () => ({ body: [] }),
       'POST /api/sources/p1/sync': () => ({ status: 500, body: { code: 'request.failed' } }),
     });
@@ -55,7 +52,6 @@ describe('SourcesCanvas', () => {
     stubApi({
       'GET /api/providers': () => ({ body: PROVIDERS }),
       'GET /api/sources': () => ({ body: [] }),
-      'GET /api/hub': () => ({ body: { ...HUB, sources: 0, documents: 0, pendingReview: 0 } }),
     });
     const { container } = render(<SourcesCanvas />);
     await screen.findByText('Connect your first source');
@@ -67,7 +63,6 @@ describe('SourcesCanvas', () => {
     stubApi({
       'GET /api/providers': () => ({ body: PROVIDERS }),
       'GET /api/sources': () => ({ body: [] }),
-      'GET /api/hub': () => ({ body: { ...HUB, sources: 0, documents: 0, pendingReview: 0 } }),
     });
     render(<SourcesCanvas />);
 
@@ -83,7 +78,6 @@ describe('SourcesCanvas', () => {
     stubApi({
       'GET /api/providers': () => ({ body: PROVIDERS }),
       'GET /api/sources': () => ({ body: [] }),
-      'GET /api/hub': () => ({ body: HUB }),
     });
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Connect your first source')).toBeInTheDocument();

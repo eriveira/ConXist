@@ -5,24 +5,16 @@ export interface Point {
   y: number;
 }
 
-/** `across`: sources in a column with the hub to their right. `down`: sources and then the hub in one column, for narrow screens. */
-export type Orientation = 'across' | 'down';
+export const COLUMN_GAP = 320;
+export const ROW_GAP = 220;
+/** Sources per row on a wide screen; a narrow screen uses one. */
+export const WIDE_COLUMNS = 3;
 
-export const SOURCE_COLUMN_X = 0;
-export const HUB_COLUMN_X = 420;
-export const ROW_GAP = 200;
-/** Extra room above the hub when it sits below the sources, so a tall source card never touches it. */
-export const HUB_GAP_BELOW = 80;
-
-/** Places sources in one column, oldest first, and the hub to their right (across) or below them (down). */
-export function layoutCanvas(
-  sources: readonly Source[],
-  orientation: Orientation = 'across',
-): { sources: Map<string, Point>; hub: Point } {
+/** Places sources in a grid, oldest first, filling each row left to right. */
+export function layoutSources(sources: readonly Source[], columns: number = WIDE_COLUMNS): Map<string, Point> {
   const ordered = [...sources].sort((a, b) => a.addedAt.localeCompare(b.addedAt));
   const positions = new Map<string, Point>();
-  ordered.forEach((source, row) => positions.set(source.id, { x: SOURCE_COLUMN_X, y: row * ROW_GAP }));
-  if (orientation === 'down') return { sources: positions, hub: { x: SOURCE_COLUMN_X, y: ordered.length * ROW_GAP + HUB_GAP_BELOW } };
-  const middle = ordered.length === 0 ? 0 : ((ordered.length - 1) * ROW_GAP) / 2;
-  return { sources: positions, hub: { x: ordered.length === 0 ? SOURCE_COLUMN_X : HUB_COLUMN_X, y: middle } };
+  ordered.forEach((source, index) =>
+    positions.set(source.id, { x: (index % columns) * COLUMN_GAP, y: Math.floor(index / columns) * ROW_GAP }));
+  return positions;
 }

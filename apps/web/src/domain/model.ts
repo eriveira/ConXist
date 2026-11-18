@@ -34,12 +34,6 @@ export interface CapturedDocument {
   capturedAt: string;
 }
 
-export interface HubOverview {
-  sources: number;
-  documents: number;
-  pendingReview: number;
-}
-
 export interface SyncResult {
   imported: number;
   alreadyImported: number;
