@@ -40,10 +40,11 @@ export CONXIST_SECRETS_KEY=$(openssl rand -base64 32)
 Client ID `demo-team` to see five sample meetings (three import, one is older
 than 30 days, one is still being transcribed).
 
-**Do not upload real customer documents or connect a real Plaud Team** until
-encryption at rest and sign-in land. Uploads are stored unencrypted under
-`apps/api/data/uploads`, and imported text (including meeting transcripts) is
-stored unencrypted in PostgreSQL. Recorder private keys are encrypted.
+Uploaded files, captured text (including meeting transcripts) and recorder
+private keys are encrypted at rest with `CONXIST_SECRETS_KEY` (ADR 0004). Keep
+that key out of the database and its backups: without it the data cannot be
+read, and losing it loses the data. The API has no sign-in yet and listens only
+on this machine, so use real customer data on your own computer only.
 
 ## Test it
 

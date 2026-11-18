@@ -1,4 +1,4 @@
-package com.conxist.capture.adapter.plaud;
+package com.conxist.capture.adapter.secrets;
 
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
@@ -9,8 +9,9 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Encrypts secrets at rest with AES-256-GCM. The 32-byte key comes from the environment
- * ({@code CONXIST_SECRETS_KEY}), never from the database, so a copy of the database alone reveals no private key.
+ * Encrypts customer data and secrets at rest with AES-256-GCM: recorder private keys, captured text and uploaded
+ * files. The 32-byte key comes from the environment ({@code CONXIST_SECRETS_KEY}), never from the database or the
+ * disk it protects, so a copy of either alone reveals nothing.
  * Stored form: 12-byte nonce followed by the ciphertext and tag.
  */
 public final class SecretBox {

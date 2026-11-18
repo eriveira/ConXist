@@ -55,9 +55,7 @@ asked for Plaud to become the first real source. Plaud offers four ways in
 - Plaud shows as **Preview** in the app and on the product page until one real
   Plaud Team signs in. The code path is the real one; only the fake Plaud has
   answered it so far.
-- Imported meeting text is stored unencrypted, like uploads (README warning).
-  Encrypting captured text at rest is the next security slice, and comes before
-  any real customer Team is connected. Private keys are already sealed.
+- Imported meeting text is encrypted at rest since ADR 0004.
 - Untrusted transcript text is kept to one line per utterance, speakers are
   cleaned, summaries are quoted, and meetings stop at
   `conxist.capture.max-text-characters`, so spoken text cannot forge document

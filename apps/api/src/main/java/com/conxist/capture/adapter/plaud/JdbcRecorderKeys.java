@@ -1,5 +1,6 @@
 package com.conxist.capture.adapter.plaud;
 
+import com.conxist.capture.adapter.secrets.SecretBox;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;

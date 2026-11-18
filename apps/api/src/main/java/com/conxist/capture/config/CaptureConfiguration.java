@@ -12,7 +12,7 @@ import com.conxist.capture.application.FileStore;
 import com.conxist.capture.application.ListDocuments;
 import com.conxist.capture.adapter.plaud.JdbcRecorderKeys;
 import com.conxist.capture.adapter.plaud.PlaudTeamClient;
-import com.conxist.capture.adapter.plaud.SecretBox;
+import com.conxist.capture.adapter.secrets.SecretBox;
 import com.conxist.capture.application.ConnectPlaudTeam;
 import com.conxist.capture.application.ListRecorderConnections;
 import com.conxist.capture.application.PlaudTeam;
@@ -42,8 +42,13 @@ class CaptureConfiguration {
     }
 
     @Bean
-    FileStore fileStore(CaptureProperties properties) {
-        return new LocalFileStore(properties.storageRoot());
+    SecretBox secretBox(SecretsProperties secrets) {
+        return new SecretBox(Base64.getDecoder().decode(secrets.encryptionKey()));
+    }
+
+    @Bean
+    FileStore fileStore(CaptureProperties properties, SecretBox box) {
+        return new LocalFileStore(properties.storageRoot(), box);
     }
 
     @Bean
@@ -60,8 +65,8 @@ class CaptureConfiguration {
     }
 
     @Bean
-    JdbcRecorderKeys recorderKeys(JdbcClient jdbc, SecretsProperties secrets, Clock clock) {
-        return new JdbcRecorderKeys(jdbc, new SecretBox(Base64.getDecoder().decode(secrets.encryptionKey())), clock);
+    JdbcRecorderKeys recorderKeys(JdbcClient jdbc, SecretBox box, Clock clock) {
+        return new JdbcRecorderKeys(jdbc, box, clock);
     }
 
     @Bean

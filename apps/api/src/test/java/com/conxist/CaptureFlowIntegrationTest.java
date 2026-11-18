@@ -23,6 +23,8 @@ import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -57,6 +59,9 @@ class CaptureFlowIntegrationTest {
     @Autowired
     FakePlaudServer plaud;
 
+    @Autowired
+    java.util.List<ApplicationRunner> runners;
+
     @Test
     void an_uploaded_file_reaches_the_hub_waiting_for_review() throws Exception {
         String sourceId = addSource("{\"provider\":\"UPLOAD\",\"name\":\"Product specs\"}");
@@ -73,6 +78,7 @@ class CaptureFlowIntegrationTest {
                 .andExpect(jsonPath("$[0].text").doesNotExist());
         awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW");
         awaitHubItem(sourceId, "SOURCE", "CONNECTED");
+        assertNoPlaintextFor(sourceId, "Every source connects");
         mvc.perform(get("/api/hub"))
                 .andExpect(jsonPath("$.pendingReview").value(greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.latest[0].workspaceId").doesNotExist());
@@ -188,6 +194,38 @@ class CaptureFlowIntegrationTest {
         String sealed = jdbc.sql("select encode(private_key_sealed, 'escape') from recorder_keys where key_id = :id")
                 .param("id", keyId).query(String.class).single();
         org.assertj.core.api.Assertions.assertThat(sealed).doesNotContain("PRIVATE KEY");
+        assertNoPlaintextFor(sourceId, "Text of");
+    }
+
+    @Test
+    void text_captured_before_encryption_is_sealed_on_start_and_still_readable() throws Exception {
+        String sourceId = addSource("{\"provider\":\"UPLOAD\",\"name\":\"Old notes\"}");
+        jdbc.sql("""
+                insert into captured_documents (id, workspace_id, source_id, title, media_type, size_bytes,
+                  text_content, origin, origin_reference, captured_at)
+                select :id, workspace_id, id, 'old.txt', 'text/plain', 9, 'Old notes', 'UPLOAD', 'old', now()
+                from sources where id = :sourceId
+                """).param("id", UUID.randomUUID()).param("sourceId", UUID.fromString(sourceId)).update();
+
+        for (ApplicationRunner runner : runners) {
+            runner.run(new DefaultApplicationArguments());
+        }
+
+        assertNoPlaintextFor(sourceId, "Old notes");
+        mvc.perform(get("/api/sources/{id}/documents", sourceId))
+                .andExpect(jsonPath("$[0].title").value("old.txt"))
+                .andExpect(jsonPath("$[0].textLength").value(9));
+    }
+
+    private void assertNoPlaintextFor(String sourceId, String phrase) {
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql("""
+                select count(*) from captured_documents
+                where source_id = :id and (text_content is not null or position(convert_to(:phrase, 'UTF8') in text_sealed) > 0)
+                """).param("id", UUID.fromString(sourceId)).param("phrase", phrase).query(Long.class).single())
+                .isZero();
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql(
+                "select count(*) from captured_documents where source_id = :id and text_sealed is not null")
+                .param("id", UUID.fromString(sourceId)).query(Long.class).single()).isPositive();
     }
 
     @Test
