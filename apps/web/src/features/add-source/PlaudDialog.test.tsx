@@ -16,10 +16,10 @@ describe('PlaudDialog', () => {
     render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
 
     expect(screen.getByText(/Preview: this signs in to a sample account/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in to Plaud' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('Sample Plaud account')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('2 meetings are waiting for review');
     const added = calls.find((call) => call.key === 'POST /api/sources');
@@ -38,13 +38,13 @@ describe('PlaudDialog', () => {
         : { body: { imported: 2, alreadyImported: 0 } }),
     });
     render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in to Plaud' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByText('Sample Plaud account');
-    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('2 meetings');
     expect(calls.filter((call) => call.key === 'POST /api/sources')).toHaveLength(1);
@@ -59,7 +59,7 @@ describe('PlaudDialog', () => {
   it('asks for the sign-in before continuing', async () => {
     render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Sign in to continue.');
   });

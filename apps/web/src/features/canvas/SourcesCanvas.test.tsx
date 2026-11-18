@@ -42,7 +42,7 @@ describe('SourcesCanvas', () => {
     render(<SourcesCanvas />);
     const node = await screen.findByTestId('rf__node-p1');
 
-    fireEvent.click(within(node).getByText('Sync now').closest('button')!);
+    fireEvent.click(within(node).getByText('Sync').closest('button')!);
 
     expect(await within(node).findByText('Sync failed. Try again.')).toBeInTheDocument();
     expect(within(node).getByText('Sync failed')).toHaveClass('pill', 'error');
@@ -79,7 +79,7 @@ describe('SourcesCanvas', () => {
       'GET /api/providers': () => ({ body: PROVIDERS }),
       'GET /api/sources': () => ({ body: [] }),
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Connect your first source')).toBeInTheDocument();
   });
 });

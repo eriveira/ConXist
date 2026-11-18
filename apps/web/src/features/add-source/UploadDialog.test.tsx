@@ -9,7 +9,7 @@ const SOURCE = { id: 'src-1', category: 'CAPTURE', provider: 'UPLOAD', name: 'Sp
 const pdf = () => new File(['%PDF'], 'spec.pdf', { type: 'application/pdf' });
 
 async function continueTo() {
-  await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 }
 
 describe('UploadDialog', () => {
@@ -28,7 +28,7 @@ describe('UploadDialog', () => {
     await continueTo();
     await userEvent.upload(screen.getByTestId('file-input'), pdf());
     await continueTo();
-    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('1 of 1 file is waiting for review');
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ provider: 'UPLOAD', name: 'Specs' });
@@ -62,7 +62,7 @@ describe('UploadDialog', () => {
 
     await userEvent.upload(screen.getByTestId('file-input'), pdf());
     await continueTo();
-    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByText('We could not read the text in this file.')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('0 of 1 file is waiting');
@@ -75,10 +75,10 @@ describe('UploadDialog', () => {
     await continueTo();
     await userEvent.upload(screen.getByTestId('file-input'), pdf());
     await continueTo();
-    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('already exists');
-    expect(screen.getByRole('button', { name: 'Add to canvas' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled();
   });
 
   it('has no accessibility violations on the files step', async () => {
@@ -98,8 +98,8 @@ describe('UploadDialog', () => {
     );
 
     await userEvent.upload(screen.getByTestId('file-input'), pdf());
-    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Agregar al lienzo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar' }));
 
     expect(await screen.findByText('No pudimos leer el texto de este archivo.')).toBeInTheDocument();
   });
@@ -116,7 +116,7 @@ describe('UploadDialog', () => {
     await continueTo();
     await userEvent.upload(screen.getByTestId('file-input'), pdf());
     await continueTo();
-    await userEvent.click(screen.getByRole('button', { name: 'Add to canvas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(await screen.findByRole('status')).toHaveTextContent('0 of 1');
 
     expect(calls.filter((call) => call.key === 'POST /api/sources')).toHaveLength(1);
