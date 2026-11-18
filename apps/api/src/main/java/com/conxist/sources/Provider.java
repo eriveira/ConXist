@@ -2,7 +2,6 @@ package com.conxist.sources;
 
 import static com.conxist.sources.Availability.COMING_SOON;
 import static com.conxist.sources.Availability.LIVE;
-import static com.conxist.sources.Availability.PREVIEW;
 import static com.conxist.sources.SourceCategory.CAPTURE;
 import static com.conxist.sources.SourceCategory.REPO;
 import static com.conxist.sources.SourceCategory.STORAGE;
@@ -10,7 +9,7 @@ import static com.conxist.sources.SourceCategory.STORAGE;
 /** Every provider in the Phase 1 scope set by the owner (AGENTS.md). */
 public enum Provider {
     UPLOAD(CAPTURE, LIVE, "File upload", false),
-    PLAUD(CAPTURE, PREVIEW, "Plaud", true),
+    PLAUD(CAPTURE, LIVE, "Plaud", true),
     EMAIL(CAPTURE, COMING_SOON, "Email", false),
     GITHUB(REPO, COMING_SOON, "GitHub", true),
     BITBUCKET(REPO, COMING_SOON, "Bitbucket", true),

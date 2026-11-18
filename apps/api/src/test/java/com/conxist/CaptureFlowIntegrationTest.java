@@ -17,6 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
+import com.conxist.testing.FakePlaudConfiguration;
+import com.conxist.testing.FakePlaudServer;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,7 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** The whole slice against a real PostgreSQL: add sources, capture, and see it arrive in the hub. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(PostgresContainerConfiguration.class)
+@Import({PostgresContainerConfiguration.class, FakePlaudConfiguration.class})
 class CaptureFlowIntegrationTest {
 
     @TempDir
@@ -51,6 +53,9 @@ class CaptureFlowIntegrationTest {
 
     @Autowired
     JdbcClient jdbc;
+
+    @Autowired
+    FakePlaudServer plaud;
 
     @Test
     void an_uploaded_file_reaches_the_hub_waiting_for_review() throws Exception {
@@ -120,7 +125,7 @@ class CaptureFlowIntegrationTest {
     @Test
     void answers_only_requests_addressed_to_this_machine() throws Exception {
         mvc.perform(get("/api/sources").header("Host", "rebound.attacker.example")).andExpect(status().isForbidden());
-        mvc.perform(post("/api/recorders/plaud/sign-in").header("Origin", "https://attacker.example"))
+        mvc.perform(post("/api/recorders/plaud/keys").header("Origin", "https://attacker.example"))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/sources").header("Origin", "http://localhost:5173")).andExpect(status().isOk());
     }
@@ -147,17 +152,42 @@ class CaptureFlowIntegrationTest {
     }
 
     @Test
-    void a_recorder_sync_imports_each_recording_once() throws Exception {
-        String account = JsonPath.read(mvc.perform(post("/api/recorders/plaud/sign-in"))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.label");
+    void a_plaud_team_connects_with_a_conxist_key_and_imports_each_meeting_once() throws Exception {
+        String key = mvc.perform(post("/api/recorders/plaud/keys"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.pem").value(startsWith("-----BEGIN PUBLIC KEY-----")))
+                .andExpect(jsonPath("$.privateKey").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        String keyId = JsonPath.read(key, "$.keyId");
+        String credential = "{\"clientId\":\"client_it\",\"keyId\":\"" + keyId + "\"}";
+
+        mvc.perform(post("/api/recorders/plaud/test").contentType(MediaType.APPLICATION_JSON).content(credential))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("plaud.not-accepted"));
+        plaud.register("client_it", JsonPath.read(key, "$.pem"));
+        mvc.perform(post("/api/recorders/plaud/test").contentType(MediaType.APPLICATION_JSON).content(credential))
+                .andExpect(jsonPath("$.teamName").value(FakePlaudServer.TEAM_NAME));
+
         String sourceId = addSource("{\"provider\":\"PLAUD\",\"name\":\"Team meetings\",\"accountLabel\":\""
-                + account + "\"}");
+                + FakePlaudServer.TEAM_NAME + "\"}");
+        mvc.perform(post("/api/sources/{id}/plaud-team", sourceId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientId\":\"client_it\",\"keyId\":\"" + keyId
+                                + "\",\"startFrom\":\"LAST_30_DAYS\",\"includeSummaries\":true}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.clientId").doesNotExist());
 
         mvc.perform(post("/api/sources/{id}/sync", sourceId))
-                .andExpect(jsonPath("$.imported").value(2));
+                .andExpect(jsonPath("$.imported").value(3))
+                .andExpect(jsonPath("$.waitingForTranscript").value(1));
         mvc.perform(post("/api/sources/{id}/sync", sourceId))
-                .andExpect(jsonPath("$.imported").value(0))
-                .andExpect(jsonPath("$.alreadyImported").value(2));
+                .andExpect(jsonPath("$.imported").value(0));
+        mvc.perform(get("/api/recorders/plaud/connections"))
+                .andExpect(jsonPath("$[?(@.sourceId=='" + sourceId + "')].lastCheckedAt").isNotEmpty());
+        awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW", 3);
+        String sealed = jdbc.sql("select encode(private_key_sealed, 'escape') from recorder_keys where key_id = :id")
+                .param("id", keyId).query(String.class).single();
+        org.assertj.core.api.Assertions.assertThat(sealed).doesNotContain("PRIVATE KEY");
     }
 
     @Test
@@ -185,7 +215,7 @@ class CaptureFlowIntegrationTest {
         mvc.perform(get("/api/providers"))
                 .andExpect(jsonPath("$", hasSize(11)))
                 .andExpect(jsonPath("$[?(@.provider=='UPLOAD')].availability").value("LIVE"))
-                .andExpect(jsonPath("$[?(@.provider=='PLAUD')].availability").value("PREVIEW"));
+                .andExpect(jsonPath("$[?(@.provider=='PLAUD')].availability").value("LIVE"));
     }
 
     private String addSource(String json) throws Exception {
@@ -196,11 +226,15 @@ class CaptureFlowIntegrationTest {
     }
 
     private void awaitHubItem(String sourceId, String type, String expectedStatus) {
+        awaitHubItem(sourceId, type, expectedStatus, 1);
+    }
+
+    private void awaitHubItem(String sourceId, String type, String expectedStatus, long count) {
         await().atMost(Duration.ofSeconds(10)).until(() -> jdbc.sql("""
                         select count(*) from hub_items
                         where source_id = cast(:sourceId as uuid) and item_type = :type and status = :status
                         """)
                 .param("sourceId", sourceId).param("type", type).param("status", expectedStatus)
-                .query(Long.class).single() == 1);
+                .query(Long.class).single() == count);
     }
 }

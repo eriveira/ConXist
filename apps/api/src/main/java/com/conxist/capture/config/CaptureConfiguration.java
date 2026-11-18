@@ -1,6 +1,8 @@
 package com.conxist.capture.config;
 
 import java.time.Clock;
+import java.net.http.HttpClient;
+import java.util.Base64;
 import com.conxist.capture.adapter.extraction.TikaTextExtractor;
 import com.conxist.capture.adapter.files.LocalFileStore;
 import com.conxist.capture.application.CaptureContext;
@@ -8,8 +10,13 @@ import com.conxist.capture.application.CaptureUpload;
 import com.conxist.capture.application.CapturedDocumentRepository;
 import com.conxist.capture.application.FileStore;
 import com.conxist.capture.application.ListDocuments;
-import com.conxist.capture.application.RecorderConnector;
-import com.conxist.capture.application.SignInToRecorder;
+import com.conxist.capture.adapter.plaud.JdbcRecorderKeys;
+import com.conxist.capture.adapter.plaud.PlaudTeamClient;
+import com.conxist.capture.adapter.plaud.SecretBox;
+import com.conxist.capture.application.ConnectPlaudTeam;
+import com.conxist.capture.application.ListRecorderConnections;
+import com.conxist.capture.application.PlaudTeam;
+import com.conxist.capture.application.PlaudTeamConnections;
 import com.conxist.capture.application.SyncRecorder;
 import com.conxist.capture.application.TextExtractor;
 import com.conxist.capture.domain.UploadPolicy;
@@ -19,9 +26,14 @@ import com.conxist.platform.UnitOfWork;
 import com.conxist.sources.SourceCatalog;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.web.client.RestClient;
 
 /** Wires the capture use cases to their adapters. */
 @Configuration(proxyBeanMethods = false)
+@EnableScheduling
 class CaptureConfiguration {
 
     @Bean
@@ -48,14 +60,37 @@ class CaptureConfiguration {
     }
 
     @Bean
-    SyncRecorder syncRecorder(SourceCatalog catalog, RecorderConnector recorder, CapturedDocumentRepository documents,
-            CaptureContext context) {
-        return new SyncRecorder(catalog, recorder, documents, context);
+    JdbcRecorderKeys recorderKeys(JdbcClient jdbc, SecretsProperties secrets, Clock clock) {
+        return new JdbcRecorderKeys(jdbc, new SecretBox(Base64.getDecoder().decode(secrets.encryptionKey())), clock);
     }
 
     @Bean
-    SignInToRecorder signInToRecorder(RecorderConnector recorder) {
-        return new SignInToRecorder(recorder);
+    PlaudTeam plaudTeam(PlaudProperties plaud, JdbcRecorderKeys keys, Clock clock) {
+        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+                .connectTimeout(plaud.connectTimeout())
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build());
+        requests.setReadTimeout(plaud.readTimeout());
+        RestClient http = RestClient.builder().requestFactory(requests).build();
+        return new PlaudTeamClient(http, plaud.apiBaseUrl(), plaud.tokenUrl(), plaud.tokenAudience(),
+                plaud.pageSize(), keys, clock);
+    }
+
+    @Bean
+    ConnectPlaudTeam connectPlaudTeam(SourceCatalog catalog, JdbcRecorderKeys keys, PlaudTeam plaud,
+            PlaudTeamConnections connections, CaptureContext context) {
+        return new ConnectPlaudTeam(catalog, keys, plaud, connections, context);
+    }
+
+    @Bean
+    SyncRecorder syncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
+            CapturedDocumentRepository documents, CaptureContext context) {
+        return new SyncRecorder(catalog, plaud, connections, documents, context);
+    }
+
+    @Bean
+    ListRecorderConnections listRecorderConnections(PlaudTeamConnections connections, CurrentWorkspace workspace) {
+        return new ListRecorderConnections(connections, workspace);
     }
 
     @Bean

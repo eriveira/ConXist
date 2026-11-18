@@ -13,6 +13,9 @@ const PATHS = {
   file: 'M7 3h7l5 5v13H7zM14 3v5h5',
   sync: 'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',
   alert: 'M12 4l9 16H3zM12 10v4M12 17v.5',
+  copy: 'M9 9h11v11H9zM5 15V4h11',
+  info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.5',
+  team: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5.5M21 20a6 6 0 0 0-4-5.6',
 } as const;
 
 export type IconName = keyof typeof PATHS;

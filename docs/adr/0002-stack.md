@@ -23,7 +23,7 @@ The standards require Clean Architecture with an enforced dependency rule.
 | Data | PostgreSQL 16, Spring Data JDBC (`JdbcClient`), Flyway migrations |
 | Text extraction | Apache Tika (PDF and Office), plain read for Markdown and text |
 | MCP server | Spring AI MCP server, in its own module, calling the same use cases (later slice) |
-| Frontend (`apps/web`) | React + TypeScript + Vite, React Flow (`@xyflow/react`) for the canvas, brand tokens only |
+| Frontend (`apps/web`) | React + TypeScript + Vite, brand tokens only (React Flow was dropped on 2026-11-18 when the canvas became the Sources page, ADR 0003) |
 | Tests | JUnit 5 + AssertJ (unit), Testcontainers PostgreSQL (adapters, integration), `ApplicationModules.verify()` + ArchUnit (architecture), Vitest (web), Playwright later for end-to-end |
 
 ## Why

@@ -3,7 +3,7 @@ import type { Provider } from './domain/model';
 
 export const PROVIDERS: Provider[] = [
   { provider: 'UPLOAD', category: 'CAPTURE', availability: 'LIVE', displayName: 'File upload', signInRequired: false },
-  { provider: 'PLAUD', category: 'CAPTURE', availability: 'PREVIEW', displayName: 'Plaud', signInRequired: true },
+  { provider: 'PLAUD', category: 'CAPTURE', availability: 'LIVE', displayName: 'Plaud', signInRequired: true },
   { provider: 'EMAIL', category: 'CAPTURE', availability: 'COMING_SOON', displayName: 'Email', signInRequired: false },
   { provider: 'GITHUB', category: 'REPO', availability: 'COMING_SOON', displayName: 'GitHub', signInRequired: true },
 ];

@@ -38,3 +38,16 @@ conxist:
       - text/plain
       - text/markdown
       - text/x-web-markdown
+  plaud:
+    # Plaud Enterprise API (Team workspaces), read-only. See docs/adr/0003-plaud-team-source.md.
+    api-base-url: ${CONXIST_PLAUD_API_URL:https://api.plaud.ai/enterprise/v1}
+    token-url: ${CONXIST_PLAUD_TOKEN_URL:https://api.plaud.ai/team-oauth/oauth/token}
+    # The issuer string Plaud sends with a credential (exact match). The default is a guess until Plaud confirms it.
+    token-audience: ${CONXIST_PLAUD_TOKEN_AUDIENCE:https://api.plaud.ai/team-oauth}
+    page-size: 100
+    sync-interval: ${CONXIST_PLAUD_SYNC_INTERVAL:5m}
+    connect-timeout: 10s
+    read-timeout: 30s
+  secrets:
+    # 32 random bytes, base64: openssl rand -base64 32. Required; there is no default on purpose.
+    encryption-key: ${CONXIST_SECRETS_KEY:}
