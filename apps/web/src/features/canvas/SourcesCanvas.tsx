@@ -161,7 +161,7 @@ function Flow({ workspace, onAddFiles, onSynced }: FlowProps) {
       ariaLabelConfig={ariaLabels}
     >
       <Background gap={22} size={1.4} />
-      <Controls showInteractive={false} position={narrow ? 'top-right' : 'bottom-left'} />
+      <Controls showInteractive={false} position={narrow ? 'bottom-right' : 'bottom-left'} />
     </ReactFlow>
   );
 }
