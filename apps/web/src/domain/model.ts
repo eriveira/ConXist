@@ -37,10 +37,31 @@ export interface CapturedDocument {
 export interface SyncResult {
   imported: number;
   alreadyImported: number;
+  /** Recordings Plaud is still transcribing; they arrive in a later sync. */
+  waitingForTranscript: number;
 }
 
-export interface RecorderAccount {
-  label: string;
+/** How far back the first import of a meeting recorder reaches. */
+export type StartFrom = 'LAST_30_DAYS' | 'LAST_7_DAYS' | 'NEW_ONLY';
+export const START_FROM: readonly StartFrom[] = ['LAST_30_DAYS', 'LAST_7_DAYS', 'NEW_ONLY'];
+
+/** A key ConXist made for signing in to Plaud. Only the public half ever reaches the browser. */
+export interface RecorderKey {
+  keyId: string;
+  pem: string;
+}
+
+export interface TeamCheck {
+  teamName: string;
+}
+
+export interface RecorderConnection {
+  sourceId: string;
+  teamName: string;
+  startFrom: StartFrom;
+  includeSummaries: boolean;
+  status: 'ACTIVE' | 'PAUSED';
+  lastCheckedAt: string | null;
 }
 
 /** Matches Source.MAX_NAME_LENGTH in the API. */

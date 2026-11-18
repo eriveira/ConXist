@@ -10,6 +10,7 @@ import static com.conxist.sources.SourceCategory.STORAGE;
 /** Every provider in the Phase 1 scope set by the owner (AGENTS.md). */
 public enum Provider {
     UPLOAD(CAPTURE, LIVE, "File upload", false),
+    /** Preview until one real Plaud Team signs in (ADR 0003); the code path itself is the live one. */
     PLAUD(CAPTURE, PREVIEW, "Plaud", true),
     EMAIL(CAPTURE, COMING_SOON, "Email", false),
     GITHUB(REPO, COMING_SOON, "GitHub", true),

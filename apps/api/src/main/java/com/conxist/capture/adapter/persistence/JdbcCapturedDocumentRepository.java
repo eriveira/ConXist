@@ -46,6 +46,19 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
     }
 
     @Override
+    public boolean exists(UUID workspaceId, UUID sourceId, String originReference) {
+        return jdbc.sql("""
+                select exists (select 1 from captured_documents
+                  where workspace_id = :workspaceId and source_id = :sourceId and origin_reference = :reference)
+                """)
+                .param("workspaceId", workspaceId)
+                .param("sourceId", sourceId)
+                .param("reference", originReference)
+                .query(Boolean.class)
+                .single();
+    }
+
+    @Override
     public List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId) {
         return jdbc.sql("""
                 select id, workspace_id, source_id, title, media_type, size_bytes, text_content, origin,

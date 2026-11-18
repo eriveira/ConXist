@@ -7,8 +7,8 @@ import { dirname, join, relative, resolve } from 'node:path';
  */
 const SRC = __dirname;
 const RULES: { layer: string; forbidden: readonly string[] }[] = [
-  { layer: 'domain', forbidden: ['react', '@xyflow', 'api', 'features', 'components', 'i18n'] },
-  { layer: 'api', forbidden: ['react', '@xyflow', 'features', 'components', 'i18n'] },
+  { layer: 'domain', forbidden: ['react', 'api', 'features', 'components', 'i18n'] },
+  { layer: 'api', forbidden: ['react', 'features', 'components', 'i18n'] },
   { layer: 'components', forbidden: ['features', 'api'] },
 ];
 const IMPORT = /(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]/g;
@@ -33,8 +33,8 @@ function importsOf(file: string): string[] {
 describe('architecture', () => {
   it('resolves imports at any depth and in any quote style', () => {
     const file = join(SRC, 'domain', 'deep', 'x.ts');
-    expect(targetOf(file, '../../features/canvas/nodes')).toBe('features');
-    expect(targetOf(file, '@xyflow/react')).toBe('@xyflow');
+    expect(targetOf(file, '../../features/sources/SourceCard')).toBe('features');
+    expect(targetOf(file, '@tanstack/query')).toBe('@tanstack');
     expect(targetOf(file, 'react-dom/client')).toBe('react-dom');
   });
 

@@ -22,7 +22,7 @@ A modular AI platform for development and product teams. It captures work
 information (meeting recordings, documents, repositories), turns it into
 requirements, and keeps a shared memory that coding agents reach through MCP.
 Phase 1 is Capture. Every source connects to one ConXist hub (an API module; the
-canvas does not show it for now, owner decision 2026-11-17).
+Sources page does not show it for now, owner decision 2026-11-17).
 
 ## What is in this repository
 
@@ -38,15 +38,18 @@ canvas does not show it for now, owner decision 2026-11-17).
   is a module (`platform`, `sources`, `capture`, `hub`) with `domain`,
   `application`, `adapter` and `config` inside. Modules talk through their root
   package (API) and events. See `docs/adr/0002-stack.md` (accepted).
-- `apps/web/`: the web app (React Flow sources canvas). `domain` and `api` stay
+- `apps/web/`: the web app (the Sources page and its add-source dialogs). `domain` and `api` stay
   free of React; screens live in `features`.
 
-## Current state (2026-11-17)
+## Current state (2026-11-18)
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
-- Slice 1 of Capture is built: file upload (live) and Plaud (preview, sample
-  sign-in) on the sources canvas; Repo and Storage show as coming soon.
+- Capture has file upload (live) and Plaud Team workspaces (preview: built on
+  Plaud's Enterprise API, not yet tried with a real Plaud Team; see `docs/adr/0003-plaud-team-source.md`) on the
+  Sources page. Personal "Sign in with Plaud" shows as coming soon, as do Repo
+  and Storage. The API needs `CONXIST_SECRETS_KEY` (32 bytes, Base64) to start;
+  `mvn spring-boot:test-run` runs a fake Plaud that accepts Client ID `demo-team`.
 - No sign-in yet: the API is single-workspace and listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

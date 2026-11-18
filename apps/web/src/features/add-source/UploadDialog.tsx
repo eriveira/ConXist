@@ -13,7 +13,7 @@ import { useUploads, type PickedFile } from './useUploads';
 type Step = 'name' | 'files' | 'review' | 'result';
 
 interface UploadDialogProps {
-  /** Set when adding files to a source already on the canvas; the name step is then skipped. */
+  /** Set when adding files to a source already on the Sources page; the name step is then skipped. */
   existing?: Source;
   onClose: () => void;
   onCaptured: () => void;

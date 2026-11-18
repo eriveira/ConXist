@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import logoLight from '@brand/assets/logo/conxist-logo-horizontal-transparent.png';
 import logoDark from '@brand/assets/logo/conxist-logo-horizontal-reversed.png';
-import { SourcesCanvas } from './features/canvas/SourcesCanvas';
+import { SourcesPage } from './features/sources/SourcesPage';
 import { I18nProvider, translator } from './i18n/i18n';
 import { LANGUAGES, type Language } from './i18n/messages';
 import { readPreference, savePreference } from './preferences';
@@ -52,7 +52,7 @@ export function App() {
           </label>
         </header>
         <main className="stage">
-          <SourcesCanvas />
+          <SourcesPage />
         </main>
       </div>
     </I18nProvider>

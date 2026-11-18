@@ -1,4 +1,4 @@
-/* Sources canvas. Colors, fonts, radii and shadows come only from the brand tokens. */
+/* Sources page. Colors, fonts, radii and shadows come only from the brand tokens. */
 @import '@brand/tokens/conxist.css';
 
 * { box-sizing: border-box; }
@@ -38,13 +38,12 @@ button { cursor: pointer; }
   height: 36px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-pill);
   background: var(--cx-surface-raised); padding: 0 10px;
 }
-.stage { position: relative; min-height: 0; }
+.stage { position: relative; min-height: 0; overflow: auto; }
 @media (max-width: 560px) {
   .crumbs { display: none; }
   .top { gap: 8px; padding: 0 12px; }
   .logo-chip img { height: 28px; }
   .pick select { padding: 0 6px; font-size: 14px; }
-  .react-flow__controls-button { width: 44px; height: 44px; }
 }
 
 /* buttons and pills */
@@ -71,42 +70,33 @@ button { cursor: pointer; }
 .pill.live { background: var(--cx-ok-bg); color: var(--cx-ok-fg); }
 .pill.error { background: var(--cx-err-bg); color: var(--cx-err-fg); }
 
-/* canvas */
-.viewport { position: absolute; inset: 0; }
-.react-flow {
-  --xy-background-color: var(--cx-surface);
-  --xy-background-pattern-color: var(--cx-canvas-dot);
-  --xy-edge-stroke: var(--cx-edge);
-  --xy-handle-background-color: var(--cx-surface-raised);
-  --xy-handle-border-color: var(--cx-edge);
-  --xy-controls-button-background-color: var(--cx-surface-raised);
-  --xy-controls-button-background-color-hover: var(--cx-surface);
-  --xy-controls-button-color: var(--cx-fg);
-  --xy-controls-button-color-hover: var(--cx-fg);
-  --xy-controls-button-border-color: var(--cx-border);
-  --xy-controls-box-shadow: var(--cx-shadow-card);
-  --xy-attribution-background-color: transparent;
-}
-.react-flow__handle { width: 12px; height: 12px; border-width: 2px; }
-.react-flow__attribution a { color: var(--cx-fg-muted); }
-.canvas-tl { position: absolute; left: 16px; top: 16px; z-index: 8; }
-.add-main { box-shadow: var(--cx-shadow-card); }
-.canvas-state { display: grid; place-items: center; height: 100%; gap: 8px; color: var(--cx-fg-muted); padding: 16px; }
+/* page */
+.page { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
+.page-h { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 16px; margin-bottom: 22px; }
+.page-h h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.page-h p { grid-column: 1 / -1; margin: 0; color: var(--cx-fg-muted); max-width: 60ch; }
+.page-h .menu { left: auto; right: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.page-state { display: grid; place-items: center; min-height: 240px; gap: 8px; color: var(--cx-fg-muted); padding: 16px; text-align: center; }
 .panel, .empty {
   background: var(--cx-surface-raised); border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md);
   box-shadow: var(--cx-shadow-card); padding: 20px; max-width: 440px;
 }
 .panel h2, .empty h2 { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--cx-fg); }
 .panel p, .empty p { margin: 0 0 16px; color: var(--cx-fg-muted); }
-.empty { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(440px, calc(100% - 32px)); z-index: 5; }
-.empty p { margin: 0; }
+.empty { max-width: 520px; margin: 32px auto 0; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.empty .nico { margin-bottom: 12px; }
+@media (max-width: 560px) {
+  .page { padding: 20px 16px 40px; }
+  .page-h h1 { font-size: 24px; }
+}
 
 /* nodes */
 .node {
-  width: 248px; background: var(--cx-surface-raised); border: 1px solid var(--cx-border);
+  background: var(--cx-surface-raised); border: 1px solid var(--cx-border); min-width: 0;
   border-radius: var(--cx-radius-md); box-shadow: var(--cx-shadow-card); color: var(--cx-fg);
 }
-.react-flow__node.selected .node { border-color: var(--cx-accent); }
+.node.err { border-color: var(--cx-err-fg); }
 .nhead { display: flex; align-items: center; gap: 10px; padding: 12px 12px 10px; }
 .ntext { min-width: 0; }
 .nico {
@@ -114,7 +104,7 @@ button { cursor: pointer; }
   background: var(--cx-accent-soft); color: var(--cx-accent-text);
 }
 .nico img { width: 30px; height: auto; display: block; }
-.ntitle { font-weight: 800; font-size: 14.5px; letter-spacing: -.01em; line-height: 1.2; overflow-wrap: anywhere; }
+.ntitle { margin: 0; font-weight: 800; font-size: 14.5px; letter-spacing: -.01em; line-height: 1.2; overflow-wrap: anywhere; }
 .nsub { font-size: 12.5px; color: var(--cx-fg-muted); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ncat { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--cx-fg-muted); }
 .nbody { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -214,3 +204,35 @@ button { cursor: pointer; }
 .summary dt { color: var(--cx-fg-muted); }
 .summary dd { margin: 0; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
 .node-error { margin: 0; font-size: 12.5px; color: var(--cx-err-fg); background: var(--cx-err-bg); border-radius: var(--cx-radius-sm); padding: 6px 8px; }
+
+/* Plaud connect */
+.doors { display: flex; flex-direction: column; gap: 10px; }
+.door {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px; text-align: left; min-height: 64px;
+  border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); background: var(--cx-surface-raised);
+}
+.door:hover:not([disabled]) { border-color: var(--cx-accent); }
+.door[disabled] { cursor: default; background: var(--cx-surface); }
+.door[disabled] .nico { background: var(--cx-soon-bg); color: var(--cx-fg-muted); }
+.door[disabled] .mname { color: var(--cx-fg-muted); }
+.how { margin: 0 0 14px; padding-left: 20px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.keybox { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); background: var(--cx-surface); padding: 12px; margin-bottom: 14px; }
+.keyrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 14px; }
+.pem {
+  margin: 0 0 6px; max-height: 120px; overflow: auto; font-family: var(--cx-font-mono); font-size: 11.5px;
+  line-height: 1.4; white-space: pre-wrap; word-break: break-all; color: var(--cx-fg);
+}
+.keybox small { display: block; color: var(--cx-fg-muted); font-size: 12px; }
+.keybox .copy-failed { color: var(--cx-warn-fg); margin-bottom: 4px; }
+@media (max-width: 560px) { .pem { max-height: 72px; } .how { font-size: 13.5px; } }
+.field .hint { font-size: 12.5px; color: var(--cx-fg-muted); }
+.choice { border: 0; padding: 0; margin: 0 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.choice label, .check {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px; min-height: 44px; cursor: pointer;
+  border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); background: var(--cx-surface-raised);
+}
+.choice label:has(input:checked) { border-color: var(--cx-accent); background: var(--cx-accent-soft); }
+.choice input, .check input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--cx-accent); flex: none; }
+.choice b, .check b { display: block; font-size: 14px; }
+.choice small, .check small { display: block; font-size: 12.5px; color: var(--cx-fg-muted); }
+.m-body .account { margin-bottom: 14px; }
