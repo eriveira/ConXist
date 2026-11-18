@@ -44,6 +44,7 @@
   --cx-accent: var(--cx-electric);
   /* app UI (v1.1) */
   --cx-border: #DDE3EC;
+  --cx-input-border: #7F8B9E;
   --cx-action: #006AF9;
   --cx-on-action: #FFFFFF;
   --cx-accent-soft: #E6F0FF;
@@ -68,6 +69,8 @@
     --cx-fg-muted: #9AA8BD;
     --cx-accent: #4D9BFF;
     --cx-border: #1E2B44;
+  --cx-input-border: #62738F;
+    --cx-input-border: #62738F;
     --cx-action: #4D9BFF;
     --cx-on-action: #000828;
     --cx-accent-soft: #0F2547;
