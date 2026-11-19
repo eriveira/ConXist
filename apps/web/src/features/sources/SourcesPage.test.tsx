@@ -40,6 +40,7 @@ describe('SourcesPage', () => {
     expect(plaud).toHaveTextContent('2 meetings');
     expect(plaud).toHaveTextContent('Checked 2 min ago');
     expect(within(plaud).getByText('Live')).toHaveClass('pill', 'live');
+    expect(within(plaud).getByRole('link', { name: 'Open Team meetings' })).toHaveAttribute('href', '#/sources/p1');
   });
 
   it('shows a paused Plaud Team and lets the person retry', async () => {

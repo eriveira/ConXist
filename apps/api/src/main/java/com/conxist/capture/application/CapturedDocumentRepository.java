@@ -1,6 +1,7 @@
 package com.conxist.capture.application;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.domain.CapturedDocument;
 
@@ -12,4 +13,6 @@ public interface CapturedDocumentRepository {
     boolean exists(UUID workspaceId, UUID sourceId, String originReference);
 
     List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId);
+
+    Optional<CapturedDocument> find(UUID workspaceId, UUID sourceId, UUID documentId);
 }

@@ -16,8 +16,12 @@ final class CaptureSources {
         this.catalog = catalog;
     }
 
+    SourceSummary find(UUID sourceId) {
+        return catalog.find(sourceId).orElseThrow(() -> new NotFound("source.not-found", "This source no longer exists."));
+    }
+
     SourceSummary require(UUID sourceId, Provider expected) {
-        SourceSummary source = catalog.find(sourceId).orElseThrow(() -> new NotFound("source.not-found", "This source no longer exists."));
+        SourceSummary source = find(sourceId);
         if (source.provider() != expected) {
             throw new RuleViolation("source.wrong-kind", "This source does not accept " + expected.displayName() + " captures.");
         }

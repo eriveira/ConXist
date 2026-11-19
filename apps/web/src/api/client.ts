@@ -1,5 +1,5 @@
 import type {
-  CapturedDocument, PlaudSignIn, Provider, ProviderId, RecorderConnection, SignInStart, Source, SyncResult,
+  CapturedDocument, DocumentView, PlaudSignIn, Provider, ProviderId, RecorderConnection, SignInStart, Source, SyncResult, SyncRun,
 } from '../domain/model';
 import type { RecordingList } from '../domain/recordings';
 
@@ -64,6 +64,11 @@ export const api = {
   providers: () => request<Provider[]>('/api/providers'),
   sources: () => request<Source[]>('/api/sources'),
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),
+  document: (sourceId: string, documentId: string) =>
+    request<DocumentView>(`/api/sources/${encodeURIComponent(sourceId)}/documents/${encodeURIComponent(documentId)}`),
+  /** `all` also returns checks that found nothing new. */
+  syncs: (sourceId: string, all: boolean) =>
+    request<SyncRun[]>(`/api/sources/${encodeURIComponent(sourceId)}/syncs${all ? '?all=true' : ''}`),
   addSource: (source: NewSource) => postJson<Source>('/api/sources', source),
   uploadFile: (sourceId: string, file: File) => {
     const form = new FormData();

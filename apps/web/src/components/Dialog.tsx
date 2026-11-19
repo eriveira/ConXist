@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Icon } from './Icon';
-
-const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select, textarea, a[href], [tabindex="0"]';
+import { firstFocusable, useFocusTrap } from './useFocusTrap';
 
 interface DialogProps {
   title: string;
@@ -27,46 +26,13 @@ export function Dialog({ title, subtitle, icon, closeLabel, onClose, step, closa
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const subtitleId = useId();
-  const latest = useRef({ onClose, closable });
-  latest.current = { onClose, closable };
-
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        if (latest.current.closable) latest.current.onClose();
-      } else if (event.key === 'Tab') {
-        keepFocusInside(event);
-      }
-    };
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown, true);
-      opener?.focus();
-    };
-  }, []);
+  useFocusTrap(panel, onClose, closable);
 
   useEffect(() => {
     const heading = panel.current?.querySelector<HTMLElement>('.m-body h3');
     heading?.setAttribute('tabindex', '-1');
-    (heading ?? panel.current?.querySelector<HTMLElement>(FOCUSABLE))?.focus();
+    (heading ?? firstFocusable(panel.current))?.focus();
   }, [step]);
-
-  function keepFocusInside(event: KeyboardEvent) {
-    const items = Array.from(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
-    if (items.length === 0) return;
-    const first = items[0];
-    const last = items[items.length - 1];
-    const inside = panel.current?.contains(document.activeElement) ?? false;
-    if (!inside || (event.shiftKey && document.activeElement === first)) {
-      event.preventDefault();
-      (event.shiftKey ? last : first).focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
 
   return (
     <div className="scrim">

@@ -2,6 +2,7 @@ import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import type { RecorderConnection, Source } from '../../domain/model';
 import { elapsedSince } from '../../domain/time';
+import { sourceHref } from '../../navigation';
 import { useT, type Translate } from '../../i18n/i18n';
 
 export interface SourceCardProps {
@@ -69,6 +70,12 @@ export function SourceCard(props: SourceCardProps) {
             </button>
           </div>
         )}
+        <div className="nrow">
+          <span />
+          <a className="btn sm ghost" href={sourceHref(source.id)} aria-label={t('source.openLabel', { name: source.name })}>
+            {t('source.open')} <Icon name="chevron" size={16} />
+          </a>
+        </div>
         {lastImported !== null && !syncProblem && (
           <p className="nrow muted" role="status">{lastImported === 0 ? t('node.upToDate') : t('node.synced', { count: lastImported })}</p>
         )}
@@ -80,7 +87,7 @@ export function SourceCard(props: SourceCardProps) {
   );
 }
 
-function checkedText(connection: RecorderConnection | undefined, now: Date, t: Translate): string {
+export function checkedText(connection: RecorderConnection | undefined, now: Date, t: Translate): string {
   if (!connection?.lastCheckedAt) return t('node.notChecked');
   const elapsed = elapsedSince(connection.lastCheckedAt, now);
   const when = elapsed.unit === 'now' ? t('time.now') : t(`time.${elapsed.unit}`, { count: elapsed.count });

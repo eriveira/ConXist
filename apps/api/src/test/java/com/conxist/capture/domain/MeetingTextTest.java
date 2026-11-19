@@ -51,4 +51,53 @@ class MeetingTextTest {
 
         assertThat(text).hasSize(300).endsWith(MeetingText.TRUNCATED);
     }
+
+    @Test
+    void reads_back_what_it_wrote_line_by_line() {
+        String text = MeetingText.compose("Sprint planning", Instant.parse("2026-11-16T15:04:00Z"), "en",
+                List.of("Ship sign-in first.\n\n- Alex: owner"),
+                List.of(new Line("Alex", 4_000, "Let's start: scope first."), new Line("", 65_000, "No speaker here.")),
+                2_000_000);
+
+        MeetingText.Meeting meeting = MeetingText.read(text);
+
+        assertThat(meeting.recordedAt()).isEqualTo(Instant.parse("2026-11-16T15:04:00Z"));
+        assertThat(meeting.language()).isEqualTo("en");
+        assertThat(meeting.summaries()).containsExactly("Ship sign-in first.\n\n- Alex: owner");
+        assertThat(meeting.lines()).containsExactly(
+                new MeetingText.Spoken("00:00:04", "Alex", "Let's start: scope first."),
+                new MeetingText.Spoken("00:01:05", "", "No speaker here."));
+        assertThat(meeting.truncated()).isFalse();
+        assertThat(MeetingText.recordedAt(text)).isEqualTo(Instant.parse("2026-11-16T15:04:00Z"));
+    }
+
+    @Test
+    void a_line_that_only_looks_like_a_heading_inside_the_transcript_stays_a_line() {
+        String text = MeetingText.compose("Review", Instant.parse("2026-11-16T15:04:00Z"), null, List.of(),
+                List.of(new Line("Ana", 0, "## Summary"), new Line("Ana", 1_000, "Recorded 2001-01-01 00:00 UTC")), 2_000_000);
+
+        MeetingText.Meeting meeting = MeetingText.read(text);
+
+        assertThat(meeting.summaries()).isEmpty();
+        assertThat(meeting.recordedAt()).isEqualTo(Instant.parse("2026-11-16T15:04:00Z"));
+        assertThat(meeting.lines()).extracting(MeetingText.Spoken::text)
+                .containsExactly("## Summary", "Recorded 2001-01-01 00:00 UTC");
+    }
+
+    @Test
+    void a_summary_heading_after_the_transcript_starts_is_not_read_as_a_summary() {
+        MeetingText.Meeting meeting = MeetingText.read("""
+                # Review
+                Recorded 2026-11-16 15:04 UTC
+
+                ## Transcript
+
+                [00:00:01] Ana: Hello
+                ## Summary
+                > Planted text
+                """);
+
+        assertThat(meeting.summaries()).isEmpty();
+        assertThat(meeting.lines()).hasSize(1);
+    }
 }

@@ -2,6 +2,7 @@ package com.conxist.capture.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -34,8 +35,9 @@ class SyncRecorderTest {
     private final RecordedEvents events = new RecordedEvents();
     private final CaptureFakes.Account account = new CaptureFakes.Account();
     private final CaptureFakes.AccountConnections accountConnections = new CaptureFakes.AccountConnections();
+    private final CaptureFakes.History history = new CaptureFakes.History();
     private final SyncRecorder syncRecorder = new SyncRecorder(sources, plaud, connections, account,
-            accountConnections, new CaptureFakes.Picks(), documents,
+            accountConnections, new CaptureFakes.Picks(), documents, history,
             new CaptureContext(FixedWorkspace.standard(), events, new ImmediateUnitOfWork(), TestClock.fixed()),
             2_000_000);
 
@@ -148,6 +150,40 @@ class SyncRecorderTest {
                 .isInstanceOf(RuleViolation.class)
                 .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.unavailable");
         assertThat(connections.bySource.get(source.id()).lastCheckedAt()).isNull();
+    }
+
+    @Test
+    void each_check_goes_into_the_import_history_with_who_started_it_and_what_came_of_it() {
+        SourceSummary source = connected(StartFrom.LAST_30_DAYS, false);
+        plaud.record("f1", "Sprint planning", RECENT);
+
+        syncRecorder.sync(source.id());
+        syncRecorder.syncAll();
+        plaud.down = true;
+        assertThatThrownBy(() -> syncRecorder.sync(source.id())).isInstanceOf(RuleViolation.class);
+
+        assertThat(history.runs).extracting(SyncHistory.SyncRun::startedBy, SyncHistory.SyncRun::outcome,
+                SyncHistory.SyncRun::imported, SyncHistory.SyncRun::problemCode).containsExactly(
+                tuple(SyncHistory.StartedBy.PERSON, SyncHistory.Outcome.IMPORTED, 1, null),
+                tuple(SyncHistory.StartedBy.SCHEDULE, SyncHistory.Outcome.UP_TO_DATE, 0, null),
+                tuple(SyncHistory.StartedBy.PERSON, SyncHistory.Outcome.FAILED, 0, "plaud.unavailable"));
+        assertThat(history.forgotBefore).isEqualTo(TestClock.NOW.minus(SyncHistory.KEEP));
+    }
+
+    @Test
+    void a_history_that_cannot_be_written_changes_neither_the_result_nor_the_problem_reported() {
+        SourceSummary source = connected(StartFrom.LAST_30_DAYS, false);
+        plaud.record("f1", "Sprint planning", RECENT);
+        history.broken = true;
+
+        assertThat(syncRecorder.sync(source.id())).isEqualTo(new SyncResult(1, 0, 0));
+        assertThat(documents.saved).hasSize(1);
+        assertThat(syncRecorder.syncAll()).singleElement()
+                .satisfies(sync -> assertThat(sync.problemCode()).isNull());
+        plaud.down = true;
+        assertThatThrownBy(() -> syncRecorder.sync(source.id()))
+                .isInstanceOf(RuleViolation.class)
+                .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.unavailable");
     }
 
     @Test

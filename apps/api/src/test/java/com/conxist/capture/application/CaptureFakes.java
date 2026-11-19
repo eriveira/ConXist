@@ -104,6 +104,40 @@ final class CaptureFakes {
             return saved.stream().filter(d -> d.workspaceId().equals(workspaceId) && d.sourceId().equals(sourceId))
                     .toList();
         }
+
+        @Override
+        public Optional<CapturedDocument> find(UUID workspaceId, UUID sourceId, UUID documentId) {
+            return findBySource(workspaceId, sourceId).stream().filter(d -> d.id().equals(documentId)).findFirst();
+        }
+    }
+
+    /** The import history, in memory, newest last. */
+    static final class History implements SyncHistory {
+        final List<SyncRun> runs = new ArrayList<>();
+        Instant forgotBefore;
+        boolean broken;
+
+        @Override
+        public void record(SyncRun run) {
+            if (broken) throw new IllegalStateException("history store down");
+            runs.add(run);
+        }
+
+        @Override
+        public List<SyncRun> recent(UUID workspaceId, UUID sourceId, boolean changesOnly, int limit) {
+            return runs.reversed().stream()
+                    .filter(r -> r.workspaceId().equals(workspaceId) && r.sourceId().equals(sourceId))
+                    .filter(r -> !changesOnly || r.outcome() != Outcome.UP_TO_DATE)
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public void forgetBefore(UUID workspaceId, Instant before) {
+            if (broken) throw new IllegalStateException("history store down");
+            forgotBefore = before;
+            runs.removeIf(r -> r.workspaceId().equals(workspaceId) && r.startedAt().isBefore(before));
+        }
     }
 
     static final class Keys implements RecorderKeys {

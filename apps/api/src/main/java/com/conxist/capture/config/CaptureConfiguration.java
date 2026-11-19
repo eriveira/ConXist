@@ -10,6 +10,9 @@ import com.conxist.capture.application.CaptureUpload;
 import com.conxist.capture.application.CapturedDocumentRepository;
 import com.conxist.capture.application.FileStore;
 import com.conxist.capture.application.ListDocuments;
+import com.conxist.capture.application.ListSyncHistory;
+import com.conxist.capture.application.ReadDocument;
+import com.conxist.capture.application.SyncHistory;
 import com.conxist.capture.adapter.plaud.JdbcRecorderKeys;
 import com.conxist.capture.adapter.plaud.PlaudTeamClient;
 import com.conxist.capture.adapter.secrets.SecretBox;
@@ -118,9 +121,21 @@ class CaptureConfiguration {
     @Bean
     SyncRecorder syncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
             PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, RecordingPicks picks,
-            CapturedDocumentRepository documents, CaptureContext context, CaptureProperties capture) {
-        return new SyncRecorder(catalog, plaud, connections, plaudAccounts, accounts, picks, documents, context,
-                capture.maxTextCharacters());
+            CapturedDocumentRepository documents, SyncHistory history, CaptureContext context,
+            CaptureProperties capture) {
+        return new SyncRecorder(catalog, plaud, connections, plaudAccounts, accounts, picks, documents, history,
+                context, capture.maxTextCharacters());
+    }
+
+    @Bean
+    ListSyncHistory listSyncHistory(SourceCatalog catalog, SyncHistory history, CurrentWorkspace workspace) {
+        return new ListSyncHistory(catalog, history, workspace);
+    }
+
+    @Bean
+    ReadDocument readDocument(SourceCatalog catalog, CapturedDocumentRepository documents,
+            CurrentWorkspace workspace) {
+        return new ReadDocument(catalog, documents, workspace);
     }
 
     @Bean

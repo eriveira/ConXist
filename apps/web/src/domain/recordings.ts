@@ -24,8 +24,8 @@ export interface RecordingGroup {
   recordings: Recording[];
 }
 
-/** Recordings whose title contains every word of the query, ignoring case and accents. */
-export function matching(recordings: readonly Recording[], query: string): Recording[] {
+/** Items (recordings, meetings) whose title contains every word of the query, ignoring case and accents. */
+export function matching<T extends { title: string }>(recordings: readonly T[], query: string): T[] {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [...recordings];
   return recordings.filter((recording) => {
@@ -56,8 +56,13 @@ export function pageCount(total: number, size = RECORDINGS_PER_PAGE): number {
 
 /** The calendar day a recording was made, in {@code timeZone} (the person's own by default). */
 export function dayOf(recording: Recording, timeZone?: string): string {
+  return localDay(recording.recordedAt, timeZone);
+}
+
+/** The calendar day (YYYY-MM-DD) of an instant, in {@code timeZone} (the person's own by default). */
+export function localDay(iso: string, timeZone?: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
-    .formatToParts(new Date(recording.recordedAt));
+    .formatToParts(new Date(iso));
   const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }

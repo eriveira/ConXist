@@ -4,6 +4,11 @@ import { MESSAGES, type MessageKey } from './messages';
 
 /** Says what went wrong in the person's language, from the stable code the API sends with each refusal. */
 export function problemMessage(error: unknown, t: Translate): string {
-  const key = error instanceof ApiError && error.code ? (`api.${error.code}` as MessageKey) : null;
-  return key && key in MESSAGES.en ? t(key) : t('error.generic');
+  return error instanceof ApiError && error.code ? problemText(error.code, t) : t('error.generic');
+}
+
+/** The person's-language text for a problem code the API stored, such as a failed check in the import history. */
+export function problemText(code: string, t: Translate): string {
+  const key = `api.${code}` as MessageKey;
+  return key in MESSAGES.en ? t(key) : t('error.generic');
 }

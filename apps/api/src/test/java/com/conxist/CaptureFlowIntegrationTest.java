@@ -66,6 +66,39 @@ class CaptureFlowIntegrationTest {
     @Autowired
     FakePlaudMcpServer plaudMcp;
 
+    @Autowired
+    com.conxist.capture.application.SyncHistory history;
+
+    @Autowired
+    com.conxist.platform.CurrentWorkspace workspace;
+
+    @Test
+    void the_import_history_keeps_90_days_and_returns_the_newest_changes_first() throws Exception {
+        UUID sourceId = UUID.fromString(addSource("{\"provider\":\"UPLOAD\",\"name\":\"History\"}"));
+        java.time.Instant now = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        java.util.function.BiFunction<Integer, com.conxist.capture.application.SyncHistory.Outcome,
+                com.conxist.capture.application.SyncHistory.SyncRun> run = (daysAgo, outcome) ->
+                new com.conxist.capture.application.SyncHistory.SyncRun(UUID.randomUUID(), workspace.id(), sourceId,
+                        now.minus(Duration.ofDays(daysAgo)), now.minus(Duration.ofDays(daysAgo)),
+                        com.conxist.capture.application.SyncHistory.StartedBy.SCHEDULE, outcome,
+                        outcome == com.conxist.capture.application.SyncHistory.Outcome.IMPORTED ? 1 : 0, 0, 0, 0, null);
+        history.record(run.apply(100, com.conxist.capture.application.SyncHistory.Outcome.IMPORTED));
+        history.record(run.apply(3, com.conxist.capture.application.SyncHistory.Outcome.IMPORTED));
+        history.record(run.apply(2, com.conxist.capture.application.SyncHistory.Outcome.UP_TO_DATE));
+        history.record(run.apply(1, com.conxist.capture.application.SyncHistory.Outcome.IMPORTED));
+
+        history.forgetBefore(UUID.randomUUID(), now.minus(com.conxist.capture.application.SyncHistory.KEEP));
+        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, false, 10)).hasSize(4);
+        history.forgetBefore(workspace.id(), now.minus(com.conxist.capture.application.SyncHistory.KEEP));
+
+        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, false, 10))
+                .extracting(r -> r.startedAt().isAfter(now.minus(Duration.ofDays(4)))).containsOnly(true).hasSize(3);
+        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, true, 1))
+                .singleElement().satisfies(r -> org.assertj.core.api.Assertions.assertThat(r.startedAt())
+                        .isEqualTo(now.minus(Duration.ofDays(1))));
+        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, true, 10)).hasSize(2);
+    }
+
     @Test
     void an_uploaded_file_reaches_the_hub_waiting_for_review() throws Exception {
         String sourceId = addSource("{\"provider\":\"UPLOAD\",\"name\":\"Product specs\"}");
@@ -326,6 +359,32 @@ class CaptureFlowIntegrationTest {
                         .content("{\"signInId\":\"" + signInWithPlaud() + "\"}"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         mvc.perform(post("/api/sources/{id}/sync", sourceId)).andExpect(status().isOk());
+
+        // The import history: every check, with who started it, and the problem code of the one that failed.
+        mvc.perform(get("/api/sources/{id}/syncs", sourceId).param("all", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.outcome=='IMPORTED')].imported", org.hamcrest.Matchers.hasItem(2)))
+                .andExpect(jsonPath("$[?(@.outcome=='FAILED')].problemCode",
+                        org.hamcrest.Matchers.hasItem("plaud.signed-out")))
+                .andExpect(jsonPath("$[?(@.outcome=='UP_TO_DATE')].startedBy", org.hamcrest.Matchers.hasItem("PERSON")));
+        mvc.perform(get("/api/sources/{id}/syncs", sourceId))
+                .andExpect(jsonPath("$[?(@.outcome=='UP_TO_DATE')]").isEmpty());
+
+        // One meeting, read back as summary and transcript lines.
+        String listed = mvc.perform(get("/api/sources/{id}/documents", sourceId))
+                .andExpect(jsonPath("$[?(@.title=='Weekly product sync')].recordedAt").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        java.util.List<String> ids = JsonPath.read(listed, "$[?(@.title=='Weekly product sync')].id");
+        mvc.perform(get("/api/sources/{id}/documents/{doc}", sourceId, ids.getFirst()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.origin").value("RECORDING"))
+                .andExpect(jsonPath("$.meeting.lines[0].speaker").value("Alex"))
+                .andExpect(jsonPath("$.meeting.lines[0].text").value("Let's ship sign-in first."))
+                .andExpect(jsonPath("$.meeting.summaries[0]", org.hamcrest.Matchers.containsString("Sign in with Plaud")));
+        mvc.perform(get("/api/sources/{id}/documents/{doc}", other, ids.getFirst()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("document.not-found"));
     }
 
     @Test

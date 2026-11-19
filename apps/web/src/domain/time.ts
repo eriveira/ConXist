@@ -12,3 +12,13 @@ export function elapsedSince(iso: string, now: Date): Elapsed {
   if (ms < DAY) return { unit: 'hours', count: Math.floor(ms / HOUR) };
   return { unit: 'days', count: Math.floor(ms / DAY) };
 }
+
+/** The hour and minute, in the person's language. */
+export function clock(iso: string, language: string): string {
+  return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}
+
+/** Day, month, hour and minute, in the person's language. */
+export function dateTime(iso: string, language: string): string {
+  return new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}

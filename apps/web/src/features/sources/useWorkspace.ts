@@ -42,7 +42,10 @@ export function useWorkspace() {
     void reload();
   }, [reload]);
 
-  const refresh = useCallback(() => void reload(), [reload]);
+  /** A background refresh: if it fails, the last loaded state stays on screen rather than an error page. */
+  const refresh = useCallback(() => {
+    loadWorkspace().then(setState, () => setState((current) => (current.status === 'ready' ? current : { status: 'error' })));
+  }, []);
 
   useEffect(() => {
     void reload();
