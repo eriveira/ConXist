@@ -11,6 +11,12 @@ public interface HubItemRepository {
     /** Saves the item unless it is already in the hub, so a redelivered event changes nothing. */
     void saveIfAbsent(HubItem item);
 
+    /**
+     * Turns the item into the removed marker, or saves the marker when the item has not arrived yet. Later saves of
+     * the same item change nothing, so events delivered out of order cannot bring it back.
+     */
+    void markRemoved(HubItem marker);
+
     long count(UUID workspaceId, HubItemType type);
 
     long countWithStatus(UUID workspaceId, HubItemStatus status);

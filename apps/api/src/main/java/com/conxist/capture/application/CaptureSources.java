@@ -16,6 +16,11 @@ final class CaptureSources {
         this.catalog = catalog;
     }
 
+    /** The same answer wherever a document is missing: already deleted, never there, or in another source. */
+    static NotFound documentNotFound() {
+        return new NotFound("document.not-found", "This document is no longer in ConXist.");
+    }
+
     SourceSummary find(UUID sourceId) {
         return catalog.find(sourceId).orElseThrow(() -> new NotFound("source.not-found", "This source no longer exists."));
     }

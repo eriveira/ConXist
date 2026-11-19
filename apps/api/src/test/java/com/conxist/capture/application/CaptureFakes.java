@@ -62,22 +62,31 @@ final class CaptureFakes {
     }
 
     static final class Files implements FileStore {
-        final List<byte[]> stored = new ArrayList<>();
+        final java.util.Map<String, byte[]> stored = new java.util.LinkedHashMap<>();
+        private int next;
 
         @Override
         public String store(UUID workspaceId, UUID sourceId, byte[] content) {
-            stored.add(content);
-            return "key-" + stored.size();
+            String key = workspaceId + "/" + sourceId + "/" + ++next;
+            stored.put(key, content);
+            return key;
         }
+
+        boolean deleteFails;
 
         @Override
         public void delete(String key) {
-            stored.remove(Integer.parseInt(key.substring("key-".length())) - 1);
+            if (deleteFails) {
+                throw new IllegalStateException("disk unavailable");
+            }
+            stored.remove(key);
         }
     }
 
     static final class Documents implements CapturedDocumentRepository {
         final List<CapturedDocument> saved = new ArrayList<>();
+        /** Source id + origin reference of recordings a person deleted and kept out. */
+        final java.util.Set<String> keptOut = new java.util.HashSet<>();
         boolean failing;
 
         @Override
@@ -85,7 +94,8 @@ final class CaptureFakes {
             if (failing) {
                 throw new IllegalStateException("database unavailable");
             }
-            boolean known = saved.stream().anyMatch(d -> d.sourceId().equals(document.sourceId())
+            boolean known = keptOut.contains(document.sourceId() + "/" + document.originReference())
+                    || saved.stream().anyMatch(d -> d.sourceId().equals(document.sourceId())
                     && d.originReference().equals(document.originReference()));
             if (!known) {
                 saved.add(document);
@@ -95,8 +105,17 @@ final class CaptureFakes {
 
         @Override
         public boolean exists(UUID workspaceId, UUID sourceId, String originReference) {
-            return saved.stream().anyMatch(d -> d.workspaceId().equals(workspaceId) && d.sourceId().equals(sourceId)
-                    && d.originReference().equals(originReference));
+            return keptOut.contains(sourceId + "/" + originReference)
+                    || saved.stream().anyMatch(d -> d.workspaceId().equals(workspaceId)
+                    && d.sourceId().equals(sourceId) && d.originReference().equals(originReference));
+        }
+
+        @Override
+        public boolean delete(CapturedDocument document, boolean keepOut, Instant deletedAt) {
+            if (keepOut) {
+                keptOut.add(document.sourceId() + "/" + document.originReference());
+            }
+            return saved.removeIf(d -> d.id().equals(document.id()));
         }
 
         @Override

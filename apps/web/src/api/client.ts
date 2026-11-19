@@ -28,6 +28,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const problem = await problemOf(response);
     throw new ApiError(response.status, problem.code, problem.detail);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -85,6 +86,9 @@ export const api = {
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),
   document: (sourceId: string, documentId: string) =>
     request<DocumentView>(`/api/sources/${encodeURIComponent(sourceId)}/documents/${encodeURIComponent(documentId)}`),
+  /** Removes it from ConXist only; a deleted recording is not imported again. */
+  deleteDocument: (sourceId: string, documentId: string) =>
+    request<void>(`/api/sources/${encodeURIComponent(sourceId)}/documents/${encodeURIComponent(documentId)}`, { method: 'DELETE' }),
   /** `all` also returns checks that found nothing new. */
   syncs: (sourceId: string, all: boolean) =>
     request<SyncRun[]>(`/api/sources/${encodeURIComponent(sourceId)}/syncs${all ? '?all=true' : ''}`),

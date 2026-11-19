@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { api } from '../../api/client';
+import { api, ApiError } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { useFocusTrap } from '../../components/useFocusTrap';
 import { highlight, linesMatching, speakersOf, summaryText, transcriptText } from '../../domain/meetings';
@@ -15,13 +15,17 @@ interface DocumentPanelProps {
   sourceName: string;
   documentId: string;
   onClose: () => void;
+  /** Called once the document is gone from ConXist, with its title and whether it was a recording kept out. */
+  onDeleted: (title: string, recording: boolean) => void;
 }
+
+type Removal = { state: 'idle' } | { state: 'confirming' } | { state: 'deleting' } | { state: 'failed'; problem: string };
 
 /**
  * One meeting (or uploaded file) in a side panel: when, the Plaud summary, who spoke, and the transcript with find and
  * copy. The text is customer data and is shown as plain text, never as markup.
  */
-export function DocumentPanel({ sourceId, sourceName, documentId, onClose }: DocumentPanelProps) {
+export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDeleted }: DocumentPanelProps) {
   const t = useT();
   const language = useLanguage();
   const panel = useRef<HTMLElement>(null);
@@ -37,7 +41,45 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose }: Doc
     const timer = setTimeout(() => setCopied(null), 3000);
     return () => clearTimeout(timer);
   }, [copied]);
-  useFocusTrap(panel, onClose);
+  const [removal, setRemoval] = useState<Removal>({ state: 'idle' });
+  const asking = removal.state !== 'idle';
+  const confirmHeading = useRef<HTMLHeadingElement>(null);
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  // Escape first backs out of the question, then closes the panel; nothing closes while the delete runs.
+  useFocusTrap(panel, () => (asking ? cancelDelete() : onClose()), removal.state !== 'deleting');
+
+  /** Backing out of the question gives the focus back to the Delete button that asked it. */
+  const backedOut = useRef(false);
+  useEffect(() => {
+    // The buttons turn off while the delete runs, so the question's heading holds the focus; a failure hands it back
+    // to Delete, to try again or move on to Cancel.
+    if (removal.state === 'confirming' || removal.state === 'deleting') confirmHeading.current?.focus();
+    if (removal.state === 'failed') confirmRef.current?.focus();
+    if (removal.state === 'idle' && backedOut.current) {
+      backedOut.current = false;
+      deleteRef.current?.focus();
+    }
+  }, [removal.state]);
+
+  function cancelDelete() {
+    backedOut.current = true;
+    setRemoval({ state: 'idle' });
+  }
+
+  async function confirmDelete(view: DocumentView) {
+    setRemoval({ state: 'deleting' });
+    const recording = view.origin === 'RECORDING';
+    try {
+      await api.deleteDocument(sourceId, documentId);
+      onDeleted(view.title, recording);
+    } catch (error) {
+      // Already gone (another tab, or a retry): the person's wish is met, so it counts as deleted.
+      if (error instanceof ApiError && error.code === 'document.not-found') onDeleted(view.title, recording);
+      else setRemoval({ state: 'failed', problem: problemMessage(error, t) });
+    }
+  }
+  const deleting = removal.state === 'deleting';
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -68,18 +110,24 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose }: Doc
 
   const found = meeting ? linesMatching(meeting, find) : 0;
   return (
-    <div className="scrim side" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="scrim side" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) onClose(); }}>
       <aside ref={panel} className="sidepanel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header className="phead">
           <div className="ptop">
             <h2 id={titleId}>{document?.title ?? t('doc.loading')}</h2>
-            {document && (
+            {document && !asking && (
+              <button ref={deleteRef} type="button" className="btn ghost icon danger-text" onClick={() => setRemoval({ state: 'confirming' })}
+                aria-label={t(document.origin === 'RECORDING' ? 'doc.delete' : 'doc.deleteFile')} title={t(document.origin === 'RECORDING' ? 'doc.delete' : 'doc.deleteFile')}>
+                <Icon name="trash" size={18} />
+              </button>
+            )}
+            {document && !asking && (
               <button type="button" className="btn ghost icon" onClick={() => void copy()}
                 aria-label={t(meeting ? 'doc.copy' : 'doc.copyText')} title={t(meeting ? 'doc.copy' : 'doc.copyText')}>
                 <Icon name="copy" size={18} />
               </button>
             )}
-            <button ref={closeRef} type="button" className="btn ghost icon" onClick={onClose} aria-label={t('doc.close')} title={t('doc.close')}>
+            <button ref={closeRef} type="button" className="btn ghost icon" onClick={onClose} disabled={deleting} aria-label={t('doc.close')} title={t('doc.close')}>
               <Icon name="close" size={18} />
             </button>
           </div>
@@ -95,6 +143,30 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose }: Doc
           {copied && <p className="copied" aria-hidden="true">{copied}</p>}
         </header>
         <div className="pbody">
+          {document && asking && (
+            <section className="confirm" aria-labelledby={`${titleId}-confirm`} aria-describedby={`${titleId}-consequences`}>
+              <h3 id={`${titleId}-confirm`} ref={confirmHeading} tabIndex={-1}>{t('doc.delete.title', { title: document.title })}</h3>
+              <ul id={`${titleId}-consequences`}>
+                <li>{t(document.origin === 'RECORDING' ? 'doc.delete.goneMeeting' : 'doc.delete.goneFile')}</li>
+                {document.origin === 'RECORDING' ? (
+                  <>
+                    <li>{t('doc.delete.notAgain')}</li>
+                    <li>{t('doc.delete.recorderKeeps')}</li>
+                  </>
+                ) : <li>{t('doc.delete.uploadAgain')}</li>}
+              </ul>
+              {removal.state === 'failed' && (
+                <p className="alert error" role="alert"><Icon name="alert" size={18} /><span className="grow">{removal.problem}</span></p>
+              )}
+              <div className="confirm-actions">
+                <button type="button" className="btn" onClick={cancelDelete} disabled={removal.state === 'deleting'}>{t('doc.delete.cancel')}</button>
+                <button ref={confirmRef} type="button" className="btn danger" onClick={() => void confirmDelete(document)} disabled={removal.state === 'deleting'}>
+                  <Icon name="trash" size={16} /> {removal.state === 'deleting' ? t('doc.deleting') : t(document.origin === 'RECORDING' ? 'doc.delete' : 'doc.deleteFile')}
+                </button>
+              </div>
+              <p className="sr-only" role="status">{removal.state === 'deleting' ? t('doc.deleting') : ''}</p>
+            </section>
+          )}
           {load.state === 'loading' && <p className="muted" role="status">{t('doc.loading')}</p>}
           {load.state === 'failed' && (
             <p className="alert error" role="alert">
@@ -102,13 +174,13 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose }: Doc
               <button type="button" className="btn sm" onClick={() => setAttempt(attempt + 1)}>{t('source.retry')}</button>
             </p>
           )}
-          {document && !meeting && (
+          {document && !meeting && !asking && (
             <section>
               <h3 className="section-l">{t('doc.text')}</h3>
               <div className="plain">{document.text}</div>
             </section>
           )}
-          {meeting && (
+          {meeting && !asking && (
             <>
               {meeting.truncated && <p className="note"><Icon name="info" size={16} /><span>{t('doc.truncated')}</span></p>}
               {meeting.summaries.length > 0 && (

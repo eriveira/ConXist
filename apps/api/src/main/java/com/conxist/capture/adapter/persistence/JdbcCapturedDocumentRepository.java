@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,13 +33,15 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
 
     @Override
     public boolean saveIfNew(CapturedDocument document) {
+        lockReference(document);
         return jdbc.sql("""
                 insert into captured_documents
                   (id, workspace_id, source_id, title, media_type, size_bytes, text_sealed, origin,
                    origin_reference, captured_at)
-                values
-                  (:id, :workspaceId, :sourceId, :title, :mediaType, :sizeBytes, :sealed, :origin,
-                   :originReference, :capturedAt)
+                select :id, :workspaceId, :sourceId, :title, :mediaType, :sizeBytes, :sealed, :origin,
+                       :originReference, :capturedAt
+                where not exists (select 1 from deleted_recordings
+                                  where source_id = :sourceId and origin_reference = :originReference)
                 on conflict (source_id, origin_reference) do nothing
                 """)
                 .param("id", document.id())
@@ -59,12 +62,39 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
         return jdbc.sql("""
                 select exists (select 1 from captured_documents
                   where workspace_id = :workspaceId and source_id = :sourceId and origin_reference = :reference)
+                    or exists (select 1 from deleted_recordings
+                  where workspace_id = :workspaceId and source_id = :sourceId and origin_reference = :reference)
                 """)
                 .param("workspaceId", workspaceId)
                 .param("sourceId", sourceId)
                 .param("reference", originReference)
                 .query(Boolean.class)
                 .single();
+    }
+
+    @Override
+    public boolean delete(CapturedDocument document, boolean keepOut, Instant deletedAt) {
+        if (keepOut) {
+            lockReference(document);
+            jdbc.sql("""
+                    insert into deleted_recordings (workspace_id, source_id, origin_reference, deleted_at)
+                    values (:workspaceId, :sourceId, :reference, :deletedAt)
+                    on conflict (source_id, origin_reference) do nothing
+                    """)
+                    .param("workspaceId", document.workspaceId())
+                    .param("sourceId", document.sourceId())
+                    .param("reference", document.originReference())
+                    .param("deletedAt", Timestamp.from(deletedAt))
+                    .update();
+        }
+        return jdbc.sql("""
+                delete from captured_documents
+                where workspace_id = :workspaceId and source_id = :sourceId and id = :id
+                """)
+                .param("workspaceId", document.workspaceId())
+                .param("sourceId", document.sourceId())
+                .param("id", document.id())
+                .update() == 1;
     }
 
     @Override
@@ -95,6 +125,18 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
                 .param("id", documentId)
                 .query(this::toDocument)
                 .optional();
+    }
+
+    /**
+     * A save and a delete of the same recording take turns, until the end of their transactions. Without it, a check
+     * that is importing a recording while a person deletes it would wait on the unique index, find the old row gone
+     * once the delete commits, and save the meeting again. Taking turns, the later one sees the other's work.
+     */
+    private void lockReference(CapturedDocument document) {
+        jdbc.sql("select pg_advisory_xact_lock(hashtextextended(:key, 0))")
+                .param("key", document.sourceId() + "/" + document.originReference())
+                .query((row, n) -> 1)
+                .single();
     }
 
     static byte[] seal(SecretBox box, UUID documentId, String text) {

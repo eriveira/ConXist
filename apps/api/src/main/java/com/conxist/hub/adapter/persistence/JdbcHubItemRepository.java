@@ -39,8 +39,25 @@ class JdbcHubItemRepository implements HubItemRepository {
     }
 
     @Override
+    public void markRemoved(HubItem marker) {
+        jdbc.sql("""
+                insert into hub_items (item_id, workspace_id, item_type, source_id, title, status, arrived_at)
+                values (:itemId, :workspaceId, :type, :sourceId, '', 'REMOVED', :at)
+                on conflict (item_id) do update set status = 'REMOVED', title = ''
+                  where hub_items.workspace_id = excluded.workspace_id and hub_items.source_id = excluded.source_id
+                    and hub_items.item_type = 'DOCUMENT'
+                """)
+                .param("itemId", marker.itemId())
+                .param("workspaceId", marker.workspaceId())
+                .param("type", marker.type().name())
+                .param("sourceId", marker.sourceId())
+                .param("at", Timestamp.from(marker.arrivedAt()))
+                .update();
+    }
+
+    @Override
     public long count(UUID workspaceId, HubItemType type) {
-        return jdbc.sql("select count(*) from hub_items where workspace_id = :workspaceId and item_type = :type")
+        return jdbc.sql("select count(*) from hub_items where workspace_id = :workspaceId and item_type = :type and status <> 'REMOVED'")
                 .param("workspaceId", workspaceId)
                 .param("type", type.name())
                 .query(Long.class)
@@ -60,7 +77,7 @@ class JdbcHubItemRepository implements HubItemRepository {
     public List<HubItem> latest(UUID workspaceId, int limit) {
         return jdbc.sql("""
                 select item_id, workspace_id, item_type, source_id, title, status, arrived_at
-                from hub_items where workspace_id = :workspaceId
+                from hub_items where workspace_id = :workspaceId and status <> 'REMOVED'
                 order by arrived_at desc limit :limit
                 """)
                 .param("workspaceId", workspaceId)

@@ -78,6 +78,96 @@ describe('SourcePage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('deletes a meeting after a clear question, says it will not come back, and can back out', async () => {
+    let documents = MEETINGS;
+    const calls = workspace({
+      'GET /api/sources/p1/documents': () => ({ body: documents }),
+      'DELETE /api/sources/p1/documents/d1': () => { documents = [MEETINGS[1]]; return { status: 204, body: null }; },
+    });
+    const user = userEvent.setup();
+    render(<SourcePage sourceId="p1" />);
+    await user.click(await screen.findByRole('button', { name: /Sprint planning/ }));
+    const panel = await screen.findByRole('dialog', { name: 'Sprint planning' });
+
+    await user.click(within(panel).getByRole('button', { name: 'Delete meeting' }));
+    expect(within(panel).getByRole('heading', { name: 'Delete "Sprint planning"?' })).toHaveFocus();
+    expect(within(panel).getByText('ConXist will not import this recording again.')).toBeInTheDocument();
+    expect(within(panel).getByText('Your Plaud account keeps the recording.')).toBeInTheDocument();
+    expect(await accessibilityViolations(document.body)).toEqual([]);
+
+    await user.keyboard('{Escape}');
+    expect(within(panel).queryByRole('heading', { name: /Delete/ })).not.toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Delete meeting' })).toHaveFocus();
+    expect(calls.some((call) => call.key.startsWith('DELETE'))).toBe(false);
+
+    await user.click(within(panel).getByRole('button', { name: 'Delete meeting' }));
+    await user.click(within(panel).getAllByRole('button', { name: 'Delete meeting' }).at(-1)!);
+
+    expect((await screen.findByText('Deleted "Sprint planning". It will not be imported again.')).closest('p')).toHaveFocus();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Sprint planning/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Customer call: Contoso/ })).toBeInTheDocument();
+  });
+
+  it('keeps the meeting and says why when the delete fails, and nothing closes while it runs', async () => {
+    let answer: (value: { status: number; body: unknown }) => void = () => {};
+    workspace({ 'DELETE /api/sources/p1/documents/d1': () => new Promise((resolve) => { answer = resolve; }) });
+    const user = userEvent.setup();
+    render(<SourcePage sourceId="p1" />);
+    await user.click(await screen.findByRole('button', { name: /Sprint planning/ }));
+    const panel = await screen.findByRole('dialog', { name: 'Sprint planning' });
+
+    await user.click(within(panel).getByRole('button', { name: 'Delete meeting' }));
+    await user.click(within(panel).getAllByRole('button', { name: 'Delete meeting' }).at(-1)!);
+    expect(within(panel).getByRole('button', { name: 'Close' })).toBeDisabled();
+    expect(within(panel).getByRole('heading', { name: 'Delete "Sprint planning"?' })).toHaveFocus();
+    expect(within(panel).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    answer({ status: 500, body: {} });
+    expect(await within(panel).findByRole('alert')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Cancel' })).toBeEnabled();
+    expect(within(panel).getAllByRole('button', { name: 'Delete meeting' }).at(-1)).toHaveFocus();
+    expect(screen.getByRole('button', { name: /Sprint planning/ })).toBeInTheDocument();
+  });
+
+  it('counts a meeting someone already deleted as deleted', async () => {
+    workspace({ 'DELETE /api/sources/p1/documents/d1': () => ({ status: 404, body: { code: 'document.not-found' } }) });
+    const user = userEvent.setup();
+    render(<SourcePage sourceId="p1" />);
+    await user.click(await screen.findByRole('button', { name: /Sprint planning/ }));
+    const panel = await screen.findByRole('dialog', { name: 'Sprint planning' });
+
+    await user.click(within(panel).getByRole('button', { name: 'Delete meeting' }));
+    await user.click(within(panel).getAllByRole('button', { name: 'Delete meeting' }).at(-1)!);
+
+    expect(await screen.findByText('Deleted "Sprint planning". It will not be imported again.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Sprint planning/ })).not.toBeInTheDocument();
+  });
+
+  it('deletes an uploaded document and says it can be uploaded again', async () => {
+    const SPEC = { id: 'u1', sourceId: 's1', title: 'spec.md', mediaType: 'text/markdown', sizeBytes: 10, origin: 'UPLOAD',
+      textLength: 10, capturedAt: today.toISOString(), recordedAt: null };
+    let documents = [SPEC];
+    workspace({
+      'GET /api/sources/s1/documents': () => ({ body: documents }),
+      'GET /api/sources/s1/documents/u1': () => ({ body: { ...SPEC, text: 'The spec.', meeting: null } }),
+      'DELETE /api/sources/s1/documents/u1': () => { documents = []; return { status: 204, body: null }; },
+    });
+    const user = userEvent.setup();
+    render(<SourcePage sourceId="s1" />);
+    await user.click(await screen.findByRole('button', { name: /spec\.md/ }));
+    const panel = await screen.findByRole('dialog', { name: 'spec.md' });
+
+    await user.click(within(panel).getByRole('button', { name: 'Delete document' }));
+    expect(within(panel).getByText('You can upload the file again later.')).toBeInTheDocument();
+    expect(within(panel).queryByText('ConXist will not import this recording again.')).not.toBeInTheDocument();
+    await user.click(within(panel).getAllByRole('button', { name: 'Delete document' }).at(-1)!);
+
+    expect((await screen.findByText('Deleted "spec.md".')).closest('p')).toHaveFocus();
+  });
+
   it('searches meetings by title', async () => {
     workspace();
     render(<SourcePage sourceId="p1" />);

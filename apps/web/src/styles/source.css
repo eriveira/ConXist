@@ -82,3 +82,12 @@ mark { background: var(--cx-warn-bg); color: var(--cx-fg); border-radius: var(--
   .phead, .pbody { padding-left: 16px; padding-right: 16px; }
 }
 .row:focus-visible, .tab:focus-visible { outline-offset: -2px; }
+/* Delete: a red-tinted icon, a question inside the panel, and a note once it is done. */
+.danger-text { color: var(--cx-err-fg); }
+.confirm { border: 1px solid var(--cx-err-fg); border-radius: var(--cx-radius-md); padding: 16px; display: grid; gap: 12px; max-width: 68ch; }
+.confirm h3 { margin: 0; font-size: 17px; overflow-wrap: anywhere; }
+.confirm ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.confirm .alert { margin: 0; }
+.confirm-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.done-note { margin-top: 16px; }
+.done-note:focus-visible { outline-offset: 2px; }

@@ -39,4 +39,21 @@ class LocalFileStoreTest {
 
         assertThat(store.store(id, id, new byte[] {1})).isNotEqualTo(store.store(id, id, new byte[] {1}));
     }
+
+    @Test
+    void deletes_a_stored_file_and_refuses_a_key_that_leaves_the_storage_folder() throws IOException {
+        LocalFileStore store = new LocalFileStore(root, box);
+        String key = store.store(UUID.randomUUID(), UUID.randomUUID(), "notes".getBytes());
+        java.nio.file.Path outside = java.nio.file.Files.writeString(root.getParent().resolve("keep-" + UUID.randomUUID()), "x");
+
+        store.delete(key);
+
+        assertThat(root.resolve(key)).doesNotExist();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.delete("../" + outside.getFileName()))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> store.delete(outside.toString()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(outside).exists();
+        java.nio.file.Files.delete(outside);
+    }
 }

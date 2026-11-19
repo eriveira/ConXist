@@ -39,8 +39,12 @@ public class LocalFileStore implements FileStore {
 
     @Override
     public void delete(String key) {
+        Path target = root.resolve(key).normalize();
+        if (!target.startsWith(root) || target.equals(root)) {
+            throw new IllegalArgumentException("A stored file's key must stay inside the storage folder");
+        }
         try {
-            Files.deleteIfExists(root.resolve(key).normalize());
+            Files.deleteIfExists(target);
         } catch (IOException failure) {
             throw new UncheckedIOException("Could not delete a stored file", failure);
         }

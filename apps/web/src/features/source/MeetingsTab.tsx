@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { byDay, whenOf } from '../../domain/meetings';
@@ -16,16 +16,38 @@ interface MeetingsTabProps {
   /** Offered in the empty state of a connected recorder. */
   onSync?: () => void;
   syncing: boolean;
+  /** Something changed what the source holds, such as a delete: counts elsewhere on the page are stale. */
+  onChanged?: () => void;
 }
 
 /** What ConXist holds from a source, newest first and grouped by day, with a search by title. */
-export function MeetingsTab({ source, recorder, onSync, syncing }: MeetingsTabProps) {
+export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: MeetingsTabProps) {
   const t = useT();
   const language = useLanguage();
   const searchId = useId();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<string | null>(null);
+  /** Says what was just deleted; it takes the focus, since the row that had it is gone. */
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (notice) noticeRef.current?.focus();
+  }, [notice]);
+
+  function deleted(documentId: string, title: string, recording: boolean) {
+    setLoad((current) => (current.state === 'ready'
+      ? { state: 'ready', documents: current.documents.filter((document) => document.id !== documentId) }
+      : current));
+    setOpen(null);
+    setNotice(t(recording ? 'meetings.deleted' : 'documents.deleted', { title }));
+    onChanged?.();
+  }
+
+  const noticeLine = notice && (
+    <p ref={noticeRef} tabIndex={-1} className="alert ok done-note"><Icon name="check" size={18} /><span>{notice}</span></p>
+  );
 
   const fetchDocuments = useCallback(() => {
     let current = true;
@@ -55,6 +77,8 @@ export function MeetingsTab({ source, recorder, onSync, syncing }: MeetingsTabPr
   }
   if (load.documents.length === 0) {
     return (
+      <>
+      {noticeLine}
       <div className="state">
         <h2>{t(recorder ? 'meetings.empty.title' : 'documents.empty.title')}</h2>
         <p>{t(recorder ? 'meetings.empty.body' : 'documents.empty.body')}</p>
@@ -64,12 +88,14 @@ export function MeetingsTab({ source, recorder, onSync, syncing }: MeetingsTabPr
           </button>
         )}
       </div>
+      </>
     );
   }
 
   const shown = matching(load.documents, query);
   return (
     <>
+      {noticeLine}
       <div className="toolbar">
         <label className="search" htmlFor={searchId}>
           <span className="sr-only">{t('meetings.search')}</span>
@@ -93,7 +119,7 @@ export function MeetingsTab({ source, recorder, onSync, syncing }: MeetingsTabPr
                 {group.documents.map((document) => (
                   <li key={document.id}>
                     <button type="button" className="row" aria-current={open === document.id ? 'true' : undefined}
-                      onClick={() => setOpen(document.id)}>
+                      onClick={() => { setNotice(null); setOpen(document.id); }}>
                       <span className="t">{document.title}</span>
                       <span className="m">
                         <span>{t(document.recordedAt ? 'meetings.recorded' : 'meetings.added', { time: clock(whenOf(document), language) })}</span>
@@ -107,7 +133,10 @@ export function MeetingsTab({ source, recorder, onSync, syncing }: MeetingsTabPr
           ))}
         </div>
       )}
-      {open && <DocumentPanel sourceId={source.id} sourceName={source.name} documentId={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <DocumentPanel sourceId={source.id} sourceName={source.name} documentId={open}
+          onClose={() => setOpen(null)} onDeleted={(title, recording) => deleted(open, title, recording)} />
+      )}
     </>
   );
 }

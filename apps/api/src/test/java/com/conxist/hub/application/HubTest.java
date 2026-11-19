@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import com.conxist.capture.DocumentCaptured;
+import com.conxist.capture.DocumentDeleted;
 import com.conxist.capture.DocumentOrigin;
 import com.conxist.hub.domain.HubItem;
 import com.conxist.hub.domain.HubItemStatus;
@@ -57,6 +58,41 @@ class HubTest {
     }
 
     @Test
+    void a_deleted_document_leaves_the_hub_and_a_second_delivery_changes_nothing() {
+        UUID documentId = UUID.randomUUID();
+        recordArrival.documentCaptured(document(documentId));
+        DocumentDeleted deleted = new DocumentDeleted(documentId, FixedWorkspace.WORKSPACE_ID, sourceId, TestClock.NOW);
+
+        recordArrival.documentDeleted(deleted);
+        recordArrival.documentDeleted(deleted);
+
+        assertThat(readHubOverview.read().documents()).isZero();
+        assertThat(readHubOverview.read().pendingReview()).isZero();
+    }
+
+    @Test
+    void a_capture_event_delivered_after_the_delete_does_not_bring_the_document_back() {
+        UUID documentId = UUID.randomUUID();
+
+        recordArrival.documentDeleted(new DocumentDeleted(documentId, FixedWorkspace.WORKSPACE_ID, sourceId, TestClock.NOW));
+        recordArrival.documentCaptured(document(documentId));
+
+        assertThat(readHubOverview.read().documents()).isZero();
+        assertThat(readHubOverview.read().pendingReview()).isZero();
+        assertThat(readHubOverview.read().latest()).isEmpty();
+    }
+
+    @Test
+    void a_delete_from_another_workspace_removes_nothing() {
+        UUID documentId = UUID.randomUUID();
+        recordArrival.documentCaptured(document(documentId));
+
+        recordArrival.documentDeleted(new DocumentDeleted(documentId, UUID.randomUUID(), sourceId, TestClock.NOW));
+
+        assertThat(readHubOverview.read().documents()).isOne();
+    }
+
+    @Test
     void counts_only_the_current_workspace() {
         recordArrival.sourceAdded(new SourceAdded(sourceId, UUID.randomUUID(), Provider.UPLOAD, "Other", TestClock.NOW));
 
@@ -80,8 +116,18 @@ class HubTest {
         }
 
         @Override
+        public void markRemoved(HubItem marker) {
+            boolean otherWorkspace = saved.stream().anyMatch(item -> item.itemId().equals(marker.itemId())
+                    && !item.workspaceId().equals(marker.workspaceId()));
+            if (!otherWorkspace) {
+                saved.removeIf(item -> item.itemId().equals(marker.itemId()));
+                saved.add(marker);
+            }
+        }
+
+        @Override
         public long count(UUID workspaceId, HubItemType type) {
-            return inWorkspace(workspaceId).stream().filter(item -> item.type() == type).count();
+            return shown(workspaceId).stream().filter(item -> item.type() == type).count();
         }
 
         @Override
@@ -91,7 +137,11 @@ class HubTest {
 
         @Override
         public List<HubItem> latest(UUID workspaceId, int limit) {
-            return inWorkspace(workspaceId).stream().limit(limit).toList();
+            return shown(workspaceId).stream().limit(limit).toList();
+        }
+
+        private List<HubItem> shown(UUID workspaceId) {
+            return inWorkspace(workspaceId).stream().filter(item -> item.status() != HubItemStatus.REMOVED).toList();
         }
 
         private List<HubItem> inWorkspace(UUID workspaceId) {

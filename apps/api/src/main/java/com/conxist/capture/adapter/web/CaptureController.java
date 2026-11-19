@@ -9,6 +9,7 @@ import com.conxist.capture.application.ConnectPlaudTeam;
 import com.conxist.capture.application.ConnectPlaudTeam.TeamCheck;
 import com.conxist.capture.application.ConnectionView;
 import com.conxist.capture.application.DocumentSummary;
+import com.conxist.capture.application.DeleteDocument;
 import com.conxist.capture.application.ListDocuments;
 import com.conxist.capture.application.ListRecorderConnections;
 import com.conxist.capture.application.ListSyncHistory;
@@ -28,6 +29,7 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,12 +50,14 @@ class CaptureController {
     private final ListRecorderConnections listConnections;
     private final ListDocuments listDocuments;
     private final ReadDocument readDocument;
+    private final DeleteDocument deleteDocument;
     private final ListSyncHistory listSyncHistory;
 
     CaptureController(CaptureUpload captureUpload, SyncRecorder syncRecorder, ConnectPlaudTeam connectPlaudTeam,
             ListRecorderConnections listConnections, ListDocuments listDocuments, ReadDocument readDocument,
-            ListSyncHistory listSyncHistory) {
+            ListSyncHistory listSyncHistory, DeleteDocument deleteDocument) {
         this.readDocument = readDocument;
+        this.deleteDocument = deleteDocument;
         this.listSyncHistory = listSyncHistory;
         this.captureUpload = captureUpload;
         this.syncRecorder = syncRecorder;
@@ -77,6 +81,13 @@ class CaptureController {
     @GetMapping("/sources/{sourceId}/documents/{documentId}")
     ResponseEntity<DocumentView> document(@PathVariable UUID sourceId, @PathVariable UUID documentId) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(readDocument.read(sourceId, documentId));
+    }
+
+    /** Removes the document from ConXist only; the source keeps its own copy. */
+    @DeleteMapping("/sources/{sourceId}/documents/{documentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteDocument(@PathVariable UUID sourceId, @PathVariable UUID documentId) {
+        deleteDocument.delete(sourceId, documentId);
     }
 
     /** {@code all=false} (the default) leaves out checks that found nothing new. */
