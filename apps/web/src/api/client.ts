@@ -1,5 +1,5 @@
 import type {
-  CapturedDocument, Provider, ProviderId, RecorderConnection, RecorderKey, Source, StartFrom, SyncResult, TeamCheck,
+  CapturedDocument, PlaudSignIn, Provider, ProviderId, RecorderConnection, RecorderKey, SignInStart, Source, StartFrom, SyncResult, TeamCheck,
 } from '../domain/model';
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
@@ -51,6 +51,12 @@ export interface PlaudTeamLink {
   includeSummaries: boolean;
 }
 
+export interface PlaudAccountLink {
+  signInId: string;
+  startFrom: StartFrom;
+  includeSummaries: boolean;
+}
+
 export const api = {
   providers: () => request<Provider[]>('/api/providers'),
   sources: () => request<Source[]>('/api/sources'),
@@ -65,6 +71,12 @@ export const api = {
   testPlaudTeam: (clientId: string, keyId: string) => postJson<TeamCheck>('/api/recorders/plaud/test', { clientId, keyId }),
   connectPlaudTeam: (sourceId: string, link: PlaudTeamLink) =>
     postJson<RecorderConnection>(`/api/sources/${sourceId}/plaud-team`, link),
+  startPlaudSignIn: () => request<SignInStart>('/api/recorders/plaud/sign-ins', { method: 'POST' }),
+  plaudSignIn: (signInId: string) => request<PlaudSignIn>(`/api/recorders/plaud/sign-ins/${encodeURIComponent(signInId)}`),
+  connectPlaudAccount: (sourceId: string, link: PlaudAccountLink) =>
+    postJson<RecorderConnection>(`/api/sources/${sourceId}/plaud-account`, link),
+  signInAgain: (sourceId: string, signInId: string) =>
+    postJson<RecorderConnection>(`/api/sources/${sourceId}/plaud-account/sign-in`, { signInId }),
   plaudConnections: () => request<RecorderConnection[]>('/api/recorders/plaud/connections'),
   sync: (sourceId: string) => request<SyncResult>(`/api/sources/${sourceId}/sync`, { method: 'POST' }),
 };

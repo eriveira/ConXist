@@ -16,17 +16,21 @@ export interface SourceCardProps {
   now: Date;
   onAddFiles?: () => void;
   onSync?: () => void;
+  /** Shown instead of Retry when Plaud signed ConXist out of a personal account. */
+  onSignInAgain?: () => void;
 }
 
 /** One connected source on the Sources page: what it is, what it holds, its state, and one action. */
 export function SourceCard(props: SourceCardProps) {
   const t = useT();
-  const { source, label, documentCount, connection, syncing, lastImported, syncProblem, now, onAddFiles, onSync } = props;
+  const { source, label, documentCount, connection, syncing, lastImported, syncProblem, now, onAddFiles, onSync, onSignInAgain } = props;
   const recorder = source.provider === 'PLAUD';
   const paused = connection?.status === 'PAUSED';
+  const signedOut = paused && connection?.kind === 'ACCOUNT';
   /** A recorder source whose Plaud connection never finished (the dialog was closed after a failure). */
   const unlinked = recorder && !connection;
-  const subtitle = recorder ? connection?.teamName ?? source.accountLabel : source.accountLabel;
+  const subtitle = recorder ? connection?.label ?? source.accountLabel : source.accountLabel;
+  const pausedText = t(signedOut ? 'node.signedOut' : 'node.accessLost');
   return (
     <article className={paused || syncProblem ? 'node err' : 'node'} aria-label={source.name}>
       <div className="nhead">
@@ -46,7 +50,11 @@ export function SourceCard(props: SourceCardProps) {
         {recorder && !unlinked && (
           <div className="nrow">
             <span>{checkedText(connection, now, t)}</span>
-            {onSync && (
+            {signedOut && onSignInAgain ? (
+              <button type="button" className="btn sm" onClick={onSignInAgain}>
+                <Icon name="lock" size={16} /> {t('node.signInAgain')}
+              </button>
+            ) : onSync && (
               <button type="button" className="btn sm" onClick={onSync} disabled={syncing}>
                 <Icon name="sync" size={16} /> {paused || syncProblem ? t('node.retry') : t('node.sync')}
               </button>
@@ -64,8 +72,8 @@ export function SourceCard(props: SourceCardProps) {
         {lastImported !== null && !syncProblem && (
           <p className="nrow muted" role="status">{lastImported === 0 ? t('node.upToDate') : t('node.synced', { count: lastImported })}</p>
         )}
-        {(syncProblem ?? (paused ? t('node.accessLost') : null)) && (
-          <p className="node-error" role="alert">{syncProblem ?? t('node.accessLost')}</p>
+        {(syncProblem ?? (paused ? pausedText : null)) && (
+          <p className="node-error" role="alert">{syncProblem ?? pausedText}</p>
         )}
       </div>
     </article>

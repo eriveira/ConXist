@@ -23,7 +23,8 @@ class ConnectPlaudTeamTest {
     private final CaptureFakes.Keys keys = new CaptureFakes.Keys();
     private final CaptureFakes.Plaud plaud = new CaptureFakes.Plaud();
     private final CaptureFakes.Connections connections = new CaptureFakes.Connections();
-    private final ConnectPlaudTeam connect = new ConnectPlaudTeam(sources, keys, plaud, connections,
+    private final CaptureFakes.AccountConnections accounts = new CaptureFakes.AccountConnections();
+    private final ConnectPlaudTeam connect = new ConnectPlaudTeam(sources, keys, plaud, connections, accounts,
             new CaptureContext(FixedWorkspace.standard(), new RecordedEvents(), new ImmediateUnitOfWork(),
                     TestClock.fixed()));
 
@@ -41,7 +42,7 @@ class ConnectPlaudTeamTest {
 
         ConnectionView view = connect.connect(source.id(), "client_acme", key.keyId(), StartFrom.LAST_7_DAYS, true);
 
-        assertThat(view.teamName()).isEqualTo("Acme Engineering");
+        assertThat(view.label()).isEqualTo("Acme Engineering");
         assertThat(view.status()).isEqualTo(ConnectionStatus.ACTIVE);
         assertThat(connections.bySource.get(source.id())).satisfies(c -> {
             assertThat(c.clientId()).isEqualTo("client_acme");
@@ -81,6 +82,17 @@ class ConnectPlaudTeamTest {
                 .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.already-connected");
         assertThatThrownBy(() -> connect.connect(uploads.id(), "client_acme", key.keyId(), StartFrom.NEW_ONLY, false))
                 .extracting(e -> ((RuleViolation) e).code()).isEqualTo("source.wrong-kind");
+    }
+
+    @Test
+    void refuses_a_source_already_signed_in_to_a_personal_plaud_account() {
+        PublicKey key = connect.createKey();
+        SourceSummary source = sources.add(Provider.PLAUD, "Mine");
+        accounts.save(com.conxist.capture.domain.PlaudAccountConnection.connect(source.id(),
+                FixedWorkspace.WORKSPACE_ID, "alex@acme.test", "key:alex", StartFrom.NEW_ONLY, false, TestClock.NOW));
+
+        assertThatThrownBy(() -> connect.connect(source.id(), "client_acme", key.keyId(), StartFrom.NEW_ONLY, false))
+                .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.already-connected");
     }
 
     @Test

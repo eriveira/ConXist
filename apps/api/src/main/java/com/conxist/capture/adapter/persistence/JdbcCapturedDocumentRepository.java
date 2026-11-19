@@ -1,34 +1,42 @@
 package com.conxist.capture.adapter.persistence;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.UUID;
 import com.conxist.capture.DocumentOrigin;
+import com.conxist.capture.adapter.secrets.SecretBox;
 import com.conxist.capture.application.CapturedDocumentRepository;
 import com.conxist.capture.domain.CapturedDocument;
 import com.conxist.capture.domain.DocumentTitle;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Captured text is customer data, so it is stored encrypted ({@code text_sealed}), bound to its document id.
+ * {@code text_content} only holds rows written before encryption, until {@link SealPlaintextDocuments} seals them.
+ */
 @Repository
 class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
 
     private final JdbcClient jdbc;
+    private final SecretBox box;
 
-    JdbcCapturedDocumentRepository(JdbcClient jdbc) {
+    JdbcCapturedDocumentRepository(JdbcClient jdbc, SecretBox box) {
         this.jdbc = jdbc;
+        this.box = box;
     }
 
     @Override
     public boolean saveIfNew(CapturedDocument document) {
         return jdbc.sql("""
                 insert into captured_documents
-                  (id, workspace_id, source_id, title, media_type, size_bytes, text_content, origin,
+                  (id, workspace_id, source_id, title, media_type, size_bytes, text_sealed, origin,
                    origin_reference, captured_at)
                 values
-                  (:id, :workspaceId, :sourceId, :title, :mediaType, :sizeBytes, :text, :origin,
+                  (:id, :workspaceId, :sourceId, :title, :mediaType, :sizeBytes, :sealed, :origin,
                    :originReference, :capturedAt)
                 on conflict (source_id, origin_reference) do nothing
                 """)
@@ -38,7 +46,7 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
                 .param("title", document.title().value())
                 .param("mediaType", document.mediaType())
                 .param("sizeBytes", document.sizeBytes())
-                .param("text", document.text())
+                .param("sealed", seal(box, document.id(), document.text()))
                 .param("origin", document.origin().name())
                 .param("originReference", document.originReference())
                 .param("capturedAt", Timestamp.from(document.capturedAt()))
@@ -61,27 +69,41 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
     @Override
     public List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId) {
         return jdbc.sql("""
-                select id, workspace_id, source_id, title, media_type, size_bytes, text_content, origin,
-                       origin_reference, captured_at
+                select id, workspace_id, source_id, title, media_type, size_bytes, text_content, text_sealed,
+                       origin, origin_reference, captured_at
                 from captured_documents
                 where workspace_id = :workspaceId and source_id = :sourceId
                 order by captured_at desc
                 """)
                 .param("workspaceId", workspaceId)
                 .param("sourceId", sourceId)
-                .query(JdbcCapturedDocumentRepository::toDocument)
+                .query(this::toDocument)
                 .list();
     }
 
-    private static CapturedDocument toDocument(ResultSet row, int rowNumber) throws SQLException {
+    static byte[] seal(SecretBox box, UUID documentId, String text) {
+        return box.seal(text.getBytes(StandardCharsets.UTF_8), documentId.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String text(ResultSet row, UUID documentId) throws SQLException {
+        byte[] sealed = row.getBytes("text_sealed");
+        if (sealed == null) {
+            return row.getString("text_content");
+        }
+        return new String(box.open(sealed, documentId.toString().getBytes(StandardCharsets.UTF_8)),
+                StandardCharsets.UTF_8);
+    }
+
+    private CapturedDocument toDocument(ResultSet row, int rowNumber) throws SQLException {
+        UUID id = row.getObject("id", UUID.class);
         return new CapturedDocument(
-                row.getObject("id", UUID.class),
+                id,
                 row.getObject("workspace_id", UUID.class),
                 row.getObject("source_id", UUID.class),
                 new DocumentTitle(row.getString("title")),
                 row.getString("media_type"),
                 row.getLong("size_bytes"),
-                row.getString("text_content"),
+                text(row, id),
                 DocumentOrigin.valueOf(row.getString("origin")),
                 row.getString("origin_reference"),
                 row.getTimestamp("captured_at").toInstant());

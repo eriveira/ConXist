@@ -18,11 +18,14 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
 import com.conxist.testing.FakePlaudConfiguration;
+import com.conxist.testing.FakePlaudMcpServer;
 import com.conxist.testing.FakePlaudServer;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -57,6 +60,12 @@ class CaptureFlowIntegrationTest {
     @Autowired
     FakePlaudServer plaud;
 
+    @Autowired
+    java.util.List<ApplicationRunner> runners;
+
+    @Autowired
+    FakePlaudMcpServer plaudMcp;
+
     @Test
     void an_uploaded_file_reaches_the_hub_waiting_for_review() throws Exception {
         String sourceId = addSource("{\"provider\":\"UPLOAD\",\"name\":\"Product specs\"}");
@@ -73,6 +82,7 @@ class CaptureFlowIntegrationTest {
                 .andExpect(jsonPath("$[0].text").doesNotExist());
         awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW");
         awaitHubItem(sourceId, "SOURCE", "CONNECTED");
+        assertNoPlaintextFor(sourceId, "Every source connects");
         mvc.perform(get("/api/hub"))
                 .andExpect(jsonPath("$.pendingReview").value(greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.latest[0].workspaceId").doesNotExist());
@@ -188,6 +198,38 @@ class CaptureFlowIntegrationTest {
         String sealed = jdbc.sql("select encode(private_key_sealed, 'escape') from recorder_keys where key_id = :id")
                 .param("id", keyId).query(String.class).single();
         org.assertj.core.api.Assertions.assertThat(sealed).doesNotContain("PRIVATE KEY");
+        assertNoPlaintextFor(sourceId, "Text of");
+    }
+
+    @Test
+    void text_captured_before_encryption_is_sealed_on_start_and_still_readable() throws Exception {
+        String sourceId = addSource("{\"provider\":\"UPLOAD\",\"name\":\"Old notes\"}");
+        jdbc.sql("""
+                insert into captured_documents (id, workspace_id, source_id, title, media_type, size_bytes,
+                  text_content, origin, origin_reference, captured_at)
+                select :id, workspace_id, id, 'old.txt', 'text/plain', 9, 'Old notes', 'UPLOAD', 'old', now()
+                from sources where id = :sourceId
+                """).param("id", UUID.randomUUID()).param("sourceId", UUID.fromString(sourceId)).update();
+
+        for (ApplicationRunner runner : runners) {
+            runner.run(new DefaultApplicationArguments());
+        }
+
+        assertNoPlaintextFor(sourceId, "Old notes");
+        mvc.perform(get("/api/sources/{id}/documents", sourceId))
+                .andExpect(jsonPath("$[0].title").value("old.txt"))
+                .andExpect(jsonPath("$[0].textLength").value(9));
+    }
+
+    private void assertNoPlaintextFor(String sourceId, String phrase) {
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql("""
+                select count(*) from captured_documents
+                where source_id = :id and (text_content is not null or position(convert_to(:phrase, 'UTF8') in text_sealed) > 0)
+                """).param("id", UUID.fromString(sourceId)).param("phrase", phrase).query(Long.class).single())
+                .isZero();
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql(
+                "select count(*) from captured_documents where source_id = :id and text_sealed is not null")
+                .param("id", UUID.fromString(sourceId)).query(Long.class).single()).isPositive();
     }
 
     @Test
@@ -216,6 +258,79 @@ class CaptureFlowIntegrationTest {
                 .andExpect(jsonPath("$", hasSize(11)))
                 .andExpect(jsonPath("$[?(@.provider=='UPLOAD')].availability").value("LIVE"))
                 .andExpect(jsonPath("$[?(@.provider=='PLAUD')].availability").value("PREVIEW"));
+    }
+
+    @Test
+    void a_person_signs_in_with_plaud_and_their_meetings_import_once_and_keep_coming_after_a_token_refresh()
+            throws Exception {
+        String signInId = signInWithPlaud();
+        mvc.perform(get("/api/recorders/plaud/sign-ins/{id}", signInId))
+                .andExpect(jsonPath("$.status").value("SIGNED_IN"))
+                .andExpect(jsonPath("$.accountLabel").value(FakePlaudMcpServer.ACCOUNT_EMAIL));
+        String sourceId = addSource("{\"provider\":\"PLAUD\",\"name\":\"My meetings\",\"accountLabel\":\""
+                + FakePlaudMcpServer.ACCOUNT_EMAIL + "\"}");
+
+        mvc.perform(post("/api/sources/{id}/plaud-account", sourceId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"signInId\":\"" + signInId + "\",\"startFrom\":\"LAST_30_DAYS\",\"includeSummaries\":true}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.kind").value("ACCOUNT"))
+                .andExpect(jsonPath("$.label").value(FakePlaudMcpServer.ACCOUNT_EMAIL));
+        mvc.perform(post("/api/sources/{id}/sync", sourceId))
+                .andExpect(jsonPath("$.imported").value(3))
+                .andExpect(jsonPath("$.waitingForTranscript").value(1));
+        plaudMcp.expireAccessTokens();
+        mvc.perform(post("/api/sources/{id}/sync", sourceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported").value(0));
+        awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW", 3);
+        assertNoPlaintextFor(sourceId, "ship sign-in first");
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql("""
+                select count(*) from plaud_account_tokens where source_id = :id
+                  and position(convert_to('at-', 'UTF8') in tokens_sealed) = 0
+                """).param("id", UUID.fromString(sourceId)).query(Long.class).single()).isEqualTo(1L);
+        // The sign-in cannot be used for a second source.
+        String other = addSource("{\"provider\":\"PLAUD\",\"name\":\"Copy\",\"accountLabel\":\"copy\"}");
+        mvc.perform(post("/api/sources/{id}/plaud-account", other).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"signInId\":\"" + signInId + "\",\"startFrom\":\"NEW_ONLY\",\"includeSummaries\":false}"))
+                .andExpect(status().isNotFound());
+
+        plaudMcp.signOutEverywhere();
+        mvc.perform(post("/api/sources/{id}/sync", sourceId))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("plaud.signed-out"));
+        mvc.perform(get("/api/recorders/plaud/connections"))
+                .andExpect(jsonPath("$[?(@.sourceId=='" + sourceId + "')].status").value("PAUSED"));
+        mvc.perform(post("/api/sources/{id}/plaud-account/sign-in", sourceId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"signInId\":\"" + signInWithPlaud() + "\"}"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        mvc.perform(post("/api/sources/{id}/sync", sourceId)).andExpect(status().isOk());
+    }
+
+    @Test
+    void a_cancelled_plaud_sign_in_connects_nothing() throws Exception {
+        plaudMcp.cancelNextSignIn();
+
+        String signInId = signInWithPlaud();
+
+        mvc.perform(get("/api/recorders/plaud/sign-ins/{id}", signInId))
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    /** Starts a sign-in, lets the stand-in Plaud page answer, and brings its answer to the callback. */
+    private String signInWithPlaud() throws Exception {
+        String started = mvc.perform(post("/api/recorders/plaud/sign-ins"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String authorizationUrl = JsonPath.read(started, "$.authorizationUrl");
+        java.net.http.HttpResponse<Void> page = java.net.http.HttpClient.newHttpClient().send(
+                java.net.http.HttpRequest.newBuilder(java.net.URI.create(authorizationUrl)).build(),
+                java.net.http.HttpResponse.BodyHandlers.discarding());
+        java.net.URI back = java.net.URI.create(page.headers().firstValue("Location").orElseThrow());
+        org.assertj.core.api.Assertions.assertThat(back.getPath()).isEqualTo("/api/recorders/plaud/callback");
+        mvc.perform(get(back.getPath() + "?" + back.getRawQuery()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"));
+        return JsonPath.read(started, "$.signInId");
     }
 
     private String addSource(String json) throws Exception {

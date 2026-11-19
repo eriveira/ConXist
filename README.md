@@ -29,21 +29,32 @@ cd apps/web && pnpm install && pnpm dev
 There is no sign-in yet, so the API listens on this machine only, refuses to
 start otherwise, and is not deployable (ADR 0002).
 
-Plaud Team workspaces connect through Plaud's Enterprise API (ADR 0003). The API
-needs a key for the secrets it keeps:
+Plaud Team workspaces connect through Plaud's Enterprise API (ADR 0003), and
+personal Plaud accounts through Sign in with Plaud on Plaud's own page (ADR 0005).
+The API needs a key for the secrets it keeps:
 
 ```sh
 export CONXIST_SECRETS_KEY=$(openssl rand -base64 32)
 ```
 
 `mvn spring-boot:test-run` also starts a fake Plaud: connect a Plaud Team with
-Client ID `demo-team` to see five sample meetings (three import, one is older
+Client ID `demo-team`, or press Sign in with Plaud (the fake signs in as
+`alex@acme.test` at once), to see five sample meetings (three import, one is older
 than 30 days, one is still being transcribed).
 
-**Do not upload real customer documents or connect a real Plaud Team** until
-encryption at rest and sign-in land. Uploads are stored unencrypted under
-`apps/api/data/uploads`, and imported text (including meeting transcripts) is
-stored unencrypted in PostgreSQL. Recorder private keys are encrypted.
+To connect your real personal Plaud account, run the API with plain
+`mvn spring-boot:run` (with `CONXIST_SECRETS_KEY` set and PostgreSQL running) and
+the web app, add a Meeting recorder, choose Sign in with Plaud and sign in on
+Plaud's page. Plaud sends you back to the API at
+`http://127.0.0.1:<port>/api/recorders/plaud/callback`, which follows
+`CONXIST_API_PORT`; set `CONXIST_PLAUD_REDIRECT_URI` only if the API is reached
+another way.
+
+Uploaded files, captured text (including meeting transcripts) and recorder
+private keys are encrypted at rest with `CONXIST_SECRETS_KEY` (ADR 0004). Keep
+that key out of the database and its backups: without it the data cannot be
+read, and losing it loses the data. The API has no sign-in yet and listens only
+on this machine, so use real customer data on your own computer only.
 
 ## Test it
 
