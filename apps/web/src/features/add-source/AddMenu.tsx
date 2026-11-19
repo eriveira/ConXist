@@ -13,12 +13,20 @@ const PROVIDER_ICON: Partial<Record<ProviderId, IconName>> = { UPLOAD: 'upload',
 interface AddMenuProps {
   providers: readonly Provider[];
   onChoose: (provider: Provider) => void;
+  /** Set with onOpenChange when something else on the page also opens this menu. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /** Add button with a two-level menu: category first (three choices), then the providers in it. */
-export function AddMenu({ providers, onChoose }: AddMenuProps) {
+export function AddMenu({ providers, onChoose, open: openFromPage, onOpenChange }: AddMenuProps) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openFromPage ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const [category, setCategory] = useState<Category | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
