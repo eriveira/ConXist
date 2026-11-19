@@ -29,17 +29,17 @@ cd apps/web && pnpm install && pnpm dev
 There is no sign-in yet, so the API listens on this machine only, refuses to
 start otherwise, and is not deployable (ADR 0002).
 
-Plaud Team workspaces connect through Plaud's Enterprise API (ADR 0003), and
-personal Plaud accounts through Sign in with Plaud on Plaud's own page (ADR 0005).
+Plaud accounts connect through Sign in with Plaud on Plaud's own page (ADR 0005).
+The Plaud Team path (ADR 0003) is on hold: its API stays, but the app no longer
+offers it.
 The API needs a key for the secrets it keeps:
 
 ```sh
 export CONXIST_SECRETS_KEY=$(openssl rand -base64 32)
 ```
 
-`mvn spring-boot:test-run` also starts a fake Plaud: connect a Plaud Team with
-Client ID `demo-team`, or press Sign in with Plaud (the fake signs in as
-`alex@acme.test` at once), to see five sample meetings (three import, one is older
+`mvn spring-boot:test-run` also starts a fake Plaud: press Sign in with Plaud (the
+fake signs in as `alex@acme.test` at once) to see five sample meetings (three import, one is older
 than 30 days, one is still being transcribed).
 
 To connect your real personal Plaud account, run the API with plain

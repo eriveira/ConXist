@@ -45,16 +45,6 @@ export interface SyncResult {
 export type StartFrom = 'LAST_30_DAYS' | 'LAST_7_DAYS' | 'NEW_ONLY';
 export const START_FROM: readonly StartFrom[] = ['LAST_30_DAYS', 'LAST_7_DAYS', 'NEW_ONLY'];
 
-/** A key ConXist made for signing in to Plaud. Only the public half ever reaches the browser. */
-export interface RecorderKey {
-  keyId: string;
-  pem: string;
-}
-
-export interface TeamCheck {
-  teamName: string;
-}
-
 /** Where a recorder source reads from: a Plaud Team workspace, or one person's Plaud account. */
 export type ConnectionKind = 'TEAM' | 'ACCOUNT';
 
