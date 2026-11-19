@@ -1,21 +1,28 @@
 import { useEffect, useState } from 'react';
-import logoLight from '@brand/assets/logo/conxist-logo-horizontal-transparent.png';
-import logoDark from '@brand/assets/logo/conxist-logo-horizontal-reversed.png';
+import { Icon } from './components/Icon';
+import type { Workspace } from './domain/workspaces';
+import { AppHeader } from './features/shell/AppHeader';
+import { AskConxist } from './features/shell/AskConxist';
+import { THEMES, type Theme } from './features/shell/AccountMenu';
+import { ComingSoonPage } from './features/shell/ComingSoonPage';
+import { HomePage } from './features/shell/HomePage';
+import { useRoute } from './features/shell/useRoute';
 import { SourcePage } from './features/source/SourcePage';
 import { SourcesPage } from './features/sources/SourcesPage';
+import { CreateWorkspacePage } from './features/workspaces/CreateWorkspacePage';
+import { NewWorkspaceDialog } from './features/workspaces/NewWorkspaceDialog';
+import { useWorkspaces } from './features/workspaces/useWorkspaces';
 import { I18nProvider, translator } from './i18n/i18n';
 import { LANGUAGES, type Language } from './i18n/messages';
-import { SOURCES_HREF, useRoute } from './navigation';
+import { useRoute as useSourceRoute } from './navigation';
 import { readPreference, savePreference } from './preferences';
 
-type Theme = 'system' | 'light' | 'dark';
-const THEMES: readonly Theme[] = ['system', 'light', 'dark'];
+/** How long "Acme is ready" stays after creating a workspace. */
+const CREATED_NOTICE_MS = 8_000;
 
 export function App() {
   const [language, setLanguage] = useState<Language>(() => readPreference('language', LANGUAGES, 'en'));
   const [theme, setTheme] = useState<Theme>(() => readPreference('theme', THEMES, 'system'));
-  const t = translator(language);
-  const route = useRoute();
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -30,37 +37,71 @@ export function App() {
 
   return (
     <I18nProvider language={language}>
-      <div className="app">
-        <header className="top">
-          <span className="logo-chip">
-            <img className="logo-l" src={logoLight} alt="ConXist.ai" />
-            <img className="logo-d" src={logoDark} alt="ConXist.ai" />
-          </span>
-          <nav className="crumbs" aria-label="Breadcrumb">
-            <span>{t('app.workspace')}</span><span className="sep" aria-hidden="true">/</span>
-            {route.page === 'source'
-              ? <a href={SOURCES_HREF}>{t('app.sources')}</a>
-              : <b aria-current="page">{t('app.sources')}</b>}
-          </nav>
-          <span className="spacer" />
-          <label className="pick">
-            <span className="sr-only">{t('app.theme')}</span>
-            <select value={theme} onChange={(event) => setTheme(event.target.value as Theme)}>
-              {THEMES.map((id) => <option key={id} value={id}>{t(`app.theme.${id}`)}</option>)}
-            </select>
-          </label>
-          <label className="pick">
-            <span className="sr-only">{t('app.language')}</span>
-            <select value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
-              <option value="en">English</option>
-              <option value="es">Español</option>
-            </select>
-          </label>
-        </header>
-        <main className="stage">
-          {route.page === 'source' ? <SourcePage key={route.sourceId} sourceId={route.sourceId} /> : <SourcesPage />}
-        </main>
-      </div>
+      <Workspaces theme={theme} onTheme={setTheme} language={language} onLanguage={setLanguage} />
     </I18nProvider>
+  );
+}
+
+interface SettingsProps {
+  theme: Theme;
+  onTheme: (theme: Theme) => void;
+  language: Language;
+  onLanguage: (language: Language) => void;
+}
+
+/** First run asks for a workspace; after that, the header, the current page and Ask ConXist. */
+function Workspaces(settings: SettingsProps) {
+  const t = translator(settings.language);
+  const { state, retry, switchTo, created, refresh } = useWorkspaces();
+  const [page, go] = useRoute();
+  const sourceRoute = useSourceRoute();
+  const [newOpen, setNewOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), CREATED_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  function onCreated(workspace: Workspace) {
+    setNewOpen(false);
+    created(workspace);
+    setNotice(t('workspace.created', { name: workspace.name }));
+    go('sources');
+  }
+
+  if (state.status === 'loading') {
+    return <div className="page-state full" role="status"><Icon name="sync" /> {t('workspace.loading')}</div>;
+  }
+  if (state.status === 'error') {
+    return (
+      <div className="page-state full" role="alert">
+        <div className="panel">
+          <h1>{t('workspace.error.title')}</h1>
+          <p>{t('workspace.error.body')}</p>
+          <button type="button" className="btn primary" onClick={retry}>{t('workspace.retry')}</button>
+        </div>
+      </div>
+    );
+  }
+  if (state.status === 'none') return <CreateWorkspacePage onCreated={onCreated} />;
+
+  return (
+    <div className="app">
+      <AppHeader page={page} workspaces={state.workspaces} current={state.current}
+        onSwitch={(workspace) => { setNotice(null); switchTo(workspace); }} onNewWorkspace={() => setNewOpen(true)} onOpenSwitcher={refresh}
+        {...settings} />
+      <main className="stage" key={state.current.id}>
+        <p className="notice" role="status">{notice && <><Icon name="check" size={16} /> {notice}</>}</p>
+        {page === 'home' && <HomePage />}
+        {page === 'sources' && (sourceRoute.page === 'source'
+          ? <SourcePage key={sourceRoute.sourceId} sourceId={sourceRoute.sourceId} />
+          : <SourcesPage />)}
+        {(page === 'flow' || page === 'agents' || page === 'knowledge') && <ComingSoonPage page={page} />}
+      </main>
+      <AskConxist />
+      {newOpen && <NewWorkspaceDialog onClose={() => setNewOpen(false)} onCreated={onCreated} />}
+    </div>
   );
 }
