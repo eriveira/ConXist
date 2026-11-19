@@ -1,6 +1,7 @@
 # 0003. Plaud Team workspaces as the first real recorder source
 
-- Status: **Accepted**
+- Status: **On hold** since 2026-11-19: the owner removed "Connect a Plaud Team" from the app. The API, sync and
+  tables stay, unused, so the path can come back for a customer on Plaud Team. Personal accounts: ADR 0005.
 - Date: 2026-11-18
 - Decided by: Eugenio Riviera (decision card "Both, Enterprise first"; connect-flow and Sources page mocks approved in the project thread, 2026-11-18)
 

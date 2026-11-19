@@ -4,16 +4,14 @@ import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import { Stepper } from '../../components/Stepper';
-import { MAX_SOURCE_NAME_LENGTH, START_FROM, type RecorderKey, type StartFrom } from '../../domain/model';
+import { MAX_SOURCE_NAME_LENGTH, START_FROM, type StartFrom } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { SignInWaiting } from './SignInWaiting';
 import { usePlaudSignIn } from './usePlaudSignIn';
 
-type Step = 'door' | 'connect' | 'recordings' | 'review' | 'result';
-/** A personal Plaud account (Sign in with Plaud) or a Plaud Team workspace (Enterprise API). */
-type Mode = 'account' | 'team';
-const STEPS: Step[] = ['connect', 'recordings', 'review'];
+type Step = 'signIn' | 'recordings' | 'review' | 'result';
+const STEPS: Step[] = ['signIn', 'recordings', 'review'];
 
 interface PlaudDialogProps {
   onClose: () => void;
@@ -21,17 +19,13 @@ interface PlaudDialogProps {
 }
 
 /**
- * Connects Plaud in one of two ways, then asks how far back to import. A personal account signs in on Plaud's own
- * page in a new window. A Plaud Team (Plaud's Enterprise API) needs a key pair: the Team admin registers ConXist's
- * public key and sends back a Client ID, and Test proves it works.
+ * Connects a person's own Plaud account: they sign in on Plaud's page in a new window, pick how far back to import,
+ * name the source and add it. (Plaud Team workspaces are not offered for now, owner decision 2026-11-19.)
  */
 export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   const t = useT();
   const nameId = useId();
-  const clientFieldId = useId();
-  const pemRef = useRef<HTMLPreElement>(null);
-  const [step, setStep] = useState<Step>('door');
-  const [mode, setMode] = useState<Mode>('account');
+  const [step, setStep] = useState<Step>('signIn');
   const signIn = usePlaudSignIn(t);
   const account = signIn.state.phase === 'signedIn' ? signIn.state : null;
   const waitingForPlaud = signIn.state.phase === 'waiting';
@@ -44,20 +38,15 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   useEffect(() => {
     if (account) nextRef.current?.focus();
   }, [account]);
-  const [key, setKey] = useState<RecorderKey | null>(null);
-  const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no');
-  const [clientId, setClientId] = useState('');
-  const [team, setTeam] = useState<string | null>(null);
   const [startFrom, setStartFrom] = useState<StartFrom>('LAST_30_DAYS');
   const [summaries, setSummaries] = useState(true);
-  const [name, setName] = useState(t('plaud.name.default'));
+  const [name, setName] = useState(t('plaud.name.account'));
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [result, setResult] = useState({ imported: 0, waiting: 0 });
   /** Kept so a retry after a failure does not add or connect the source a second time. */
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [linked, setLinked] = useState(false);
-  const [keyFailed, setKeyFailed] = useState(false);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -65,61 +54,17 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
     try {
       await action();
     } catch (error) {
-      if (step === 'connect' && mode === 'team' && !key) setKeyFailed(true);
       setProblem(problemMessage(error, t));
     } finally {
       setBusy(false);
     }
   }
 
-  useEffect(() => {
-    if (step === 'connect' && mode === 'team' && !key && !keyFailed) void run(async () => setKey(await api.createPlaudKey())).then(() => undefined);
-    // run is recreated every render; the step, the key and a failed attempt decide whether a key is needed.
-  }, [step, mode, key, keyFailed]);
-
-  async function copyKey() {
-    if (!key) return;
-    try {
-      await navigator.clipboard.writeText(key.pem);
-      setCopied('yes');
-    } catch {
-      setCopied('failed');
-      const selection = window.getSelection();
-      if (pemRef.current && selection) selection.selectAllChildren(pemRef.current);
-    }
-  }
-
-  const test = () => {
-    if (clientId.trim() === '') {
-      setProblem(t('plaud.clientId.required'));
-      return;
-    }
-    void run(async () => setTeam((await api.testPlaudTeam(clientId.trim(), key?.keyId ?? '')).teamName));
-  };
-
-  const retryKey = () => {
-    setProblem(null);
-    setKeyFailed(false);
-  };
-
-  const changeClientId = (value: string) => {
-    setClientId(value);
-    setTeam(null);
-  };
-
-  const choose = (chosen: Mode) => {
-    setMode(chosen);
-    setName(t(chosen === 'account' ? 'plaud.name.account' : 'plaud.name.default'));
-    setStep('connect');
-  };
-
-  /** Ready to move past the first step: signed in to the account, or the Team's Client ID tested. */
-  const connected = mode === 'account' ? account !== null : team !== null;
-
   const next = () => {
-    if (step === 'connect') {
-      if (connected) setStep('recordings');
-      else setProblem(t(mode === 'account' ? 'plaud.signIn.required' : 'plaud.test.required'));
+    setProblem(null);
+    if (step === 'signIn') {
+      if (account) setStep('recordings');
+      else setProblem(t('plaud.signIn.required'));
     } else if (step === 'recordings') {
       setStep('review');
     }
@@ -127,8 +72,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
 
   const back = () => {
     setProblem(null);
-    if (step === 'connect') signIn.reset();
-    setStep(step === 'review' ? 'recordings' : step === 'recordings' ? 'connect' : 'door');
+    setStep(step === 'review' ? 'recordings' : 'signIn');
   };
 
   const submit = () => {
@@ -137,15 +81,10 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
       return;
     }
     void run(async () => {
-      const label = (mode === 'account' ? account?.accountLabel : team) ?? '';
-      const id = sourceId ?? (await api.addSource({ provider: 'PLAUD', name: name.trim(), accountLabel: label })).id;
+      const id = sourceId ?? (await api.addSource({ provider: 'PLAUD', name: name.trim(), accountLabel: account?.accountLabel ?? '' })).id;
       setSourceId(id);
       if (!linked) {
-        if (mode === 'account') {
-          await api.connectPlaudAccount(id, { signInId: account?.signInId ?? '', startFrom, includeSummaries: summaries });
-        } else {
-          await api.connectPlaudTeam(id, { clientId: clientId.trim(), keyId: key?.keyId ?? '', startFrom, includeSummaries: summaries });
-        }
+        await api.connectPlaudAccount(id, { signInId: account?.signInId ?? '', startFrom, includeSummaries: summaries });
         setLinked(true);
       }
       onCaptured();
@@ -157,71 +96,46 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   };
 
   const footer = (() => {
-    if (step === 'door') {
-      return <><span className="grow" /><button type="button" className="btn ghost" onClick={onClose}>{t('dialog.cancel')}</button></>;
-    }
     if (step === 'result') {
       return <><span className="grow" /><button type="button" className="btn primary" onClick={onClose}>{t('dialog.done')}</button></>;
+    }
+    if (step === 'signIn') {
+      return (
+        <>
+          <button type="button" className="btn ghost" onClick={onClose}>{t('dialog.cancel')}</button>
+          <span className="grow" />
+          {waitingForPlaud
+            ? <button type="button" className="btn" onClick={signIn.reset}>{t('plaud.signIn.stop')}</button>
+            : (
+              <button ref={nextRef} type="button" className={account ? 'btn primary' : 'btn'} onClick={next} disabled={!account}>
+                {t('dialog.next')}
+              </button>
+            )}
+        </>
+      );
     }
     return (
       <>
         <button type="button" className="btn ghost" onClick={back} disabled={busy}>{t('dialog.backStep')}</button>
         <span className="grow" />
-        {step === 'connect' && mode === 'team' && (
-          <button type="button" className={team ? 'btn' : 'btn primary'} onClick={test} disabled={busy || !key || clientId.trim() === ''}>
-            {busy && key ? t('plaud.testing') : t('plaud.test')}
-          </button>
-        )}
-        {step === 'connect' && mode === 'account' && waitingForPlaud
-          ? <button type="button" className="btn" onClick={signIn.reset}>{t('dialog.cancel')}</button>
-          : step === 'review'
-            ? <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? t('dialog.adding') : t('dialog.add')}</button>
-            : (
-              <button ref={nextRef} type="button" className={connected || step !== 'connect' ? 'btn primary' : 'btn'} onClick={next}
-                disabled={busy || (step === 'connect' && mode === 'account' && !account)}>{t('dialog.next')}</button>
-            )}
+        {step === 'review'
+          ? <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? t('dialog.adding') : t('dialog.add')}</button>
+          : <button type="button" className="btn primary" onClick={next} disabled={busy}>{t('dialog.next')}</button>}
       </>
     );
   })();
-
-  const readOnly = <p className="note"><Icon name="lock" size={16} /><span>{t('plaud.readOnly')}</span></p>;
 
   return (
     <Dialog title={t('plaud.title')} subtitle={t('plaud.subtitle')} icon={<Icon name="mic" />}
       closeLabel={t('dialog.close')} onClose={onClose} footer={footer} step={step} closable={!busy}>
       {STEPS.includes(step) && (
-        <Stepper steps={[t(mode === 'account' ? 'plaud.step.signIn' : 'plaud.step.connect'), t('plaud.step.recordings'), t('plaud.step.review')]} current={STEPS.indexOf(step)} />
+        <Stepper steps={[t('plaud.step.signIn'), t('plaud.step.recordings'), t('plaud.step.review')]} current={STEPS.indexOf(step)} />
       )}
       <div className="m-body">
         {(problem ?? signIn.problem) && <p className="alert error" role="alert"><Icon name="alert" size={18} />{problem ?? signIn.problem}</p>}
-        {step === 'door' && (
+        {step === 'signIn' && (
           <>
-            <h3>{t('plaud.door.heading')}</h3>
-            <p className="lead">{t('plaud.door.lead')}</p>
-            <div className="doors">
-              <button type="button" className="door" onClick={() => choose('account')}>
-                <span className="nico"><Icon name="mic" /></span>
-                <span className="mtext">
-                  <span className="mname">{t('plaud.door.personal')}</span>
-                  <span className="mdesc">{t('plaud.door.personal.desc')}</span>
-                </span>
-                <span className="chev"><Icon name="chevron" size={18} /></span>
-              </button>
-              <button type="button" className="door" onClick={() => choose('team')}>
-                <span className="nico"><Icon name="team" /></span>
-                <span className="mtext">
-                  <span className="mname">{t('plaud.door.team')}</span>
-                  <span className="mdesc">{t('plaud.door.team.desc')}</span>
-                </span>
-                <span className="chev"><Icon name="chevron" size={18} /></span>
-              </button>
-            </div>
-            {readOnly}
-          </>
-        )}
-        {step === 'connect' && mode === 'account' && (
-          <>
-            <h3>{t('plaud.door.personal')}</h3>
+            <h3>{t('plaud.signIn.heading')}</h3>
             {account ? (
               <div className="account">
                 <span className="av"><Icon name="check" size={16} /></span>
@@ -241,57 +155,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
               </>
             )}
             <p className="sr-only" role="status">{account ? t('plaud.signedInAs', { account: account.accountLabel }) : ''}</p>
-            {readOnly}
-          </>
-        )}
-        {step === 'connect' && mode === 'team' && (
-          <>
-            <h3>{t('plaud.connect.heading')}</h3>
-            {team ? (
-              <div className="account">
-                <span className="av"><Icon name="check" size={16} /></span>
-                <span className="grow"><b>{team}</b><br /><span className="muted">{t('plaud.team')}</span></span>
-                <Pill tone="live">{t('plaud.connected')}</Pill>
-              </div>
-            ) : (
-              <>
-                <p className="lead">{t('plaud.connect.lead')}</p>
-                <ol className="how">
-                  <li>{t('plaud.connect.how1')}</li>
-                  <li>{t('plaud.connect.how2')}</li>
-                  <li>{t('plaud.connect.how3')}</li>
-                </ol>
-                <div className="keybox">
-                  <div className="keyrow">
-                    <b>{t('plaud.key.title')}</b>
-                    <button type="button" className="btn sm" onClick={() => void copyKey()} disabled={!key}>
-                      <Icon name={copied === 'yes' ? 'check' : 'copy'} size={16} /> {copied === 'yes' ? t('plaud.key.copied') : t('plaud.key.copy')}
-                    </button>
-                  </div>
-                  {key ? (
-                    <>
-                      <pre ref={pemRef} className="pem" tabIndex={0} aria-label={t('plaud.key.title')}>{key.pem}</pre>
-                      {copied === 'failed' && <small className="copy-failed" role="status">{t('plaud.key.copyFailed')}</small>}
-                      <small>{t('plaud.key.note', { keyId: key.keyId })}</small>
-                    </>
-                  ) : keyFailed ? (
-                    <button type="button" className="btn sm" onClick={retryKey}>{t('sources.retry')}</button>
-                  ) : (
-                    <small role="status">{t('plaud.key.loading')}</small>
-                  )}
-                </div>
-              </>
-            )}
-            <div className="field">
-              <label htmlFor={clientFieldId}>{t('plaud.clientId')}</label>
-              <input id={clientFieldId} type="text" value={clientId} autoComplete="off" spellCheck={false}
-                placeholder={t('plaud.clientId.placeholder')} aria-describedby={`${clientFieldId}-hint`}
-                onChange={(event) => changeClientId(event.target.value)}
-                onKeyDown={(event) => { if (event.key === 'Enter') test(); }} />
-              <span className="hint" id={`${clientFieldId}-hint`}>{t('plaud.clientId.hint')}</span>
-            </div>
-            {team && <p className="note"><Icon name="info" size={16} /><span>{t('plaud.members.note')}</span></p>}
-            {readOnly}
+            <p className="note"><Icon name="lock" size={16} /><span>{t('plaud.readOnly')}</span></p>
           </>
         )}
         {step === 'recordings' && (
@@ -322,9 +186,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
               <input id={nameId} type="text" value={name} maxLength={MAX_SOURCE_NAME_LENGTH} onChange={(event) => setName(event.target.value)} />
             </div>
             <dl className="summary">
-              {mode === 'account'
-                ? <div><dt>{t('plaud.account')}</dt><dd>{account?.accountLabel}</dd></div>
-                : <div><dt>{t('plaud.team')}</dt><dd>{team}</dd></div>}
+              <div><dt>{t('plaud.account')}</dt><dd>{account?.accountLabel}</dd></div>
               <div><dt>{t('plaud.review.recordings')}</dt><dd>{t(`plaud.start.${startFrom}`)}</dd></div>
               <div><dt>{t('plaud.review.summaries')}</dt><dd>{summaries ? t('plaud.review.included') : t('plaud.review.notIncluded')}</dd></div>
             </dl>
