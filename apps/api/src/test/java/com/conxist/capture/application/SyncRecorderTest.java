@@ -191,7 +191,7 @@ class SyncRecorderTest {
         SourceSummary source = connected(StartFrom.LAST_30_DAYS, false);
         plaud.broken = true;
 
-        assertThat(syncRecorder.syncAll()).singleElement().satisfies(sync -> {
+        assertThat(syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement().satisfies(sync -> {
             assertThat(sync.sourceId()).isEqualTo(source.id());
             assertThat(sync.problemCode()).isEqualTo(SyncRecorder.SYNC_FAILED);
         });
@@ -219,13 +219,13 @@ class SyncRecorderTest {
         connections.save(connections.bySource.get(paused.id()).paused(TestClock.NOW));
         plaud.record("f1", "One", RECENT);
 
-        assertThat(syncRecorder.syncAll()).singleElement().satisfies(sync -> {
+        assertThat(syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement().satisfies(sync -> {
             assertThat(sync.sourceId()).isEqualTo(first.id());
             assertThat(sync.result().imported()).isEqualTo(1);
         });
 
         plaud.down = true;
-        assertThat(syncRecorder.syncAll()).singleElement()
+        assertThat(syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement()
                 .satisfies(sync -> assertThat(sync.problemCode()).isEqualTo("plaud.unavailable"));
     }
 

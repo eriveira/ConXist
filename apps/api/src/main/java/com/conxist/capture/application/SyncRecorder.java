@@ -68,9 +68,11 @@ public final class SyncRecorder {
         return recorded(sourceId, StartedBy.PERSON, () -> accountSync.run(account));
     }
 
-    /** The scheduled check: every active connection of the workspace. One failing Team does not stop the others. */
-    public List<SourceSync> syncAll() {
-        UUID workspaceId = context.workspace().id();
+    /**
+     * The scheduled check: every active connection of one workspace. It runs outside a request, so it is told the
+     * workspace. One failing connection does not stop the others.
+     */
+    public List<SourceSync> syncAll(UUID workspaceId) {
         safely("forget old import history", () -> history.forgetBefore(workspaceId, context.clock().instant().minus(SyncHistory.KEEP)));
         Stream<Map.Entry<UUID, Supplier<SyncResult>>> teams = connections.findAll(workspaceId).stream()
                 .filter(connection -> connection.status() == ConnectionStatus.ACTIVE)

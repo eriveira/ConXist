@@ -26,8 +26,6 @@ server:
   port: ${CONXIST_API_PORT:8080}
 
 conxist:
-  workspace:
-    default-id: ${CONXIST_WORKSPACE_ID:00000000-0000-0000-0000-000000000001}
   capture:
     max-file-bytes: 26214400 # 25 MB
     max-text-characters: 2000000

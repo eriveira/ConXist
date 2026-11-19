@@ -21,6 +21,7 @@ import com.conxist.testing.FakePlaudConfiguration;
 import com.conxist.testing.FakePlaudMcpServer;
 import com.conxist.testing.FakePlaudServer;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** The whole slice against a real PostgreSQL: add sources, capture, and see it arrive in the hub. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({PostgresContainerConfiguration.class, FakePlaudConfiguration.class})
+@Import({PostgresContainerConfiguration.class, FakePlaudConfiguration.class, WorkspaceHeaderConfiguration.class})
 class CaptureFlowIntegrationTest {
 
     @TempDir
@@ -66,6 +67,7 @@ class CaptureFlowIntegrationTest {
     @Autowired
     FakePlaudMcpServer plaudMcp;
 
+<<<<<<< HEAD
     @Autowired
     com.conxist.capture.application.SyncHistory history;
 
@@ -97,6 +99,11 @@ class CaptureFlowIntegrationTest {
                 .singleElement().satisfies(r -> org.assertj.core.api.Assertions.assertThat(r.startedAt())
                         .isEqualTo(now.minus(Duration.ofDays(1))));
         org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, true, 10)).hasSize(2);
+=======
+    @BeforeEach
+    void workspace() {
+        WorkspaceHeaderConfiguration.ensure(jdbc);
+>>>>>>> a5837f7 (feat(workspaces): create and list workspaces; each request names its workspace)
     }
 
     @Test
