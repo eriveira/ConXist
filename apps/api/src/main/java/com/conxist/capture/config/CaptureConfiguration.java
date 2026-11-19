@@ -10,6 +10,7 @@ import com.conxist.capture.application.CaptureUpload;
 import com.conxist.capture.application.CapturedDocumentRepository;
 import com.conxist.capture.application.FileStore;
 import com.conxist.capture.application.DeleteDocument;
+import com.conxist.capture.application.EditMeeting;
 import com.conxist.capture.application.ListDocuments;
 import com.conxist.capture.application.ListSyncHistory;
 import com.conxist.capture.application.ReadDocument;
@@ -138,6 +139,12 @@ class CaptureConfiguration {
     DeleteDocument deleteDocument(SourceCatalog catalog, CapturedDocumentRepository documents, FileStore files,
             CaptureContext context) {
         return new DeleteDocument(catalog, documents, files, context);
+    }
+
+    @Bean
+    EditMeeting editMeeting(SourceCatalog catalog, CapturedDocumentRepository documents, CaptureContext context,
+            CaptureProperties capture) {
+        return new EditMeeting(catalog, documents, context, capture.maxTextCharacters());
     }
 
     @Bean

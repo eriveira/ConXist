@@ -3,7 +3,7 @@ import { byDay, firstSync, highlight, importedBy, recordedWithin, linesMatching,
 
 const doc = (id: string, recordedAt: string | null, capturedAt = '2026-11-18T20:00:00Z'): CapturedDocument => ({
   id, sourceId: 's', title: id, mediaType: 'text/markdown', sizeBytes: 1, origin: 'RECORDING', textLength: 1,
-  capturedAt, recordedAt, lengthSeconds: null, speakerCount: null,
+  capturedAt, recordedAt, lengthSeconds: null, speakerCount: null, editedAt: null,
 });
 
 const meeting: Meeting = {

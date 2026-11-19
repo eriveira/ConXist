@@ -56,6 +56,20 @@ class JdbcHubItemRepository implements HubItemRepository {
     }
 
     @Override
+    public void retitle(UUID workspaceId, UUID sourceId, UUID itemId, String title) {
+        jdbc.sql("""
+                update hub_items set title = :title
+                where item_id = :itemId and workspace_id = :workspaceId and source_id = :sourceId
+                  and item_type = 'DOCUMENT' and status <> 'REMOVED'
+                """)
+                .param("title", title)
+                .param("itemId", itemId)
+                .param("workspaceId", workspaceId)
+                .param("sourceId", sourceId)
+                .update();
+    }
+
+    @Override
     public long count(UUID workspaceId, HubItemType type) {
         return jdbc.sql("select count(*) from hub_items where workspace_id = :workspaceId and item_type = :type and status <> 'REMOVED'")
                 .param("workspaceId", workspaceId)

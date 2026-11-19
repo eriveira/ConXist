@@ -4,7 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -124,10 +126,76 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
     }
 
     @Override
+    public boolean saveEdit(CapturedDocument before, DocumentTitle title, String text, Instant editedAt) {
+        // The first edit keeps what was imported; later ones leave it as it is. The edited_at check makes a second
+        // tab's edit, made from an older read, change nothing instead of overwriting this one.
+        return jdbc.sql("""
+                update captured_documents set
+                  title = :title, text_sealed = :sealed, text_content = null, edited_at = :editedAt,
+                  original_title = coalesce(original_title, :beforeTitle),
+                  original_sealed = coalesce(original_sealed, :beforeSealed)
+                where workspace_id = :workspaceId and source_id = :sourceId and id = :id
+                  and edited_at is not distinct from :beforeEditedAt
+                """)
+                .param("title", title.value())
+                .param("sealed", seal(box, before.id(), text))
+                .param("editedAt", Timestamp.from(editedAt))
+                .param("beforeTitle", before.title().value())
+                // Only the first edit's text is kept as the original; a later one would be thrown away by coalesce.
+                .param("beforeSealed", before.editedAt() == null ? sealOriginal(box, before.id(), before.text()) : null,
+                        Types.BINARY)
+                .param("workspaceId", before.workspaceId())
+                .param("sourceId", before.sourceId())
+                .param("id", before.id())
+                .param("beforeEditedAt", before.editedAt() == null ? null : before.editedAt().atOffset(ZoneOffset.UTC),
+                        Types.TIMESTAMP_WITH_TIMEZONE)
+                .update() == 1;
+    }
+
+    @Override
+    public Optional<CapturedDocument> restore(CapturedDocument before) {
+        if (before.editedAt() == null) {
+            return Optional.empty();
+        }
+        Optional<Original> original = jdbc.sql("""
+                select original_title, original_sealed from captured_documents
+                where workspace_id = :workspaceId and source_id = :sourceId and id = :id
+                  and edited_at = :beforeEditedAt and original_sealed is not null
+                for update
+                """)
+                .param("workspaceId", before.workspaceId())
+                .param("sourceId", before.sourceId())
+                .param("id", before.id())
+                .param("beforeEditedAt", before.editedAt().atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE)
+                .query((row, n) -> new Original(row.getString("original_title"),
+                        openOriginal(box, before.id(), row.getBytes("original_sealed"))))
+                .optional();
+        if (original.isEmpty()) {
+            return Optional.empty();
+        }
+        jdbc.sql("""
+                update captured_documents set
+                  title = :title, text_sealed = :sealed, text_content = null,
+                  edited_at = null, original_title = null, original_sealed = null
+                where workspace_id = :workspaceId and source_id = :sourceId and id = :id
+                """)
+                .param("title", original.get().title())
+                .param("sealed", seal(box, before.id(), original.get().text()))
+                .param("workspaceId", before.workspaceId())
+                .param("sourceId", before.sourceId())
+                .param("id", before.id())
+                .update();
+        return find(before.workspaceId(), before.sourceId(), before.id());
+    }
+
+    private record Original(String title, String text) {
+    }
+
+    @Override
     public List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId) {
         return jdbc.sql("""
                 select id, workspace_id, source_id, title, media_type, size_bytes, text_content, text_sealed,
-                       origin, origin_reference, captured_at
+                       origin, origin_reference, captured_at, edited_at
                 from captured_documents
                 where workspace_id = :workspaceId and source_id = :sourceId
                 order by captured_at desc
@@ -142,7 +210,7 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
     public Optional<CapturedDocument> find(UUID workspaceId, UUID sourceId, UUID documentId) {
         return jdbc.sql("""
                 select id, workspace_id, source_id, title, media_type, size_bytes, text_content, text_sealed,
-                       origin, origin_reference, captured_at
+                       origin, origin_reference, captured_at, edited_at
                 from captured_documents
                 where workspace_id = :workspaceId and source_id = :sourceId and id = :id
                 """)
@@ -163,6 +231,15 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
                 .param("key", document.sourceId() + "/" + document.originReference())
                 .query((row, n) -> 1)
                 .single();
+    }
+
+    /** The imported text, sealed under its own label so it can never be read back as the current text, or the reverse. */
+    static byte[] sealOriginal(SecretBox box, UUID documentId, String text) {
+        return box.seal(text.getBytes(StandardCharsets.UTF_8), (documentId + "/original").getBytes(StandardCharsets.UTF_8));
+    }
+
+    static String openOriginal(SecretBox box, UUID documentId, byte[] sealed) {
+        return new String(box.open(sealed, (documentId + "/original").getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
     }
 
     static byte[] seal(SecretBox box, UUID documentId, String text) {
@@ -190,6 +267,7 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
                 text(row, id),
                 DocumentOrigin.valueOf(row.getString("origin")),
                 row.getString("origin_reference"),
-                row.getTimestamp("captured_at").toInstant());
+                row.getTimestamp("captured_at").toInstant(),
+                row.getTimestamp("edited_at") == null ? null : row.getTimestamp("edited_at").toInstant());
     }
 }

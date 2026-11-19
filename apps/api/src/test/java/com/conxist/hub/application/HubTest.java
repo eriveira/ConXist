@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.conxist.capture.DocumentCaptured;
 import com.conxist.capture.DocumentDeleted;
 import com.conxist.capture.DocumentOrigin;
+import com.conxist.capture.DocumentRetitled;
 import com.conxist.hub.domain.HubItem;
 import com.conxist.hub.domain.HubItemStatus;
 import com.conxist.hub.domain.HubItemType;
@@ -93,6 +94,24 @@ class HubTest {
     }
 
     @Test
+    void a_renamed_document_keeps_its_new_name_and_a_deleted_or_foreign_one_is_left_alone() {
+        UUID renamed = UUID.randomUUID();
+        UUID deleted = UUID.randomUUID();
+        recordArrival.documentCaptured(document(renamed));
+        recordArrival.documentDeleted(new DocumentDeleted(deleted, FixedWorkspace.WORKSPACE_ID, sourceId, TestClock.NOW));
+
+        recordArrival.documentRetitled(new DocumentRetitled(renamed, UUID.randomUUID(), sourceId, "Theirs", TestClock.NOW));
+        recordArrival.documentRetitled(new DocumentRetitled(renamed, FixedWorkspace.WORKSPACE_ID, sourceId, "Sprint 42",
+                TestClock.NOW));
+        recordArrival.documentRetitled(new DocumentRetitled(deleted, FixedWorkspace.WORKSPACE_ID, sourceId, "Back?",
+                TestClock.NOW));
+
+        assertThat(readHubOverview.read().latest()).singleElement()
+                .satisfies(item -> assertThat(item.title()).isEqualTo("Sprint 42"));
+        assertThat(readHubOverview.read().documents()).isOne();
+    }
+
+    @Test
     void counts_only_the_current_workspace() {
         recordArrival.sourceAdded(new SourceAdded(sourceId, UUID.randomUUID(), Provider.UPLOAD, "Other", TestClock.NOW));
 
@@ -123,6 +142,16 @@ class HubTest {
                 saved.removeIf(item -> item.itemId().equals(marker.itemId()));
                 saved.add(marker);
             }
+        }
+
+        @Override
+        public void retitle(UUID workspaceId, UUID sourceId, UUID itemId, String title) {
+            saved.replaceAll(item -> item.itemId().equals(itemId) && item.workspaceId().equals(workspaceId)
+                    && item.sourceId().equals(sourceId) && item.type() == HubItemType.DOCUMENT
+                    && item.status() != HubItemStatus.REMOVED
+                    ? new HubItem(item.itemId(), item.workspaceId(), item.type(), item.sourceId(), title, item.status(),
+                            item.arrivedAt())
+                    : item);
         }
 
         @Override

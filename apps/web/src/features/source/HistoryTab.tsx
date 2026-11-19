@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { Pill, type PillTone } from '../../components/Pill';
 import { firstSync, importedBy } from '../../domain/meetings';
-import type { CapturedDocument, Source, SyncRun } from '../../domain/model';
+import type { CapturedDocument, DocumentView, Source, SyncRun } from '../../domain/model';
 import { useLanguage, useT } from '../../i18n/i18n';
 import { problemText } from '../../i18n/problems';
 import { dateTime } from '../../domain/time';
@@ -43,6 +43,12 @@ export function HistoryTab({ source, onChanged }: HistoryTabProps) {
   useEffect(() => {
     if (notice) noticeRef.current?.focus();
   }, [notice]);
+
+  function edited(view: DocumentView) {
+    setLoad((current) => (current.state === 'ready' && current.documents
+      ? { ...current, documents: current.documents.map((document) => (document.id === view.id ? { ...document, title: view.title, editedAt: view.editedAt } : document)) }
+      : current));
+  }
 
   function deleted(documentId: string, title: string) {
     setLoad((current) => (current.state === 'ready' && current.documents
@@ -130,7 +136,7 @@ export function HistoryTab({ source, onChanged }: HistoryTabProps) {
       )}
       {open && (
         <DocumentPanel sourceId={sourceId} sourceName={source.name} documentId={open} onClose={() => setOpen(null)}
-          onDeleted={(title) => deleted(open, title)} />
+          onDeleted={(title) => deleted(open, title)} onEdited={edited} />
       )}
     </>
   );

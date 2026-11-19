@@ -7,7 +7,10 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,10 +25,12 @@ public final class MeetingText {
             .withZone(ZoneOffset.UTC);
 
     static final String TRUNCATED = "\n\n[truncated: this meeting is longer than ConXist keeps]\n";
-    private static final int MAX_SPEAKER_LENGTH = 80;
+    /** The longest speaker name kept; longer ones are cut. */
+    public static final int MAX_SPEAKER_LENGTH = 80;
     private static final int MAX_LANGUAGE_LENGTH = 16;
     private static final Pattern CONTROL = Pattern.compile("\\p{Cntrl}");
     private static final Pattern SPEAKER_UNSAFE = Pattern.compile("[^\\p{L}\\p{N} ._'-]");
+    private static final Pattern LOOKS_SPOKEN = Pattern.compile("[\\p{L}\\p{N} ._'-]{1,80}: ");
     private static final Pattern LANGUAGE_UNSAFE = Pattern.compile("[^A-Za-z-]");
     /** Longer than any real recording: a length past it is a bad answer and is left out, not written. */
     private static final Duration MAX_LENGTH = Duration.ofHours(1_000);
@@ -68,11 +73,8 @@ public final class MeetingText {
         text.append("\n## Transcript\n\n");
         for (Line line : lines) {
             text.append('[').append(clock(line.startMs())).append("] ");
-            String speaker = line.speaker() == null ? "" : SPEAKER_UNSAFE.matcher(line.speaker()).replaceAll("").strip();
-            if (!speaker.isEmpty()) {
-                text.append(speaker, 0, Math.min(speaker.length(), MAX_SPEAKER_LENGTH)).append(": ");
-            }
-            text.append(oneLine(line.text())).append("\n");
+            String speaker = speaker(line.speaker());
+            text.append(said(speaker, oneLine(line.text()))).append("\n");
         }
         if (text.length() > maxCharacters) {
             text.setLength(Math.max(0, maxCharacters - TRUNCATED.length()));
@@ -131,6 +133,89 @@ public final class MeetingText {
         summaries.removeIf(String::isBlank);
         return new Meeting(recordedAt, language, List.copyOf(summaries), List.copyOf(lines),
                 document.endsWith(TRUNCATED), lengthSeconds);
+    }
+
+    /**
+     * A person's corrections to a meeting {@link #compose} wrote: a new title, new names for speakers (each applies to
+     * every line that speaker said), and new text for lines, by their position in the transcript. Times, the order of
+     * lines, which speaker said each line and the summaries stay as recorded. The corrections are untrusted like the
+     * rest: they are cleaned the same way {@link #compose} cleans what Plaud sends.
+     */
+    public static String edit(String document, String title, Map<String, String> speakers, Map<Integer, String> lines,
+            int maxCharacters) {
+        checkRenames(document, speakers);
+        StringBuilder text = new StringBuilder();
+        boolean titled = false;
+        boolean inTranscript = false;
+        int index = 0;
+        String[] rows = document.split("\n", -1);
+        for (int at = 0; at < rows.length; at++) {
+            String row = rows[at];
+            Matcher line = inTranscript ? TRANSCRIPT_LINE.matcher(row) : null;
+            if (!titled && row.startsWith("# ")) {
+                row = "# " + oneLine(title);
+                titled = true;
+            } else if (row.equals("## Transcript")) {
+                inTranscript = true;
+            } else if (line != null && line.matches()) {
+                row = rewriteLine(line, speakers, lines.get(index));
+                index++;
+            }
+            text.append(row);
+            if (at < rows.length - 1) {
+                text.append('\n');
+            }
+        }
+        checkLimits(lines, index, text, maxCharacters);
+        return text.toString();
+    }
+
+    /** Each rename names a speaker of this meeting and gives a name that is not empty once cleaned. */
+    private static void checkRenames(String document, Map<String, String> speakers) {
+        Set<String> known = new HashSet<>();
+        read(document).lines().forEach(line -> known.add(line.speaker()));
+        for (Map.Entry<String, String> rename : speakers.entrySet()) {
+            if (rename.getKey().isEmpty() || !known.contains(rename.getKey())) {
+                throw new RejectedDocument("meeting.unknown-speaker", "That speaker is not in this meeting.");
+            }
+            if (speaker(rename.getValue()).isEmpty()) {
+                throw new RejectedDocument("meeting.speaker-empty", "Give each speaker a name.");
+            }
+        }
+    }
+
+    /** One transcript line with its speaker renamed and, when given, its new words; the time stays. */
+    private static String rewriteLine(Matcher line, Map<String, String> speakers, String newWords) {
+        String said = line.group(2) == null ? "" : line.group(2);
+        String speaker = speaker(speakers.getOrDefault(said, said));
+        String words = newWords != null ? oneLine(newWords) : line.group(3);
+        return "[" + line.group(1) + "] " + said(speaker, words);
+    }
+
+    /**
+     * A line's speaker and words as written. Words on a line with no speaker that start like "Name: " would read back
+     * as said by that name, so their first ": " becomes " - ": nobody can be made to say something by typing it.
+     */
+    private static String said(String speaker, String words) {
+        if (!speaker.isEmpty()) {
+            return speaker + ": " + words;
+        }
+        return LOOKS_SPOKEN.matcher(words).lookingAt() ? words.replaceFirst(": ", " - ") : words;
+    }
+
+    private static void checkLimits(Map<Integer, String> lines, int lineCount, CharSequence text, int maxCharacters) {
+        if (lines.keySet().stream().anyMatch(position -> position < 0 || position >= lineCount)) {
+            throw new RejectedDocument("meeting.unknown-line", "That line is not in this meeting.");
+        }
+        if (text.length() > maxCharacters) {
+            throw new RejectedDocument("meeting.too-long", "This meeting would be longer than ConXist keeps.");
+        }
+    }
+
+    /** A speaker's name as {@link #compose} keeps it: letters, digits, spaces and a few marks, at most 80 characters. */
+    private static String speaker(String name) {
+        String cleaned = name == null ? "" : SPEAKER_UNSAFE.matcher(name).replaceAll("").strip();
+        return cleaned.substring(0, Math.min(cleaned.length(), MAX_SPEAKER_LENGTH));
     }
 
     private static Long seconds(Matcher recorded) {

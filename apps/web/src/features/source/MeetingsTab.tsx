@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
+import { Pill } from '../../components/Pill';
 import { byDay, recordedWithin, RECENT_RANGES, type RecentRange, whenOf } from '../../domain/meetings';
-import type { CapturedDocument, Source, SyncRun } from '../../domain/model';
+import type { CapturedDocument, DocumentView, Source, SyncRun } from '../../domain/model';
 import { localDay, matching } from '../../domain/recordings';
 import { clock, dateTime, minutesOf } from '../../domain/time';
 import { useLanguage, useT, type Translate } from '../../i18n/i18n';
@@ -47,6 +48,14 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
     setOpen(null);
     setNotice(t(recording ? 'meetings.deleted' : 'documents.deleted', { title }));
     onChanged?.();
+  }
+
+  /** A correction changes the title and the Edited tag on its row; the list keeps its place. */
+  function edited(view: DocumentView) {
+    setLoad((current) => (current.state === 'ready'
+      ? { state: 'ready', documents: current.documents.map((document) => (document.id === view.id
+        ? { ...document, title: view.title, editedAt: view.editedAt } : document)) }
+      : current));
   }
 
   const noticeLine = notice && (
@@ -153,7 +162,10 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
                   <li key={document.id}>
                     <button type="button" className="row" aria-current={open === document.id ? 'true' : undefined}
                       onClick={() => { setNotice(null); setOpen(document.id); }}>
-                      <span className="t">{document.title}</span>
+                      <span className="t">
+                        {document.title}
+                        {document.editedAt && <> <Pill tone="info">{t('meetings.edited')}</Pill></>}
+                      </span>
                       <span className="m">
                         <span>{t(document.recordedAt ? 'meetings.recorded' : 'meetings.added', { time: clock(whenOf(document), language) })}</span>
                         {document.lengthSeconds ? <span>{t('meetings.length', { count: minutesOf(document.lengthSeconds) })}</span> : null}
@@ -170,7 +182,7 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
       )}
       {open && (
         <DocumentPanel sourceId={source.id} sourceName={source.name} documentId={open}
-          onClose={() => setOpen(null)} onDeleted={(title, recording) => deleted(open, title, recording)} />
+          onClose={() => setOpen(null)} onDeleted={(title, recording) => deleted(open, title, recording)} onEdited={edited} />
       )}
     </>
   );

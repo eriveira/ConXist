@@ -15,12 +15,12 @@ const today = new Date();
 today.setHours(10, 0, 0, 0);
 const MEETINGS = [
   { id: 'd1', sourceId: 'p1', title: 'Sprint planning', mediaType: 'text/markdown', sizeBytes: 10, origin: 'RECORDING', textLength: 10,
-    capturedAt: today.toISOString(), recordedAt: today.toISOString(), lengthSeconds: 1800, speakerCount: 2 },
+    capturedAt: today.toISOString(), recordedAt: today.toISOString(), lengthSeconds: 1800, speakerCount: 2, editedAt: null },
   { id: 'd2', sourceId: 'p1', title: 'Customer call: Contoso', mediaType: 'text/markdown', sizeBytes: 10, origin: 'RECORDING', textLength: 10,
-    capturedAt: today.toISOString(), recordedAt: '2026-10-02T15:00:00Z', lengthSeconds: null, speakerCount: null },
+    capturedAt: today.toISOString(), recordedAt: '2026-10-02T15:00:00Z', lengthSeconds: null, speakerCount: null, editedAt: null },
 ];
 const MEETING = {
-  id: 'd1', sourceId: 'p1', title: 'Sprint planning', mediaType: 'text/markdown', origin: 'RECORDING', capturedAt: today.toISOString(),
+  id: 'd1', sourceId: 'p1', title: 'Sprint planning', mediaType: 'text/markdown', origin: 'RECORDING', capturedAt: today.toISOString(), editedAt: null,
   text: '# Sprint planning',
   meeting: {
     recordedAt: today.toISOString(), lengthSeconds: 1800, language: 'en', summaries: ['Ship sign-in first.\n- Owner: Alex'], truncated: false,
@@ -174,7 +174,7 @@ describe('SourcePage', () => {
 
   it('deletes an uploaded document and says it can be uploaded again', async () => {
     const SPEC = { id: 'u1', sourceId: 's1', title: 'spec.md', mediaType: 'text/markdown', sizeBytes: 10, origin: 'UPLOAD',
-      textLength: 10, capturedAt: today.toISOString(), recordedAt: null, lengthSeconds: null, speakerCount: null };
+      textLength: 10, capturedAt: today.toISOString(), recordedAt: null, lengthSeconds: null, speakerCount: null, editedAt: null };
     let documents = [SPEC];
     workspace({
       'GET /api/sources/s1/documents': () => ({ body: documents }),

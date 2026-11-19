@@ -39,6 +39,8 @@ export interface CapturedDocument {
   lengthSeconds: number | null;
   /** How many people speak in a recorded meeting; null for an uploaded file. */
   speakerCount: number | null;
+  /** When a person last corrected it in ConXist; null when it is as imported. */
+  editedAt: string | null;
 }
 
 /** One transcript line: `at` is hh:mm:ss from the start of the recording; `speaker` may be empty. */
@@ -67,6 +69,8 @@ export interface DocumentView {
   mediaType: string;
   origin: 'UPLOAD' | 'RECORDING';
   capturedAt: string;
+  /** When a person last corrected it in ConXist; null when it is as imported. */
+  editedAt: string | null;
   text: string;
   /** Null for an uploaded file. */
   meeting: Meeting | null;

@@ -118,6 +118,45 @@ final class CaptureFakes {
             return saved.removeIf(d -> d.id().equals(document.id()));
         }
 
+        /** The document as imported, by id, kept from its first edit until it is restored. */
+        final java.util.Map<UUID, CapturedDocument> originals = new java.util.HashMap<>();
+
+        @Override
+        public boolean saveEdit(CapturedDocument before, com.conxist.capture.domain.DocumentTitle title, String text,
+                Instant editedAt) {
+            int at = indexOf(before);
+            if (at < 0 || !java.util.Objects.equals(saved.get(at).editedAt(), before.editedAt())) {
+                return false;
+            }
+            CapturedDocument now = saved.get(at);
+            originals.putIfAbsent(now.id(), now);
+            saved.set(at, new CapturedDocument(now.id(), now.workspaceId(), now.sourceId(), title, now.mediaType(),
+                    now.sizeBytes(), text, now.origin(), now.originReference(), now.capturedAt(), editedAt));
+            return true;
+        }
+
+        @Override
+        public Optional<CapturedDocument> restore(CapturedDocument before) {
+            int at = indexOf(before);
+            if (at < 0 || before.editedAt() == null || !before.editedAt().equals(saved.get(at).editedAt())) {
+                return Optional.empty();
+            }
+            CapturedDocument original = originals.remove(before.id());
+            saved.set(at, original);
+            return Optional.of(original);
+        }
+
+        private int indexOf(CapturedDocument document) {
+            for (int at = 0; at < saved.size(); at++) {
+                CapturedDocument d = saved.get(at);
+                if (d.id().equals(document.id()) && d.workspaceId().equals(document.workspaceId())
+                        && d.sourceId().equals(document.sourceId())) {
+                    return at;
+                }
+            }
+            return -1;
+        }
+
         @Override
         public java.util.Map<String, Known> known(UUID workspaceId, java.util.Collection<String> references) {
             java.util.Map<String, Known> known = new java.util.HashMap<>();
