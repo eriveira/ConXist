@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -67,6 +68,9 @@ class CaptureFlowIntegrationTest {
     @Autowired
     FakePlaudMcpServer plaudMcp;
 
+    @Autowired
+    com.conxist.capture.application.CapturedDocumentRepository documentRepository;
+
     @BeforeEach
     void workspace() {
         WorkspaceHeaderConfiguration.ensure(jdbc);
@@ -122,6 +126,22 @@ class CaptureFlowIntegrationTest {
         mvc.perform(get("/api/hub"))
                 .andExpect(jsonPath("$.pendingReview").value(greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.latest[0].workspaceId").doesNotExist());
+
+        // Deleting it removes the stored file as well, and leaves nothing waiting for review in the hub.
+        String documentId = JsonPath.read(mvc.perform(get("/api/sources/{id}/documents", sourceId))
+                .andReturn().getResponse().getContentAsString(), "$[0].id");
+        long filesBefore = storedFiles();
+        mvc.perform(delete("/api/sources/{id}/documents/{doc}", sourceId, documentId))
+                .andExpect(status().isNoContent());
+        org.assertj.core.api.Assertions.assertThat(storedFiles()).isEqualTo(filesBefore - 1);
+        mvc.perform(get("/api/sources/{id}/documents", sourceId)).andExpect(jsonPath("$", hasSize(0)));
+        awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW", 0);
+    }
+
+    private static long storedFiles() throws java.io.IOException {
+        try (java.util.stream.Stream<Path> paths = java.nio.file.Files.walk(uploads)) {
+            return paths.filter(java.nio.file.Files::isRegularFile).count();
+        }
     }
 
     @Test
@@ -388,6 +408,34 @@ class CaptureFlowIntegrationTest {
         mvc.perform(get("/api/sources/{id}/documents/{doc}", other, ids.getFirst()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("document.not-found"));
+
+        // Deleting it: gone from ConXist and the hub, and the next check does not bring it back.
+        mvc.perform(delete("/api/sources/{id}/documents/{doc}", other, ids.getFirst()))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/sources/{id}/documents/{doc}", sourceId, ids.getFirst()))
+                .andExpect(status().isNoContent());
+        mvc.perform(delete("/api/sources/{id}/documents/{doc}", sourceId, ids.getFirst()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("document.not-found"));
+        await().atMost(Duration.ofSeconds(10)).until(() -> jdbc.sql(
+                        "select count(*) from hub_items where item_id = cast(:id as uuid) and status = 'REMOVED' and title = ''")
+                .param("id", ids.getFirst()).query(Long.class).single() == 1);
+        mvc.perform(post("/api/sources/{id}/sync", sourceId)).andExpect(status().isOk());
+        mvc.perform(get("/api/sources/{id}/documents", sourceId))
+                .andExpect(jsonPath("$[?(@.title=='Weekly product sync')]").isEmpty());
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql(
+                        "select count(*) from deleted_recordings where source_id = cast(:id as uuid)")
+                .param("id", sourceId).query(Long.class).single()).isOne();
+        // Even a save that skipped the check, such as one already running when the delete came, is refused.
+        String reference = jdbc.sql("select origin_reference from deleted_recordings where source_id = cast(:id as uuid)")
+                .param("id", sourceId).query(String.class).single();
+        com.conxist.capture.domain.CapturedDocument again = new com.conxist.capture.domain.CapturedDocument(UUID.randomUUID(),
+                jdbc.sql("select workspace_id from sources where id = cast(:id as uuid)").param("id", sourceId)
+                        .query(UUID.class).single(),
+                UUID.fromString(sourceId), new com.conxist.capture.domain.DocumentTitle("Weekly product sync"),
+                "text/markdown", 4, "text", com.conxist.capture.DocumentOrigin.RECORDING, reference,
+                java.time.Instant.now());
+        org.assertj.core.api.Assertions.assertThat(documentRepository.saveIfNew(again)).isFalse();
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.conxist.capture.application.CaptureContext;
 import com.conxist.capture.application.CaptureUpload;
 import com.conxist.capture.application.CapturedDocumentRepository;
 import com.conxist.capture.application.FileStore;
+import com.conxist.capture.application.DeleteDocument;
 import com.conxist.capture.application.ListDocuments;
 import com.conxist.capture.application.ListSyncHistory;
 import com.conxist.capture.application.ReadDocument;
@@ -130,6 +131,12 @@ class CaptureConfiguration {
     @Bean
     ListSyncHistory listSyncHistory(SourceCatalog catalog, SyncHistory history, CurrentWorkspace workspace) {
         return new ListSyncHistory(catalog, history, workspace);
+    }
+
+    @Bean
+    DeleteDocument deleteDocument(SourceCatalog catalog, CapturedDocumentRepository documents, FileStore files,
+            CaptureContext context) {
+        return new DeleteDocument(catalog, documents, files, context);
     }
 
     @Bean

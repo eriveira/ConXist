@@ -49,7 +49,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   OAuth sign-in, waiting on Plaud to confirm outside apps may use it; see
   `docs/adr/0005-plaud-sign-in.md`) on the Sources page. Connecting Plaud lists the
   newest recordings to pick from (up to 500) and can follow new ones. Each source has its own page
-  (`#/sources/{id}`): its meetings, each transcript, and an import history kept 90 days (ADR 0006). Repo and Storage show as
+  (`#/sources/{id}`): its meetings, each transcript, and an import history kept 90 days; a meeting can be deleted and is then not imported again (ADR 0006, ADR 0008). Repo and Storage show as
   coming soon. Plaud Team workspaces (ADR 0003) are on hold: the API code stays,
   the app does not offer them (owner, 2026-11-19). Captured text, files and tokens are encrypted at rest (ADR 0004). The API needs `CONXIST_SECRETS_KEY` (32 bytes, Base64) to start;
   `mvn spring-boot:test-run` runs a fake Plaud that signs in as `alex@acme.test`.

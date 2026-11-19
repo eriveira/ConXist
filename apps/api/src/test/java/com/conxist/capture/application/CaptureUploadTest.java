@@ -40,10 +40,10 @@ class CaptureUploadTest {
 
         DocumentSummary captured = captureUpload.capture(uploads.id(), "notes.txt", NOTES);
 
-        assertThat(files.stored).containsExactly(NOTES);
+        assertThat(files.stored.values()).containsExactly(NOTES);
         assertThat(documents.saved).singleElement().satisfies(document -> {
             assertThat(document.text()).isEqualTo(new String(NOTES, UTF_8));
-            assertThat(document.originReference()).isEqualTo("key-1");
+            assertThat(document.originReference()).isEqualTo(FixedWorkspace.WORKSPACE_ID + "/" + uploads.id() + "/1");
             assertThat(document.workspaceId()).isEqualTo(FixedWorkspace.WORKSPACE_ID);
         });
         assertThat(captured.title()).isEqualTo("notes.txt");

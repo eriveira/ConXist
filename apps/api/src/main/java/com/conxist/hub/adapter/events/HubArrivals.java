@@ -1,6 +1,7 @@
 package com.conxist.hub.adapter.events;
 
 import com.conxist.capture.DocumentCaptured;
+import com.conxist.capture.DocumentDeleted;
 import com.conxist.hub.application.RecordArrival;
 import com.conxist.sources.SourceAdded;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -24,5 +25,10 @@ class HubArrivals {
     @ApplicationModuleListener
     void on(DocumentCaptured event) {
         recordArrival.documentCaptured(event);
+    }
+
+    @ApplicationModuleListener
+    void on(DocumentDeleted event) {
+        recordArrival.documentDeleted(event);
     }
 }

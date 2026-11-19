@@ -7,7 +7,6 @@ import com.conxist.capture.domain.CapturedDocument;
 import com.conxist.capture.domain.MeetingText;
 import com.conxist.capture.domain.MeetingText.Meeting;
 import com.conxist.platform.CurrentWorkspace;
-import com.conxist.platform.NotFound;
 import com.conxist.sources.SourceCatalog;
 
 /**
@@ -31,7 +30,7 @@ public final class ReadDocument {
     public DocumentView read(UUID sourceId, UUID documentId) {
         sources.find(sourceId);
         CapturedDocument document = documents.find(workspace.id(), sourceId, documentId)
-                .orElseThrow(() -> new NotFound("document.not-found", "This document is no longer in ConXist."));
+                .orElseThrow(CaptureSources::documentNotFound);
         // Who read what, by ids only: never the title or the text. Becomes an audit row with the person once sign-in exists.
         log.log(System.Logger.Level.INFO, "Document {0} of source {1} in workspace {2} read", documentId, sourceId, workspace.id());
         Meeting meeting = document.origin() == DocumentOrigin.RECORDING ? MeetingText.read(document.text()) : null;

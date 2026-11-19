@@ -34,7 +34,11 @@ export function firstFocusable(panel: HTMLElement | null): HTMLElement | null {
 
 function keepFocusInside(panel: HTMLElement | null, event: KeyboardEvent) {
   const items = Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
-  if (items.length === 0) return;
+  if (items.length === 0) {
+    // Nothing can take the focus just now (every button is off while work runs): it stays where it is, inside.
+    event.preventDefault();
+    return;
+  }
   const first = items[0];
   const last = items[items.length - 1];
   const inside = panel?.contains(document.activeElement) ?? false;

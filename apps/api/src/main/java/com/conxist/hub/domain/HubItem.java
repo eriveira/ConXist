@@ -12,6 +12,12 @@ public record HubItem(UUID itemId, UUID workspaceId, HubItemType type, UUID sour
                 addedAt);
     }
 
+    /** The marker left by a deleted document: no title, so the hub keeps nothing of it but its ids. */
+    public static HubItem removedDocument(UUID documentId, UUID workspaceId, UUID sourceId, Instant deletedAt) {
+        return new HubItem(documentId, workspaceId, HubItemType.DOCUMENT, sourceId, "", HubItemStatus.REMOVED,
+                deletedAt);
+    }
+
     public static HubItem documentToReview(UUID documentId, UUID workspaceId, UUID sourceId, String title,
             Instant capturedAt) {
         return new HubItem(documentId, workspaceId, HubItemType.DOCUMENT, sourceId, title,
