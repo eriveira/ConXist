@@ -24,6 +24,6 @@ public final class ListWorkspaces implements WorkspaceDirectory {
 
     @Override
     public List<UUID> ids() {
-        return workspaces.findAll().stream().map(WorkspaceView::id).toList();
+        return workspaces.ids();
     }
 }

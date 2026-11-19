@@ -32,9 +32,18 @@ class ScheduledRecorderSync {
     void checkRecorders() {
         MDC.put(JOB_LOG_KEY, "recorder-sync-" + UUID.randomUUID());
         try {
-            workspaces.ids().forEach(workspaceId -> report(syncRecorder.syncAll(workspaceId)));
+            workspaces.ids().forEach(this::checkWorkspace);
         } finally {
             MDC.remove(JOB_LOG_KEY);
+        }
+    }
+
+    /** One workspace failing does not stop the check of the others. */
+    private void checkWorkspace(UUID workspaceId) {
+        try {
+            report(syncRecorder.syncAll(workspaceId));
+        } catch (RuntimeException failure) {
+            log.error("Recorder check failed for workspace {}: {}", workspaceId, failure.getClass().getSimpleName());
         }
     }
 

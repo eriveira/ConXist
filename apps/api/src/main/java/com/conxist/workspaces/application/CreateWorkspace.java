@@ -22,11 +22,10 @@ public final class CreateWorkspace {
     public WorkspaceView create(String name, String description) {
         Workspace workspace = Workspace.create(UUID.randomUUID(), name, description, clock.instant());
         return unitOfWork.inTransaction(() -> {
-            if (workspaces.nameTaken(workspace.name())) {
+            if (workspaces.nameTaken(workspace.name()) || !workspaces.saveIfNameFree(workspace)) {
                 throw new InvalidWorkspace("name-taken",
                         "A workspace named \"" + workspace.name() + "\" already exists.");
             }
-            workspaces.save(workspace);
             return new WorkspaceView(workspace.id(), workspace.name(), workspace.description(), 0,
                     workspace.createdAt());
         });

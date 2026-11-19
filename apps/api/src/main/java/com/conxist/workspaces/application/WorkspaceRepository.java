@@ -6,10 +6,14 @@ import com.conxist.workspaces.domain.Workspace;
 
 public interface WorkspaceRepository {
 
-    void save(Workspace workspace);
+    /** Saves it unless another workspace has the name (ignoring case), which can happen when two creates race. */
+    boolean saveIfNameFree(Workspace workspace);
 
     /** Oldest first, each with how many sources it has. */
     List<WorkspaceView> findAll();
+
+    /** Every workspace id, oldest first. */
+    List<UUID> ids();
 
     boolean exists(UUID workspaceId);
 

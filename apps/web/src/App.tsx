@@ -92,6 +92,7 @@ function Workspaces(settings: SettingsProps) {
       <AppHeader page={page} workspaces={state.workspaces} current={state.current}
         onSwitch={(workspace) => { setNotice(null); switchTo(workspace); }} onNewWorkspace={() => setNewOpen(true)} onOpenSwitcher={refresh}
         {...settings} />
+      {/* A new key on switching remounts the page, so nothing from the previous workspace stays on screen. */}
       <main className="stage" key={state.current.id}>
         <p className="notice" role="status">{notice && <><Icon name="check" size={16} /> {notice}</>}</p>
         {page === 'home' && <HomePage />}

@@ -62,8 +62,13 @@ class WorkspacesTest {
         private final Set<List<UUID>> sources = new HashSet<>();
 
         @Override
-        public void save(Workspace workspace) {
-            workspaces.add(workspace);
+        public boolean saveIfNameFree(Workspace workspace) {
+            return !nameTaken(workspace.name()) && workspaces.add(workspace);
+        }
+
+        @Override
+        public List<UUID> ids() {
+            return workspaces.stream().map(Workspace::id).toList();
         }
 
         @Override

@@ -19,16 +19,17 @@ class JdbcWorkspaceRepository implements WorkspaceRepository {
     }
 
     @Override
-    public void save(Workspace workspace) {
-        jdbc.sql("""
+    public boolean saveIfNameFree(Workspace workspace) {
+        return jdbc.sql("""
                 insert into workspaces (id, name, description, created_at)
                 values (:id, :name, :description, :createdAt)
+                on conflict do nothing
                 """)
                 .param("id", workspace.id())
                 .param("name", workspace.name())
                 .param("description", workspace.description())
                 .param("createdAt", Timestamp.from(workspace.createdAt()))
-                .update();
+                .update() == 1;
     }
 
     @Override
@@ -45,6 +46,11 @@ class JdbcWorkspaceRepository implements WorkspaceRepository {
                         row.getInt("source_count"),
                         row.getTimestamp("created_at").toInstant()))
                 .list();
+    }
+
+    @Override
+    public List<UUID> ids() {
+        return jdbc.sql("select id from workspaces order by created_at, id").query(UUID.class).list();
     }
 
     @Override

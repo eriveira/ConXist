@@ -48,13 +48,11 @@ class RequestWorkspace implements CurrentWorkspace {
         throw new IllegalStateException("The current workspace is only known inside a request; pass the id instead");
     }
 
+    /** A missing or malformed header both mean the app has not chosen a workspace. */
     private static UUID parse(String header) {
-        if (header == null || header.isBlank()) {
-            throw new RuleViolation("workspace.required", "Choose a workspace first.");
-        }
         try {
-            return UUID.fromString(header.strip());
-        } catch (IllegalArgumentException malformed) {
+            return UUID.fromString(header == null ? "" : header.strip());
+        } catch (IllegalArgumentException missingOrMalformed) {
             throw new RuleViolation("workspace.required", "Choose a workspace first.");
         }
     }
