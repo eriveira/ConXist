@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.domain.CapturedDocument;
+import com.conxist.capture.domain.DocumentTitle;
 
 public interface CapturedDocumentRepository {
 
@@ -27,6 +28,18 @@ public interface CapturedDocumentRepository {
 
     /** HELD: a source holds it now. DELETED: a person deleted it and ConXist keeps it out of that source. */
     enum Known { HELD, DELETED }
+
+    /**
+     * Stores a person's correction of {@code before}, keeping the text and title as imported on the first one. False,
+     * with nothing changed, when the document is gone or was edited or restored since {@code before} was read.
+     */
+    boolean saveEdit(CapturedDocument before, DocumentTitle title, String text, Instant editedAt);
+
+    /**
+     * Puts back the text and title as imported and returns the document as it is now. Empty, with nothing changed, when
+     * the document is gone, has no edits, or was edited or restored since {@code before} was read.
+     */
+    Optional<CapturedDocument> restore(CapturedDocument before);
 
     List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId);
 

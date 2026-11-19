@@ -2,6 +2,7 @@ package com.conxist.hub.application;
 
 import com.conxist.capture.DocumentCaptured;
 import com.conxist.capture.DocumentDeleted;
+import com.conxist.capture.DocumentRetitled;
 import com.conxist.hub.domain.HubItem;
 import com.conxist.sources.SourceAdded;
 
@@ -23,6 +24,11 @@ public final class RecordArrival {
     public void documentDeleted(DocumentDeleted event) {
         items.markRemoved(HubItem.removedDocument(event.documentId(), event.workspaceId(), event.sourceId(),
                 event.deletedAt()));
+    }
+
+    /** A document a person renamed keeps its new name in the hub; a deleted one stays a marker with no title. */
+    public void documentRetitled(DocumentRetitled event) {
+        items.retitle(event.workspaceId(), event.sourceId(), event.documentId(), event.title());
     }
 
     public void documentCaptured(DocumentCaptured event) {

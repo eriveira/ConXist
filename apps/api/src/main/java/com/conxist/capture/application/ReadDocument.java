@@ -33,13 +33,17 @@ public final class ReadDocument {
                 .orElseThrow(CaptureSources::documentNotFound);
         // Who read what, by ids only: never the title or the text. Becomes an audit row with the person once sign-in exists.
         log.log(System.Logger.Level.INFO, "Document {0} of source {1} in workspace {2} read", documentId, sourceId, workspace.id());
-        Meeting meeting = document.origin() == DocumentOrigin.RECORDING ? MeetingText.read(document.text()) : null;
-        return new DocumentView(document.id(), document.sourceId(), document.title().value(), document.mediaType(),
-                document.origin(), document.capturedAt(), document.text(), meeting);
+        return view(document);
     }
 
-    /** {@code meeting} is null for an uploaded file. */
+    static DocumentView view(CapturedDocument document) {
+        Meeting meeting = document.origin() == DocumentOrigin.RECORDING ? MeetingText.read(document.text()) : null;
+        return new DocumentView(document.id(), document.sourceId(), document.title().value(), document.mediaType(),
+                document.origin(), document.capturedAt(), document.editedAt(), document.text(), meeting);
+    }
+
+    /** {@code meeting} is null for an uploaded file; {@code editedAt} is null while it is as imported. */
     public record DocumentView(UUID id, UUID sourceId, String title, String mediaType, DocumentOrigin origin,
-            Instant capturedAt, String text, Meeting meeting) {
+            Instant capturedAt, Instant editedAt, String text, Meeting meeting) {
     }
 }

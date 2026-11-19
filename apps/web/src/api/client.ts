@@ -1,6 +1,7 @@
 import type {
   CapturedDocument, DocumentView, PlaudSignIn, Provider, ProviderId, RecorderConnection, SignInStart, Source, SyncResult, SyncRun,
 } from '../domain/model';
+import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
 
@@ -86,6 +87,13 @@ export const api = {
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),
   document: (sourceId: string, documentId: string) =>
     request<DocumentView>(`/api/sources/${encodeURIComponent(sourceId)}/documents/${encodeURIComponent(documentId)}`),
+  /** Corrects a recorded meeting in ConXist only; Plaud keeps the original. */
+  editMeeting: (sourceId: string, documentId: string, changes: MeetingChanges) =>
+    request<DocumentView>(`/api/sources/${encodeURIComponent(sourceId)}/documents/${encodeURIComponent(documentId)}/meeting`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes),
+    }),
+  restoreMeeting: (sourceId: string, documentId: string, editedAt: string) =>
+    postJson<DocumentView>(`/api/sources/${encodeURIComponent(sourceId)}/documents/${encodeURIComponent(documentId)}/restore`, { editedAt }),
   /** Removes it from ConXist only; a deleted recording is not imported again. */
   deleteDocument: (sourceId: string, documentId: string) =>
     request<void>(`/api/sources/${encodeURIComponent(sourceId)}/documents/${encodeURIComponent(documentId)}`, { method: 'DELETE' }),

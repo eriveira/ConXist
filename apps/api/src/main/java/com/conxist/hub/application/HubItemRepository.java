@@ -17,6 +17,9 @@ public interface HubItemRepository {
      */
     void markRemoved(HubItem marker);
 
+    /** Gives a document item its new title, unless it is a removed marker or not there yet. */
+    void retitle(UUID workspaceId, UUID sourceId, UUID itemId, String title);
+
     long count(UUID workspaceId, HubItemType type);
 
     long countWithStatus(UUID workspaceId, HubItemStatus status);

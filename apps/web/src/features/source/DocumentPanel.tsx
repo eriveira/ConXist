@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { useFocusTrap } from '../../components/useFocusTrap';
@@ -7,6 +7,8 @@ import type { DocumentView } from '../../domain/model';
 import { useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { dateTime, minutesOf } from '../../domain/time';
+import { EditedNote } from './EditedNote';
+import { MeetingEditor } from './MeetingEditor';
 
 type Load = { state: 'loading' } | { state: 'failed'; problem: string } | { state: 'ready'; document: DocumentView };
 
@@ -17,6 +19,8 @@ interface DocumentPanelProps {
   onClose: () => void;
   /** Called once the document is gone from ConXist, with its title and whether it was a recording kept out. */
   onDeleted: (title: string, recording: boolean) => void;
+  /** Called after a person saved corrections or restored the original, with the meeting as it is now. */
+  onEdited?: (view: DocumentView) => void;
 }
 
 type Removal = { state: 'idle' } | { state: 'confirming' } | { state: 'deleting' } | { state: 'failed'; problem: string };
@@ -25,7 +29,7 @@ type Removal = { state: 'idle' } | { state: 'confirming' } | { state: 'deleting'
  * One meeting (or uploaded file) in a side panel: when, the Plaud summary, who spoke, and the transcript with find and
  * copy. The text is customer data and is shown as plain text, never as markup.
  */
-export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDeleted }: DocumentPanelProps) {
+export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDeleted, onEdited }: DocumentPanelProps) {
   const t = useT();
   const language = useLanguage();
   const panel = useRef<HTMLElement>(null);
@@ -46,8 +50,41 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
   const confirmHeading = useRef<HTMLHeadingElement>(null);
   const deleteRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
-  // Escape first backs out of the question, then closes the panel; nothing closes while the delete runs.
-  useFocusTrap(panel, () => (asking ? cancelDelete() : onClose()), removal.state !== 'deleting');
+  const [editing, setEditing] = useState(false);
+  /** The Restore question is open: Edit, Delete and Copy step aside so only one question shows. */
+  const [restoreAsking, setRestoreAsking] = useState(false);
+  const [restoreBackOut, setRestoreBackOut] = useState(0);
+  /** Grows on each Close or Escape while editing: the editor asks about unsaved changes first. */
+  const [leaveAsked, setLeaveAsked] = useState(0);
+  const editRef = useRef<HTMLButtonElement>(null);
+  /** Grows when the focus should go back to Edit: after leaving the editor, saving, or restoring. */
+  const [backToEdit, setBackToEdit] = useState(0);
+  const askToLeave = () => setLeaveAsked((count) => count + 1);
+  // Escape first backs out of the question or the editor, then closes the panel; nothing closes while the delete runs.
+  useFocusTrap(panel, () => {
+    if (editing) askToLeave();
+    else if (restoreAsking) setRestoreBackOut((count) => count + 1);
+    else if (asking) cancelDelete();
+    else onClose();
+  }, removal.state !== 'deleting');
+
+  useLayoutEffect(() => {
+    // Leaving the editor hands the focus back to Edit, the button that opened it.
+    if (backToEdit > 0) editRef.current?.focus();
+  }, [backToEdit]);
+
+  const leaveEditor = useCallback(() => {
+    setEditing(false);
+    setBackToEdit((count) => count + 1);
+  }, []);
+
+  function changed(view: DocumentView, said: string) {
+    setLoad({ state: 'ready', document: view });
+    setRestoreAsking(false);
+    leaveEditor();
+    setCopied(said);
+    onEdited?.(view);
+  }
 
   /** Backing out of the question gives the focus back to the Delete button that asked it. */
   const backedOut = useRef(false);
@@ -112,26 +149,34 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
   const found = meeting ? linesMatching(meeting, find) : 0;
   const speakers = meeting ? speakersOf(meeting) : [];
   /** The same colour marks a speaker in the list and on each of their lines; the name is always written too. */
-  const dot = (speaker: string) => <span className={`dot s${speakers.indexOf(speaker) % SPEAKER_COLOURS}`} aria-hidden="true" />;
+  const dotClass = (speaker: string) => `dot s${Math.max(0, speakers.indexOf(speaker)) % SPEAKER_COLOURS}`;
+  const dot = (speaker: string) => <span className={dotClass(speaker)} aria-hidden="true" />;
   return (
-    <div className="scrim side" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) onClose(); }}>
+    <div className="scrim side" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) (editing ? askToLeave() : onClose()); }}>
       <aside ref={panel} className="sidepanel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header className="phead">
           <div className="ptop">
-            <h2 id={titleId}>{document?.title ?? t('doc.loading')}</h2>
-            {document && !asking && (
+            <h2 id={titleId}>{editing ? t('edit.heading') : document?.title ?? t('doc.loading')}</h2>
+            {meeting && !asking && !editing && !restoreAsking && (
+              <button ref={editRef} type="button" className="btn ghost icon" onClick={() => setEditing(true)}
+                aria-label={t('doc.edit')} title={t('doc.edit')}>
+                <Icon name="edit" size={18} />
+              </button>
+            )}
+            {document && !asking && !editing && !restoreAsking && (
               <button ref={deleteRef} type="button" className="btn ghost icon danger-text" onClick={() => setRemoval({ state: 'confirming' })}
                 aria-label={t(document.origin === 'RECORDING' ? 'doc.delete' : 'doc.deleteFile')} title={t(document.origin === 'RECORDING' ? 'doc.delete' : 'doc.deleteFile')}>
                 <Icon name="trash" size={18} />
               </button>
             )}
-            {document && !asking && (
+            {document && !asking && !editing && !restoreAsking && (
               <button type="button" className="btn ghost icon" onClick={() => void copy()}
                 aria-label={t(meeting ? 'doc.copy' : 'doc.copyText')} title={t(meeting ? 'doc.copy' : 'doc.copyText')}>
                 <Icon name="copy" size={18} />
               </button>
             )}
-            <button ref={closeRef} type="button" className="btn ghost icon" onClick={onClose} disabled={deleting} aria-label={t('doc.close')} title={t('doc.close')}>
+            <button ref={closeRef} type="button" className="btn ghost icon" onClick={editing ? askToLeave : onClose} disabled={deleting}
+              aria-label={t(editing ? 'edit.close' : 'doc.close')} title={t(editing ? 'edit.close' : 'doc.close')}>
               <Icon name="close" size={18} />
             </button>
           </div>
@@ -147,7 +192,16 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
           <p className="sr-only" role="status">{copied ?? ''}</p>
           {copied && <p className="copied" aria-hidden="true">{copied}</p>}
         </header>
+        {editing && document && meeting ? (
+          <MeetingEditor sourceId={sourceId} view={document} meeting={meeting} dotClass={dotClass}
+            leaveAsked={leaveAsked} onLeave={leaveEditor} onSaved={(view) => changed(view, t('edit.saved'))}
+            onReload={() => { leaveEditor(); setAttempt(attempt + 1); }} />
+        ) : (
         <div className="pbody">
+          {document?.editedAt && meeting && !asking && (
+            <EditedNote sourceId={sourceId} documentId={document.id} editedAt={document.editedAt} backOutAsked={restoreBackOut} onAsking={setRestoreAsking}
+              onRestored={(view) => changed(view, t('restore.done'))} />
+          )}
           {document && asking && (
             <section className="confirm" aria-labelledby={`${titleId}-confirm`} aria-describedby={`${titleId}-consequences`}>
               <h3 id={`${titleId}-confirm`} ref={confirmHeading} tabIndex={-1}>{t('doc.delete.title', { title: document.title })}</h3>
@@ -230,6 +284,7 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
             </>
           )}
         </div>
+        )}
       </aside>
     </div>
   );

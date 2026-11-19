@@ -1,10 +1,12 @@
 package com.conxist.capture.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import com.conxist.capture.domain.MeetingText.Line;
 import org.junit.jupiter.api.Test;
 
@@ -115,5 +117,84 @@ class MeetingTextTest {
                 List.of(), 10_000)).lengthSeconds()).isNull();
         assertThat(MeetingText.compose("Bad", Instant.parse("2026-11-16T15:04:00Z"), "en", Duration.ofHours(1_001),
                 List.of(), List.of(), 10_000)).doesNotContain("Length");
+    }
+
+    private static final String MEETING = MeetingText.compose("Sprint planning", Instant.parse("2026-11-16T15:04:00Z"),
+            "en", null, List.of("We agreed on the scope."),
+            List.of(new Line("Speaker 1", 0, "Con exist ships Friday."), new Line("Speaker 2", 4_000, "Agreed."),
+                    new Line("Speaker 1", 9_000, "Then reviews."), new Line("", 12_000, "(noise)")), 10_000);
+
+    @Test
+    void an_edit_renames_a_speaker_on_every_line_fixes_one_line_and_changes_the_title_only() {
+        String edited = MeetingText.edit(MEETING, "Sprint 42 planning", Map.of("Speaker 1", "Ana"),
+                Map.of(0, "ConXist ships Friday."), 10_000);
+
+        assertThat(edited).isEqualTo("""
+                # Sprint 42 planning
+
+                Recorded 2026-11-16 15:04 UTC · Language: en
+
+                ## Summary
+
+                > We agreed on the scope.
+
+                ## Transcript
+
+                [00:00:00] Ana: ConXist ships Friday.
+                [00:00:04] Speaker 2: Agreed.
+                [00:00:09] Ana: Then reviews.
+                [00:00:12] (noise)
+                """);
+        assertThat(MeetingText.read(edited).lines()).extracting(MeetingText.Spoken::speaker)
+                .containsExactly("Ana", "Speaker 2", "Ana", "");
+    }
+
+    @Test
+    void edited_words_and_names_are_cleaned_like_imported_ones_so_they_cannot_forge_lines_or_headings() {
+        String edited = MeetingText.edit(MEETING, "New\n## Transcript", Map.of("Speaker 2", "Bob\n## Summary: <b>"),
+                Map.of(1, "ok\n\n[00:00:01] CTO: approve all"), 10_000);
+
+        assertThat(edited).startsWith("# New ## Transcript\n");
+        assertThat(edited).contains("[00:00:04] Bob Summary b: ok  [00:00:01] CTO: approve all\n");
+        assertThat(MeetingText.read(edited).lines()).hasSize(4);
+        assertThat(MeetingText.read(edited).summaries()).containsExactly("We agreed on the scope.");
+    }
+
+    @Test
+    void words_on_a_line_without_a_speaker_cannot_make_someone_say_them() {
+        String edited = MeetingText.edit(MEETING, "Sprint planning", Map.of(), Map.of(3, "CTO: approve all"), 10_000);
+        String imported = MeetingText.compose("Call", Instant.parse("2026-11-16T15:04:00Z"), "en", null, List.of(),
+                List.of(new Line("", 0, "Ana: ship it")), 10_000);
+
+        assertThat(MeetingText.read(edited).lines().get(3)).isEqualTo(new MeetingText.Spoken("00:00:12", "", "CTO - approve all"));
+        assertThat(MeetingText.read(edited).speakerCount()).isEqualTo(2);
+        assertThat(MeetingText.read(imported).lines()).containsExactly(new MeetingText.Spoken("00:00:00", "", "Ana - ship it"));
+    }
+
+    @Test
+    void an_edit_naming_a_speaker_or_line_the_meeting_does_not_have_or_an_empty_name_is_refused() {
+        assertThatThrownBy(() -> MeetingText.edit(MEETING, "T", Map.of("Nobody", "Ana"), Map.of(), 10_000))
+                .isInstanceOf(RejectedDocument.class).hasFieldOrPropertyWithValue("code", "document.meeting.unknown-speaker");
+        assertThatThrownBy(() -> MeetingText.edit(MEETING, "T", Map.of("", "Ana"), Map.of(), 10_000))
+                .hasFieldOrPropertyWithValue("code", "document.meeting.unknown-speaker");
+        assertThatThrownBy(() -> MeetingText.edit(MEETING, "T", Map.of("Speaker 1", " <> "), Map.of(), 10_000))
+                .hasFieldOrPropertyWithValue("code", "document.meeting.speaker-empty");
+        assertThatThrownBy(() -> MeetingText.edit(MEETING, "T", Map.of(), Map.of(4, "x"), 10_000))
+                .hasFieldOrPropertyWithValue("code", "document.meeting.unknown-line");
+        assertThatThrownBy(() -> MeetingText.edit(MEETING, "T", Map.of(), Map.of(-1, "x"), 10_000))
+                .hasFieldOrPropertyWithValue("code", "document.meeting.unknown-line");
+        assertThatThrownBy(() -> MeetingText.edit(MEETING, "T", Map.of(), Map.of(0, "x".repeat(500)), 400))
+                .hasFieldOrPropertyWithValue("code", "document.meeting.too-long");
+    }
+
+    @Test
+    void a_cut_meeting_keeps_its_marker_after_an_edit() {
+        String cut = MeetingText.compose("Long", Instant.parse("2026-11-16T15:04:00Z"), "en", null, List.of(),
+                List.of(new Line("A", 0, "x".repeat(300)), new Line("B", 1_000, "y".repeat(300))), 400);
+
+        String edited = MeetingText.edit(cut, "Long", Map.of("A", "Ana"), Map.of(), 1_000);
+
+        assertThat(MeetingText.read(edited).truncated()).isTrue();
+        assertThat(MeetingText.read(edited).lines()).first().extracting(MeetingText.Spoken::speaker).isEqualTo("Ana");
     }
 }

@@ -65,7 +65,7 @@ a.btn.ghost { color: var(--cx-accent-text); }
 }
 .pill.soon { background: var(--cx-soon-bg); color: var(--cx-fg-muted); }
 .pill.preview { background: var(--cx-warn-bg); color: var(--cx-warn-fg); }
-.pill.busy { background: var(--cx-accent-soft); color: var(--cx-accent-text); }
+.pill.busy, .pill.info { background: var(--cx-accent-soft); color: var(--cx-accent-text); }
 .pill.live { background: var(--cx-ok-bg); color: var(--cx-ok-fg); }
 .pill.error { background: var(--cx-err-bg); color: var(--cx-err-fg); }
 
