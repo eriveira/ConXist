@@ -1,5 +1,6 @@
 package com.conxist.capture.domain;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -26,8 +27,10 @@ public final class MeetingText {
     private static final Pattern CONTROL = Pattern.compile("\\p{Cntrl}");
     private static final Pattern SPEAKER_UNSAFE = Pattern.compile("[^\\p{L}\\p{N} ._'-]");
     private static final Pattern LANGUAGE_UNSAFE = Pattern.compile("[^A-Za-z-]");
+    /** Longer than any real recording: a length past it is a bad answer and is left out, not written. */
+    private static final Duration MAX_LENGTH = Duration.ofHours(1_000);
     private static final Pattern RECORDED_LINE = Pattern.compile(
-            "^Recorded (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}) UTC(?: · Language: ([A-Za-z-]{1,16}))?$");
+            "^Recorded (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}) UTC(?: · Language: ([A-Za-z-]{1,16}))?(?: · Length: (\\d{2,6}):(\\d{2}):(\\d{2}))?$");
     private static final Pattern TRANSCRIPT_LINE = Pattern.compile(
             "^\\[(\\d{2}:\\d{2}:\\d{2})\\] (?:([\\p{L}\\p{N} ._'-]{1,80}): )?(.*)$");
 
@@ -40,15 +43,19 @@ public final class MeetingText {
     /**
      * Transcripts and summaries are untrusted: a speaker could say, or a Plaud member could type, text that looks like
      * a heading or another speaker's line. Each utterance and speaker is kept on one line, summaries are quoted, and
-     * the whole text stops at {@code maxCharacters} with a visible marker.
+     * the whole text stops at {@code maxCharacters} with a visible marker. {@code length} is how long the recording
+     * runs, when the recorder says (null otherwise); it is written next to the date.
      */
-    public static String compose(String title, Instant recordedAt, String language, List<String> summaries,
-            List<Line> lines, int maxCharacters) {
+    public static String compose(String title, Instant recordedAt, String language, Duration length,
+            List<String> summaries, List<Line> lines, int maxCharacters) {
         StringBuilder text = new StringBuilder("# ").append(oneLine(title)).append("\n\n");
         text.append("Recorded ").append(RECORDED.format(recordedAt));
         String spoken = language == null ? "" : LANGUAGE_UNSAFE.matcher(language).replaceAll("");
         if (!spoken.isBlank()) {
             text.append(" · Language: ").append(spoken, 0, Math.min(spoken.length(), MAX_LANGUAGE_LENGTH));
+        }
+        if (length != null && !length.isNegative() && !length.isZero() && length.compareTo(MAX_LENGTH) <= 0) {
+            text.append(" · Length: ").append(clock(length.toMillis()));
         }
         text.append("\n");
         for (String summary : summaries) {
@@ -76,7 +83,12 @@ public final class MeetingText {
 
     /** A meeting read back from its document, to show it: the parts {@link #compose} wrote, in order. */
     public record Meeting(Instant recordedAt, String language, List<String> summaries, List<Spoken> lines,
-            boolean truncated) {
+            boolean truncated, Long lengthSeconds) {
+
+        /** The people who speak, each once. */
+        public int speakerCount() {
+            return (int) lines.stream().map(Spoken::speaker).filter(speaker -> !speaker.isEmpty()).distinct().count();
+        }
     }
 
     /** One transcript line as written: {@code at} is "hh:mm:ss" from the start; {@code speaker} may be empty. */
@@ -87,6 +99,7 @@ public final class MeetingText {
     public static Meeting read(String document) {
         Instant recordedAt = null;
         String language = null;
+        Long lengthSeconds = null;
         List<String> summaries = new ArrayList<>();
         List<Spoken> lines = new ArrayList<>();
         StringBuilder summary = null;
@@ -96,6 +109,7 @@ public final class MeetingText {
             if (!inTranscript && recordedAt == null && recorded.matches()) {
                 recordedAt = utc(recorded.group(1));
                 language = recorded.group(2);
+                lengthSeconds = seconds(recorded);
             } else if (!inTranscript && row.equals("## Summary")) {
                 summary = new StringBuilder();
                 summaries.add("");
@@ -116,20 +130,15 @@ public final class MeetingText {
         }
         summaries.removeIf(String::isBlank);
         return new Meeting(recordedAt, language, List.copyOf(summaries), List.copyOf(lines),
-                document.endsWith(TRUNCATED));
+                document.endsWith(TRUNCATED), lengthSeconds);
     }
 
-    /** When the meeting was recorded, from the line {@link #compose} writes; null when the text has none. */
-    public static Instant recordedAt(String document) {
-        int end = document.indexOf("\n## ");
-        String head = end < 0 ? document : document.substring(0, end);
-        for (String row : head.split("\n")) {
-            Matcher recorded = RECORDED_LINE.matcher(row);
-            if (recorded.matches()) {
-                return utc(recorded.group(1));
-            }
+    private static Long seconds(Matcher recorded) {
+        if (recorded.group(3) == null) {
+            return null;
         }
-        return null;
+        return Long.parseLong(recorded.group(3)) * 3600 + Long.parseLong(recorded.group(4)) * 60
+                + Long.parseLong(recorded.group(5));
     }
 
     private static Instant utc(String value) {
@@ -145,6 +154,7 @@ public final class MeetingText {
         return value == null ? "" : CONTROL.matcher(value.replaceAll("\\R", " ")).replaceAll(" ").strip();
     }
 
+    /** hh:mm:ss; the hours keep counting past 99 rather than wrap. */
     static String clock(long startMs) {
         long seconds = Math.max(0, startMs) / 1000;
         return "%02d:%02d:%02d".formatted(seconds / 3600, (seconds % 3600) / 60, seconds % 60);

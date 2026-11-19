@@ -194,7 +194,7 @@ public final class SyncRecorder {
         List<String> summaries = connection.includeSummaries() && file.hasSummary()
                 ? plaud.summaries(credential, file.id()) : List.of();
         if (meetings.save(connection.workspaceId(), connection.sourceId(), file.id(), file.title(),
-                file.recordedAt(), transcript, summaries)) {
+                file.recordedAt(), null, transcript, summaries)) { // Plaud Team files carry no length (on hold).
             tally.imported++;
         } else {
             tally.alreadyImported++;

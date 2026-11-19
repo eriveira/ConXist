@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -63,6 +65,25 @@ class DeleteDocumentIntegrationTest {
         assertThat(count("select count(*) from deleted_recordings where source_id = :id", foreignSource)).isZero();
         assertThat(count("select count(*) from hub_items where item_id = :id and status = 'REMOVED'", theirs.id()))
                 .isZero();
+    }
+
+    @Test
+    void the_workspace_knows_which_recordings_it_holds_and_which_a_person_deleted_and_nothing_of_another_workspace()
+            throws Exception {
+        UUID mine = source(WorkspaceHeaderConfiguration.TEST_WORKSPACE);
+        CapturedDocument held = meeting(WorkspaceHeaderConfiguration.TEST_WORKSPACE, mine, "rec-known-held");
+        CapturedDocument gone = meeting(WorkspaceHeaderConfiguration.TEST_WORKSPACE, mine, "rec-known-gone");
+        documents.saveIfNew(held);
+        documents.saveIfNew(gone);
+        mvc.perform(delete("/api/sources/{id}/documents/{doc}", mine, gone.id())).andExpect(status().isNoContent());
+        UUID otherWorkspace = UUID.randomUUID();
+        documents.saveIfNew(meeting(otherWorkspace, source(otherWorkspace), "rec-known-theirs"));
+
+        assertThat(documents.known(WorkspaceHeaderConfiguration.TEST_WORKSPACE,
+                List.of("rec-known-held", "rec-known-gone", "rec-known-theirs", "rec-known-new")))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        "rec-known-held", CapturedDocumentRepository.Known.HELD,
+                        "rec-known-gone", CapturedDocumentRepository.Known.DELETED));
     }
 
     @Test

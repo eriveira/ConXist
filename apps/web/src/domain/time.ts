@@ -22,3 +22,8 @@ export function clock(iso: string, language: string): string {
 export function dateTime(iso: string, language: string): string {
   return new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
+
+/** A length in whole minutes for a glance: never 0, so a short meeting still reads as 1 min. */
+export function minutesOf(seconds: number): number {
+  return Math.max(1, Math.round(seconds / 60));
+}

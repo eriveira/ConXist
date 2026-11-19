@@ -35,6 +35,10 @@ export interface CapturedDocument {
   capturedAt: string;
   /** When a recorded meeting took place; null for an uploaded file. */
   recordedAt: string | null;
+  /** How long a recorded meeting lasted; null when ConXist does not know (older imports, uploads). */
+  lengthSeconds: number | null;
+  /** How many people speak in a recorded meeting; null for an uploaded file. */
+  speakerCount: number | null;
 }
 
 /** One transcript line: `at` is hh:mm:ss from the start of the recording; `speaker` may be empty. */
@@ -46,6 +50,8 @@ export interface SpokenLine {
 
 export interface Meeting {
   recordedAt: string | null;
+  /** Null when ConXist does not know it (meetings imported before it was kept). */
+  lengthSeconds: number | null;
   language: string | null;
   summaries: string[];
   lines: SpokenLine[];

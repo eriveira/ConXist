@@ -50,6 +50,11 @@ final class RecorderProblems {
         return new InvalidRecorderLink("nothing-picked", "Pick at least one recording, or turn on new recordings.");
     }
 
+    static RuleViolation pickAlreadyHeld() {
+        return new InvalidRecorderLink("pick-already-held", "Some picked recordings are already in ConXist. Go back, "
+                + "untick the ones marked Already in ConXist and press Add again.");
+    }
+
     static RuleViolation pickNotListed() {
         return new InvalidRecorderLink("pick-not-listed", "Some picked recordings are no longer in your Plaud "
                 + "account. Go back, check the list and press Add again.");

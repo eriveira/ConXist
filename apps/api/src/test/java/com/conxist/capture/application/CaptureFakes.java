@@ -119,6 +119,20 @@ final class CaptureFakes {
         }
 
         @Override
+        public java.util.Map<String, Known> known(UUID workspaceId, java.util.Collection<String> references) {
+            java.util.Map<String, Known> known = new java.util.HashMap<>();
+            for (String reference : references) {
+                if (saved.stream().anyMatch(d -> d.workspaceId().equals(workspaceId)
+                        && d.originReference().equals(reference))) {
+                    known.put(reference, Known.HELD);
+                } else if (keptOut.stream().anyMatch(key -> key.endsWith("/" + reference))) {
+                    known.put(reference, Known.DELETED);
+                }
+            }
+            return known;
+        }
+
+        @Override
         public List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId) {
             return saved.stream().filter(d -> d.workspaceId().equals(workspaceId) && d.sourceId().equals(sourceId))
                     .toList();

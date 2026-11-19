@@ -15,15 +15,15 @@ const today = new Date();
 today.setHours(10, 0, 0, 0);
 const MEETINGS = [
   { id: 'd1', sourceId: 'p1', title: 'Sprint planning', mediaType: 'text/markdown', sizeBytes: 10, origin: 'RECORDING', textLength: 10,
-    capturedAt: today.toISOString(), recordedAt: today.toISOString() },
+    capturedAt: today.toISOString(), recordedAt: today.toISOString(), lengthSeconds: 1800, speakerCount: 2 },
   { id: 'd2', sourceId: 'p1', title: 'Customer call: Contoso', mediaType: 'text/markdown', sizeBytes: 10, origin: 'RECORDING', textLength: 10,
-    capturedAt: today.toISOString(), recordedAt: '2026-10-02T15:00:00Z' },
+    capturedAt: today.toISOString(), recordedAt: '2026-10-02T15:00:00Z', lengthSeconds: null, speakerCount: null },
 ];
 const MEETING = {
   id: 'd1', sourceId: 'p1', title: 'Sprint planning', mediaType: 'text/markdown', origin: 'RECORDING', capturedAt: today.toISOString(),
   text: '# Sprint planning',
   meeting: {
-    recordedAt: today.toISOString(), language: 'en', summaries: ['Ship sign-in first.\n- Owner: Alex'], truncated: false,
+    recordedAt: today.toISOString(), lengthSeconds: 1800, language: 'en', summaries: ['Ship sign-in first.\n- Owner: Alex'], truncated: false,
     lines: [
       { at: '00:00:04', speaker: 'Alex', text: 'Ship sign-in first.' },
       { at: '00:00:19', speaker: 'Sam', text: 'Agreed, then reviews. Sign-in matters.' },
@@ -46,7 +46,7 @@ function workspace(routes: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/sources/s1/documents': () => ({ body: [] }),
     'GET /api/sources/p1/documents/d1': () => ({ body: MEETING }),
     'GET /api/sources/p1/syncs': () => ({ body: RUNS }),
-    'GET /api/sources/p1/syncs?all=true': () => ({ body: [...RUNS, { ...RUNS[0], id: 'r3', outcome: 'UP_TO_DATE', imported: 0 }] }),
+    'GET /api/sources/p1/syncs?all=true': () => ({ body: [...RUNS, { ...RUNS[1], id: 'r3', startedAt: '2026-11-18T10:00:30Z', finishedAt: '2026-11-18T10:00:31Z', outcome: 'UP_TO_DATE', problemCode: null }] }),
     ...routes,
   });
 }
@@ -64,9 +64,14 @@ describe('SourcePage', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Today' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(2);
 
-    await userEvent.click(screen.getByRole('button', { name: /Sprint planning/ }));
+    const row = screen.getByRole('button', { name: /Sprint planning/ });
+    expect(row).toHaveTextContent('30 min');
+    expect(row).toHaveTextContent('2 speakers');
+    expect(screen.getByRole('button', { name: /Customer call: Contoso/ })).not.toHaveTextContent('min');
+    await userEvent.click(row);
     const panel = await screen.findByRole('dialog', { name: 'Sprint planning' });
     expect(within(panel).getByRole('button', { name: 'Close' })).toHaveFocus();
+    expect(within(panel).getByText('Length: 30 min')).toBeInTheDocument();
     expect(within(panel).getByText(/Ship sign-in first\.\s+- Owner: Alex/)).toBeInTheDocument();
     expect(within(panel).getAllByRole('listitem').map((item) => item.textContent)).toContain('Sam');
     // Each speaker keeps one colour, in the list and on their lines.
@@ -169,7 +174,7 @@ describe('SourcePage', () => {
 
   it('deletes an uploaded document and says it can be uploaded again', async () => {
     const SPEC = { id: 'u1', sourceId: 's1', title: 'spec.md', mediaType: 'text/markdown', sizeBytes: 10, origin: 'UPLOAD',
-      textLength: 10, capturedAt: today.toISOString(), recordedAt: null };
+      textLength: 10, capturedAt: today.toISOString(), recordedAt: null, lengthSeconds: null, speakerCount: null };
     let documents = [SPEC];
     workspace({
       'GET /api/sources/s1/documents': () => ({ body: documents }),
@@ -216,10 +221,45 @@ describe('SourcePage', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(3);
     expect(within(table).getByText('Plaud is not answering right now. Try again in a minute.')).toBeInTheDocument();
     expect(within(table).getByText('Automatic')).toBeInTheDocument();
+    // The check that imported names its meetings; a name opens the meeting.
+    expect(within(table).getByRole('button', { name: 'Customer call: Contoso' })).toBeInTheDocument();
+    await userEvent.click(within(table).getByRole('button', { name: 'Sprint planning' }));
+    const panel = await screen.findByRole('dialog', { name: 'Sprint planning' });
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
 
     await userEvent.selectOptions(screen.getByLabelText('Show'), 'all');
     expect(await screen.findByText('Up to date')).toBeInTheDocument();
+    expect(screen.getByText('First sync')).toBeInTheDocument();
     expect(await accessibilityViolations(document.body)).toEqual([]);
+  });
+
+  it('deletes a meeting opened from the history and says so', async () => {
+    workspace({ 'DELETE /api/sources/p1/documents/d1': () => ({ status: 204, body: null }) });
+    const user = userEvent.setup();
+    render(<SourcePage sourceId="p1" />);
+    await user.click(await screen.findByRole('tab', { name: 'Import history' }));
+    await user.click(await screen.findByRole('button', { name: 'Sprint planning' }));
+    const panel = await screen.findByRole('dialog', { name: 'Sprint planning' });
+    await user.click(within(panel).getByRole('button', { name: 'Delete meeting' }));
+    await user.click(within(panel).getAllByRole('button', { name: 'Delete meeting' }).at(-1)!);
+
+    expect((await screen.findByText('Deleted "Sprint planning". It will not be imported again.')).closest('p')).toHaveFocus();
+    expect(screen.getByText('1 deleted since')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Customer call: Contoso' })).toBeInTheDocument();
+  });
+
+  it('shows the history counts without meeting names when the meetings do not load', async () => {
+    let down = false;
+    workspace({ 'GET /api/sources/p1/documents': () => (down ? { status: 500, body: {} } : { body: MEETINGS }) });
+    render(<SourcePage sourceId="p1" />);
+    const tab = await screen.findByRole('tab', { name: 'Import history' });
+    down = true;
+    await userEvent.click(tab);
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+    expect(within(table).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(table).queryByText(/deleted since/)).not.toBeInTheDocument();
   });
 
   it('offers Sync now on an empty recorder, and only documents for an upload source', async () => {
