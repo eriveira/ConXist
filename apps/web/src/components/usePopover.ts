@@ -19,6 +19,11 @@ export function usePopover<Root extends HTMLElement = HTMLDivElement>() {
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [open]);
 
+  /** Tabbing out of the panel closes it. */
+  function onBlur(event: React.FocusEvent) {
+    if (open && !root.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+  }
+
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.key !== 'Escape' || !open) return;
     event.stopPropagation();
@@ -26,5 +31,5 @@ export function usePopover<Root extends HTMLElement = HTMLDivElement>() {
     button.current?.focus();
   }
 
-  return { open, setOpen, toggle: () => setOpen((value) => !value), root, button, onKeyDown };
+  return { open, setOpen, toggle: () => setOpen((value) => !value), root, button, onKeyDown, onBlur };
 }

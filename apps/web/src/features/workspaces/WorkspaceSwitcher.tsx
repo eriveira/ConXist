@@ -23,13 +23,13 @@ export function WorkspaceSwitcher({ workspaces, current, onSwitch, onNew, onOpen
   }
 
   return (
-    <div className="switcher" ref={popover.root} onKeyDown={popover.onKeyDown}>
+    <div className="switcher" ref={popover.root} onKeyDown={popover.onKeyDown} onBlur={popover.onBlur}>
       <button
         ref={popover.button}
         type="button"
         className={popover.open ? 'ws-button open' : 'ws-button'}
         aria-expanded={popover.open}
-        aria-haspopup="true"
+        aria-haspopup="dialog"
         aria-label={t('workspace.switch', { name: current.name })}
         onClick={() => {
           if (!popover.open) onOpen?.();

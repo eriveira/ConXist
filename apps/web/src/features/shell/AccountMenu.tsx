@@ -19,13 +19,13 @@ export function AccountMenu({ theme, onTheme, language, onLanguage }: AccountMen
   const popover = usePopover();
 
   return (
-    <div className="account-menu" ref={popover.root} onKeyDown={popover.onKeyDown}>
+    <div className="account-menu" ref={popover.root} onKeyDown={popover.onKeyDown} onBlur={popover.onBlur}>
       <button
         ref={popover.button}
         type="button"
         className="user-button"
         aria-expanded={popover.open}
-        aria-haspopup="true"
+        aria-haspopup="dialog"
         onClick={popover.toggle}
       >
         <span className="avatar"><Icon name="user" size={18} /></span>

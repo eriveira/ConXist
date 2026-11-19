@@ -11,7 +11,7 @@ export function AskConxist() {
   const titleId = useId();
 
   return (
-    <div className="ask" ref={popover.root} onKeyDown={popover.onKeyDown}>
+    <div className="ask" ref={popover.root} onKeyDown={popover.onKeyDown} onBlur={popover.onBlur}>
       {popover.open && (
         <section className="ask-panel" aria-labelledby={titleId} data-popover>
           <header>
