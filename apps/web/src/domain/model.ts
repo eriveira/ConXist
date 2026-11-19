@@ -39,11 +39,12 @@ export interface SyncResult {
   alreadyImported: number;
   /** Recordings Plaud is still transcribing; they arrive in a later sync. */
   waitingForTranscript: number;
+  /** Picked recordings not imported yet; later syncs bring them in, a few at a time. */
+  queued: number;
 }
 
-/** How far back the first import of a meeting recorder reaches. */
+/** How far back the first import of a meeting recorder reached (Plaud Teams, and accounts connected before picking). */
 export type StartFrom = 'LAST_30_DAYS' | 'LAST_7_DAYS' | 'NEW_ONLY';
-export const START_FROM: readonly StartFrom[] = ['LAST_30_DAYS', 'LAST_7_DAYS', 'NEW_ONLY'];
 
 /** Where a recorder source reads from: a Plaud Team workspace, or one person's Plaud account. */
 export type ConnectionKind = 'TEAM' | 'ACCOUNT';

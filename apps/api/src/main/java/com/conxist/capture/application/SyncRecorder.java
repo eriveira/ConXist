@@ -39,11 +39,11 @@ public final class SyncRecorder {
     private final SyncPlaudAccount accountSync;
 
     public SyncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
-            PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, CapturedDocumentRepository documents,
-            CaptureContext context, int maxTextCharacters) {
+            PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, RecordingPicks picks,
+            CapturedDocumentRepository documents, CaptureContext context, int maxTextCharacters) {
         this.meetings = new MeetingImport(documents, context, maxTextCharacters);
         this.accounts = accounts;
-        this.accountSync = new SyncPlaudAccount(plaudAccounts, accounts, meetings, context);
+        this.accountSync = new SyncPlaudAccount(plaudAccounts, accounts, picks, meetings, context);
         this.sources = new CaptureSources(catalog);
         this.plaud = plaud;
         this.connections = connections;
@@ -165,8 +165,15 @@ public final class SyncRecorder {
         }
     }
 
-    /** {@code waitingForTranscript}: recordings Plaud is still transcribing; they arrive in a later sync. */
-    public record SyncResult(int imported, int alreadyImported, int waitingForTranscript) {
+    /**
+     * {@code waitingForTranscript}: recordings Plaud is still transcribing; they arrive in a later sync.
+     * {@code queued}: picked recordings not reached yet; later syncs import them, a few at a time.
+     */
+    public record SyncResult(int imported, int alreadyImported, int waitingForTranscript, int queued) {
+
+        public SyncResult(int imported, int alreadyImported, int waitingForTranscript) {
+            this(imported, alreadyImported, waitingForTranscript, 0);
+        }
     }
 
     /** {@code problemCode} is set when the sync failed; {@link #SYNC_FAILED} for a failure ConXist did not expect. */

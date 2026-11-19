@@ -1,6 +1,7 @@
 package com.conxist.capture.application;
 
 import com.conxist.capture.domain.InvalidRecorderLink;
+import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
 
 /** The messages a person sees when Plaud refuses or does not answer. */
@@ -24,6 +25,10 @@ final class RecorderProblems {
                 + "again to keep importing. Meetings already imported stay.");
     }
 
+    static NotFound signInExpired() {
+        return new NotFound("plaud.sign-in-not-found", "This sign-in expired. Sign in with Plaud again.");
+    }
+
     static RuleViolation signInNotFinished() {
         return new InvalidRecorderLink("sign-in-not-finished", "Sign in with Plaud first, then press Add.");
     }
@@ -31,6 +36,23 @@ final class RecorderProblems {
     static RuleViolation otherAccount() {
         return new InvalidRecorderLink("other-account", "That is a different Plaud account. Sign in with the account "
                 + "this source was connected to, or add another meeting recorder for this one.");
+    }
+
+    static RuleViolation datesReversed() {
+        return new InvalidRecorderLink("dates-reversed", "The From date is after the To date. Change one of them.");
+    }
+
+    static RuleViolation tooManyPicks(int max) {
+        return new InvalidRecorderLink("too-many-picks", "Pick at most " + max + " recordings at a time.");
+    }
+
+    static RuleViolation nothingPicked() {
+        return new InvalidRecorderLink("nothing-picked", "Pick at least one recording, or turn on new recordings.");
+    }
+
+    static RuleViolation pickNotListed() {
+        return new InvalidRecorderLink("pick-not-listed", "Some picked recordings are no longer in your Plaud "
+                + "account. Go back, check the list and press Add again.");
     }
 
     static RuleViolation unavailable() {

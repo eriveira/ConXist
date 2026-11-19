@@ -121,6 +121,28 @@ class PlaudAccountStore {
         return true;
     }
 
+    /** The tokens of a finished sign-in no source uses yet, while it can still be used. */
+    Optional<Tokens> signInTokens(UUID workspaceId, UUID signInId, Instant usableSince) {
+        return jdbc.sql("""
+                select tokens_sealed from plaud_sign_ins
+                where id = :id and workspace_id = :workspaceId and status = 'SIGNED_IN' and started_at >= :since
+                """)
+                .param("id", signInId)
+                .param("workspaceId", workspaceId)
+                .param("since", Timestamp.from(usableSince))
+                .query(byte[].class)
+                .optional()
+                .map(sealed -> open(sealed, context("sign-in", signInId)));
+    }
+
+    /** False when the sign-in was used or forgotten meanwhile: the fresh tokens have nowhere to go. */
+    boolean replaceSignInTokens(UUID signInId, Tokens tokens) {
+        return jdbc.sql("update plaud_sign_ins set tokens_sealed = :tokens where id = :id and status = 'SIGNED_IN'")
+                .param("id", signInId)
+                .param("tokens", seal(tokens, context("sign-in", signInId)))
+                .update() == 1;
+    }
+
     /** Sign-ins started before {@code before} are deleted, with any tokens a person never used. */
     void forgetOldSignIns(Instant before) {
         jdbc.sql("delete from plaud_sign_ins where started_at < :before")

@@ -270,19 +270,40 @@ class CaptureFlowIntegrationTest {
         String sourceId = addSource("{\"provider\":\"PLAUD\",\"name\":\"My meetings\",\"accountLabel\":\""
                 + FakePlaudMcpServer.ACCOUNT_EMAIL + "\"}");
 
+        mvc.perform(get("/api/recorders/plaud/sign-ins/{id}/recordings", signInId))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.recordings", hasSize(5)))
+                .andExpect(jsonPath("$.recordings[0].id").value("of_demo_5"))
+                .andExpect(jsonPath("$.recordings[0].lengthSeconds").value(60))
+                .andExpect(jsonPath("$.capped").value(false))
+                .andExpect(jsonPath("$.max").value(500));
+        mvc.perform(get("/api/recorders/plaud/sign-ins/{id}/recordings", signInId)
+                        .param("from", "2026-01-02").param("to", "2026-01-01"))
+                .andExpect(jsonPath("$.code").value("plaud.dates-reversed"));
         mvc.perform(post("/api/sources/{id}/plaud-account", sourceId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"signInId\":\"" + signInId + "\",\"startFrom\":\"LAST_30_DAYS\",\"includeSummaries\":true}"))
+                        .content("{\"signInId\":\"" + signInId + "\",\"recordingIds\":[\"bad id!\"],"
+                                + "\"importNew\":true,\"includeSummaries\":true}"))
+                .andExpect(status().isBadRequest());
+        // The 50-day-old retro is picked too: picking reaches past any date limit.
+        mvc.perform(post("/api/sources/{id}/plaud-account", sourceId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"signInId\":\"" + signInId + "\",\"recordingIds\":[\"of_demo_1\",\"of_demo_4\","
+                                + "\"of_demo_5\"],\"importNew\":true,\"includeSummaries\":true}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.kind").value("ACCOUNT"))
                 .andExpect(jsonPath("$.label").value(FakePlaudMcpServer.ACCOUNT_EMAIL));
         mvc.perform(post("/api/sources/{id}/sync", sourceId))
-                .andExpect(jsonPath("$.imported").value(3))
-                .andExpect(jsonPath("$.waitingForTranscript").value(1));
+                .andExpect(jsonPath("$.imported").value(2))
+                .andExpect(jsonPath("$.waitingForTranscript").value(1))
+                .andExpect(jsonPath("$.queued").value(0));
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql(
+                "select file_id from plaud_recording_picks where source_id = :id")
+                .param("id", UUID.fromString(sourceId)).query(String.class).list()).containsExactly("of_demo_5");
         plaudMcp.expireAccessTokens();
         mvc.perform(post("/api/sources/{id}/sync", sourceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.imported").value(0));
-        awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW", 3);
+        awaitHubItem(sourceId, "DOCUMENT", "PENDING_REVIEW", 2);
         assertNoPlaintextFor(sourceId, "ship sign-in first");
         org.assertj.core.api.Assertions.assertThat(jdbc.sql("""
                 select count(*) from plaud_account_tokens where source_id = :id
@@ -291,7 +312,8 @@ class CaptureFlowIntegrationTest {
         // The sign-in cannot be used for a second source.
         String other = addSource("{\"provider\":\"PLAUD\",\"name\":\"Copy\",\"accountLabel\":\"copy\"}");
         mvc.perform(post("/api/sources/{id}/plaud-account", other).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"signInId\":\"" + signInId + "\",\"startFrom\":\"NEW_ONLY\",\"includeSummaries\":false}"))
+                        .content("{\"signInId\":\"" + signInId + "\",\"recordingIds\":[],\"importNew\":true,"
+                                + "\"includeSummaries\":false}"))
                 .andExpect(status().isNotFound());
 
         plaudMcp.signOutEverywhere();
@@ -304,6 +326,45 @@ class CaptureFlowIntegrationTest {
                         .content("{\"signInId\":\"" + signInWithPlaud() + "\"}"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         mvc.perform(post("/api/sources/{id}/sync", sourceId)).andExpect(status().isOk());
+    }
+
+    @Test
+    void lists_at_most_the_newest_500_recordings_and_says_there_are_more() throws Exception {
+        java.time.Instant old = java.time.Instant.parse("2001-06-01T12:00:00Z");
+        for (int i = 0; i <= 500; i++) {
+            plaudMcp.add(new com.conxist.testing.FakePlaudServer.Meeting("of_cap_" + i, "Old " + i, old.minusSeconds(60L * i), true, "",
+                    java.util.List.of("Alex: old")));
+        }
+        try {
+            String signInId = signInWithPlaud();
+            mvc.perform(get("/api/recorders/plaud/sign-ins/{id}/recordings", signInId)
+                            .param("from", "2001-01-01").param("to", "2001-12-31"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.recordings", hasSize(500)))
+                    .andExpect(jsonPath("$.recordings[0].id").value("of_cap_0"))
+                    .andExpect(jsonPath("$.capped").value(true));
+        } finally {
+            plaudMcp.remove(meeting -> meeting.id().startsWith("of_cap_"));
+        }
+    }
+
+    @Test
+    void a_plaud_sign_in_of_another_workspace_lists_and_connects_nothing() throws Exception {
+        String signInId = signInWithPlaud();
+        jdbc.sql("update plaud_sign_ins set workspace_id = :other where id = :id")
+                .param("other", UUID.randomUUID()).param("id", UUID.fromString(signInId)).update();
+        String sourceId = addSource("{\"provider\":\"PLAUD\",\"name\":\"Not theirs\",\"accountLabel\":\"them@acme.test\"}");
+
+        mvc.perform(get("/api/recorders/plaud/sign-ins/{id}/recordings", signInId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("plaud.sign-in-not-found"));
+        mvc.perform(post("/api/sources/{id}/plaud-account", sourceId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"signInId\":\"" + signInId + "\",\"recordingIds\":[],"
+                                + "\"importNew\":true,\"includeSummaries\":false}"))
+                .andExpect(status().is4xxClientError());
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql(
+                "select count(*) from plaud_account_connections where source_id = :id")
+                .param("id", UUID.fromString(sourceId)).query(Integer.class).single()).isZero();
     }
 
     @Test

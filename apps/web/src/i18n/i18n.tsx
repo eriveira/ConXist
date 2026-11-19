@@ -19,10 +19,20 @@ export function translator(language: Language): Translate {
 }
 
 const I18nContext = createContext<Translate>(translator('en'));
+const LanguageContext = createContext<Language>('en');
 
 export function I18nProvider({ language, children }: { language: Language; children: ReactNode }) {
   const translate = useMemo(() => translator(language), [language]);
-  return <I18nContext.Provider value={translate}>{children}</I18nContext.Provider>;
+  return (
+    <LanguageContext.Provider value={language}>
+      <I18nContext.Provider value={translate}>{children}</I18nContext.Provider>
+    </LanguageContext.Provider>
+  );
+}
+
+/** The person's language, for dates, numbers and sorting by name. */
+export function useLanguage(): Language {
+  return useContext(LanguageContext);
 }
 
 export function useT(): Translate {

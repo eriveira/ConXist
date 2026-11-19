@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import com.conxist.capture.application.RecordingPicks.Pick;
 import com.conxist.capture.domain.CapturedDocument;
 import com.conxist.capture.application.PlaudTeam.Transcript;
 import com.conxist.capture.domain.MeetingText.Line;
@@ -164,6 +165,57 @@ final class CaptureFakes {
         }
     }
 
+    static final class Picks implements RecordingPicks {
+        final Map<String, Pick> byFile = new java.util.LinkedHashMap<>();
+        final Map<String, Instant> tried = new HashMap<>();
+        final Map<String, Instant> pickedAt = new HashMap<>();
+
+        @Override
+        public void add(UUID workspaceId, UUID sourceId, java.util.Collection<Pick> picks, Instant at) {
+            picks.forEach(pick -> {
+                byFile.putIfAbsent(sourceId + "/" + pick.fileId(), pick);
+                pickedAt.putIfAbsent(sourceId + "/" + pick.fileId(), at);
+            });
+        }
+
+        @Override
+        public int giveUp(UUID sourceId, Instant pickedBefore) {
+            List<String> gone = byFile.keySet().stream()
+                    .filter(k -> k.startsWith(sourceId + "/") && tried.containsKey(k)
+                            && pickedAt.get(k).isBefore(pickedBefore))
+                    .toList();
+            gone.forEach(byFile::remove);
+            return gone.size();
+        }
+
+        @Override
+        public List<Pick> next(UUID sourceId, int limit) {
+            return byFile.entrySet().stream()
+                    .filter(e -> e.getKey().startsWith(sourceId + "/"))
+                    .sorted(java.util.Comparator.<Map.Entry<String, Pick>, Instant>comparing(
+                                    e -> tried.getOrDefault(e.getKey(), Instant.MIN))
+                            .thenComparing(e -> e.getValue().recordedAt(), java.util.Comparator.reverseOrder()))
+                    .limit(limit)
+                    .map(Map.Entry::getValue)
+                    .toList();
+        }
+
+        @Override
+        public void remove(UUID sourceId, String fileId) {
+            byFile.remove(sourceId + "/" + fileId);
+        }
+
+        @Override
+        public void tried(UUID sourceId, String fileId, Instant at) {
+            tried.put(sourceId + "/" + fileId, at);
+        }
+
+        @Override
+        public int count(UUID sourceId) {
+            return (int) byFile.keySet().stream().filter(k -> k.startsWith(sourceId + "/")).count();
+        }
+    }
+
     /** A person's Plaud account: sign-ins that finish when told, and recordings listed by date in pages of 2. */
     static final class Account implements PlaudAccounts {
         static final int PAGE_SIZE = 2;
@@ -175,6 +227,7 @@ final class CaptureFakes {
         boolean signedOut;
         boolean down;
         int transcriptCalls;
+        int listCalls;
 
         AccountFile record(String id, String title, Instant recordedAt, boolean transcribed) {
             AccountFile file = new AccountFile(id, title, recordedAt);
@@ -237,16 +290,41 @@ final class CaptureFakes {
         }
 
         @Override
-        public FilePage files(UUID sourceId, LocalDate from, int page) {
+        public FilePage files(UUID sourceId, LocalDate from, LocalDate to, int page) {
             check();
             datesAsked.add(from);
-            List<AccountFile> matching = files.stream()
-                    .filter(f -> !LocalDate.ofInstant(f.recordedAt(), java.time.ZoneOffset.UTC).isBefore(from))
-                    .sorted(java.util.Comparator.comparing(AccountFile::recordedAt).reversed())
-                    .toList();
+            List<AccountFile> matching = inRange(from, to);
             int start = Math.min(matching.size(), (page - 1) * PAGE_SIZE);
             int end = Math.min(matching.size(), page * PAGE_SIZE);
             return new FilePage(matching.subList(start, end), end - start == PAGE_SIZE);
+        }
+
+        @Override
+        public RecentFiles recentFiles(UUID workspaceId, UUID signInId, DateRange dates) {
+            LocalDate from = dates.from();
+            LocalDate to = dates.to();
+            int max = MAX_RECENT_FILES;
+            check();
+            listCalls++;
+            SignIn signIn = signIns.get(signInId);
+            if (signIn == null || signIn.status() != SignInStatus.SIGNED_IN) {
+                throw new AccessDenied("no such sign-in");
+            }
+            List<AccountFile> matching = inRange(from, to);
+            return new RecentFiles(matching.subList(0, Math.min(max, matching.size())), matching.size() > max);
+        }
+
+        private List<AccountFile> inRange(LocalDate from, LocalDate to) {
+            return files.stream()
+                    .filter(f -> from == null || f.recordedAt() != null)
+                    .filter(f -> from == null
+                            || !LocalDate.ofInstant(f.recordedAt(), java.time.ZoneOffset.UTC).isBefore(from))
+                    .filter(f -> to == null || f.recordedAt() != null)
+                    .filter(f -> to == null
+                            || !LocalDate.ofInstant(f.recordedAt(), java.time.ZoneOffset.UTC).isAfter(to))
+                    .sorted(java.util.Comparator.comparing(AccountFile::recordedAt,
+                            java.util.Comparator.nullsFirst(java.util.Comparator.<Instant>naturalOrder())).reversed())
+                    .toList();
         }
 
         @Override

@@ -35,7 +35,7 @@ class SyncRecorderTest {
     private final CaptureFakes.Account account = new CaptureFakes.Account();
     private final CaptureFakes.AccountConnections accountConnections = new CaptureFakes.AccountConnections();
     private final SyncRecorder syncRecorder = new SyncRecorder(sources, plaud, connections, account,
-            accountConnections, documents,
+            accountConnections, new CaptureFakes.Picks(), documents,
             new CaptureContext(FixedWorkspace.standard(), events, new ImmediateUnitOfWork(), TestClock.fixed()),
             2_000_000);
 

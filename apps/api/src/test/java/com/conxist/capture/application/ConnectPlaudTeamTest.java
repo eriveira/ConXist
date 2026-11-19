@@ -89,7 +89,7 @@ class ConnectPlaudTeamTest {
         PublicKey key = connect.createKey();
         SourceSummary source = sources.add(Provider.PLAUD, "Mine");
         accounts.save(com.conxist.capture.domain.PlaudAccountConnection.connect(source.id(),
-                FixedWorkspace.WORKSPACE_ID, "alex@acme.test", "key:alex", StartFrom.NEW_ONLY, false, TestClock.NOW));
+                FixedWorkspace.WORKSPACE_ID, "alex@acme.test", "key:alex", true, false, TestClock.NOW));
 
         assertThatThrownBy(() -> connect.connect(source.id(), "client_acme", key.keyId(), StartFrom.NEW_ONLY, false))
                 .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.already-connected");
