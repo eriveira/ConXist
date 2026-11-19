@@ -1,5 +1,6 @@
 package com.conxist.capture.application;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -10,6 +11,9 @@ import com.conxist.capture.application.PlaudTeam.ChangePage;
 import com.conxist.capture.application.PlaudTeam.Credential;
 import com.conxist.capture.application.PlaudTeam.TeamFile;
 import com.conxist.capture.application.PlaudTeam.Transcript;
+import com.conxist.capture.application.SyncHistory.Outcome;
+import com.conxist.capture.application.SyncHistory.StartedBy;
+import com.conxist.capture.application.SyncHistory.SyncRun;
 import com.conxist.capture.domain.ConnectionStatus;
 import com.conxist.capture.domain.PlaudAccountConnection;
 import com.conxist.capture.domain.PlaudTeamConnection;
@@ -37,10 +41,12 @@ public final class SyncRecorder {
     private final MeetingImport meetings;
     private final PlaudAccountConnections accounts;
     private final SyncPlaudAccount accountSync;
+    private final SyncHistory history;
 
     public SyncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
             PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, RecordingPicks picks,
-            CapturedDocumentRepository documents, CaptureContext context, int maxTextCharacters) {
+            CapturedDocumentRepository documents, SyncHistory history, CaptureContext context, int maxTextCharacters) {
+        this.history = history;
         this.meetings = new MeetingImport(documents, context, maxTextCharacters);
         this.accounts = accounts;
         this.accountSync = new SyncPlaudAccount(plaudAccounts, accounts, picks, meetings, context);
@@ -55,16 +61,17 @@ public final class SyncRecorder {
         UUID workspaceId = context.workspace().id();
         Optional<PlaudTeamConnection> team = connections.find(workspaceId, sourceId);
         if (team.isPresent()) {
-            return run(team.get());
+            return recorded(sourceId, StartedBy.PERSON, () -> run(team.get()));
         }
         PlaudAccountConnection account = accounts.find(workspaceId, sourceId)
                 .orElseThrow(() -> new RuleViolation("plaud.not-connected", "Connect this source to Plaud first."));
-        return accountSync.run(account);
+        return recorded(sourceId, StartedBy.PERSON, () -> accountSync.run(account));
     }
 
     /** The scheduled check: every active connection of the workspace. One failing Team does not stop the others. */
     public List<SourceSync> syncAll() {
         UUID workspaceId = context.workspace().id();
+        safely("forget old import history", () -> history.forgetBefore(workspaceId, context.clock().instant().minus(SyncHistory.KEEP)));
         Stream<Map.Entry<UUID, Supplier<SyncResult>>> teams = connections.findAll(workspaceId).stream()
                 .filter(connection -> connection.status() == ConnectionStatus.ACTIVE)
                 .map(connection -> Map.entry(connection.sourceId(), () -> run(connection)));
@@ -75,7 +82,7 @@ public final class SyncRecorder {
                 .map(entry -> {
                     UUID sourceId = entry.getKey();
                     try {
-                        return new SourceSync(sourceId, entry.getValue().get(), null);
+                        return new SourceSync(sourceId, recorded(sourceId, StartedBy.SCHEDULE, entry.getValue()), null);
                     } catch (RuleViolation problem) {
                         return new SourceSync(sourceId, null, problem.code());
                     } catch (RuntimeException failure) {
@@ -85,6 +92,43 @@ public final class SyncRecorder {
                     }
                 })
                 .toList();
+    }
+
+    /** Runs one check and writes it to the import history, failed or not; a failure is then passed on. */
+    private SyncResult recorded(UUID sourceId, StartedBy startedBy, Supplier<SyncResult> check) {
+        Instant startedAt = context.clock().instant();
+        SyncResult result;
+        try {
+            result = check.get();
+        } catch (RuleViolation problem) {
+            remember(failed(sourceId, startedBy, startedAt, problem.code()));
+            throw problem;
+        } catch (RuntimeException failure) {
+            remember(failed(sourceId, startedBy, startedAt, SYNC_FAILED));
+            throw failure;
+        }
+        remember(new SyncRun(UUID.randomUUID(), context.workspace().id(), sourceId, startedAt,
+                context.clock().instant(), startedBy, result.imported() > 0 ? Outcome.IMPORTED : Outcome.UP_TO_DATE,
+                result.imported(), result.alreadyImported(), result.waitingForTranscript(), result.queued(), null));
+        return result;
+    }
+
+    /** The history only reports on a check: failing to write it never changes what the check itself did. */
+    private void remember(SyncRun run) {
+        safely("record a check in the import history", () -> history.record(run));
+    }
+
+    private static void safely(String what, Runnable step) {
+        try {
+            step.run();
+        } catch (RuntimeException failure) {
+            log.log(System.Logger.Level.WARNING, "Could not {0}: {1}", what, failure.getClass().getSimpleName());
+        }
+    }
+
+    private SyncRun failed(UUID sourceId, StartedBy startedBy, Instant startedAt, String problemCode) {
+        return new SyncRun(UUID.randomUUID(), context.workspace().id(), sourceId, startedAt, context.clock().instant(),
+                startedBy, Outcome.FAILED, 0, 0, 0, 0, problemCode);
     }
 
     /** Reads from the saved checkpoint; if Plaud says it expired, reads once more from the start. */

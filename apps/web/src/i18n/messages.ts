@@ -1,7 +1,9 @@
 import { pickerEn, pickerEs } from './pickerMessages';
+import { sourceEn, sourceEs } from './sourceMessages';
 
 const en = {
   ...pickerEn,
+  ...sourceEn,
   'app.workspace': 'Workspace',
   'app.sources': 'Sources',
   'app.theme': 'Theme',
@@ -193,6 +195,7 @@ export type Messages = Record<MessageKey, string>;
 
 const es: Messages = {
   ...pickerEs,
+  ...sourceEs,
   'app.workspace': 'Espacio de trabajo',
   'app.sources': 'Fuentes',
   'app.theme': 'Tema',

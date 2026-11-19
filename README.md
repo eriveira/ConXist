@@ -40,7 +40,8 @@ export CONXIST_SECRETS_KEY=$(openssl rand -base64 32)
 
 `mvn spring-boot:test-run` also starts a fake Plaud: press Sign in with Plaud (the
 fake signs in as `alex@acme.test` at once) to see five sample recordings in the picker. Pick
-them all: four import and one is still being transcribed.
+them all: four import and one is still being transcribed. Press Open on the card to read each meeting and see
+the import history.
 
 To connect your real personal Plaud account, run the API with plain
 `mvn spring-boot:run` (with `CONXIST_SECRETS_KEY` set and PostgreSQL running) and

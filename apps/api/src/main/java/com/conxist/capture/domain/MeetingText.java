@@ -1,9 +1,13 @@
 package com.conxist.capture.domain;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -22,6 +26,10 @@ public final class MeetingText {
     private static final Pattern CONTROL = Pattern.compile("\\p{Cntrl}");
     private static final Pattern SPEAKER_UNSAFE = Pattern.compile("[^\\p{L}\\p{N} ._'-]");
     private static final Pattern LANGUAGE_UNSAFE = Pattern.compile("[^A-Za-z-]");
+    private static final Pattern RECORDED_LINE = Pattern.compile(
+            "^Recorded (\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}) UTC(?: · Language: ([A-Za-z-]{1,16}))?$");
+    private static final Pattern TRANSCRIPT_LINE = Pattern.compile(
+            "^\\[(\\d{2}:\\d{2}:\\d{2})\\] (?:([\\p{L}\\p{N} ._'-]{1,80}): )?(.*)$");
 
     private MeetingText() {
     }
@@ -64,6 +72,72 @@ public final class MeetingText {
             text.append(TRUNCATED);
         }
         return text.toString();
+    }
+
+    /** A meeting read back from its document, to show it: the parts {@link #compose} wrote, in order. */
+    public record Meeting(Instant recordedAt, String language, List<String> summaries, List<Spoken> lines,
+            boolean truncated) {
+    }
+
+    /** One transcript line as written: {@code at} is "hh:mm:ss" from the start; {@code speaker} may be empty. */
+    public record Spoken(String at, String speaker, String text) {
+    }
+
+    /** Reads a document {@link #compose} wrote. Anything it does not recognise is left out rather than guessed. */
+    public static Meeting read(String document) {
+        Instant recordedAt = null;
+        String language = null;
+        List<String> summaries = new ArrayList<>();
+        List<Spoken> lines = new ArrayList<>();
+        StringBuilder summary = null;
+        boolean inTranscript = false;
+        for (String row : document.split("\n", -1)) {
+            Matcher recorded = RECORDED_LINE.matcher(row);
+            if (!inTranscript && recordedAt == null && recorded.matches()) {
+                recordedAt = utc(recorded.group(1));
+                language = recorded.group(2);
+            } else if (!inTranscript && row.equals("## Summary")) {
+                summary = new StringBuilder();
+                summaries.add("");
+            } else if (row.equals("## Transcript")) {
+                inTranscript = true;
+                summary = null;
+            } else if (summary != null && row.startsWith("> ")) {
+                summary.append(summary.isEmpty() ? "" : "\n").append(row.substring(2));
+                summaries.set(summaries.size() - 1, summary.toString());
+            } else if (summary != null && row.equals(">")) {
+                summary.append("\n");
+            } else if (inTranscript) {
+                Matcher line = TRANSCRIPT_LINE.matcher(row);
+                if (line.matches()) {
+                    lines.add(new Spoken(line.group(1), line.group(2) == null ? "" : line.group(2), line.group(3)));
+                }
+            }
+        }
+        summaries.removeIf(String::isBlank);
+        return new Meeting(recordedAt, language, List.copyOf(summaries), List.copyOf(lines),
+                document.endsWith(TRUNCATED));
+    }
+
+    /** When the meeting was recorded, from the line {@link #compose} writes; null when the text has none. */
+    public static Instant recordedAt(String document) {
+        int end = document.indexOf("\n## ");
+        String head = end < 0 ? document : document.substring(0, end);
+        for (String row : head.split("\n")) {
+            Matcher recorded = RECORDED_LINE.matcher(row);
+            if (recorded.matches()) {
+                return utc(recorded.group(1));
+            }
+        }
+        return null;
+    }
+
+    private static Instant utc(String value) {
+        try {
+            return LocalDateTime.parse(value.replace(' ', 'T')).toInstant(ZoneOffset.UTC);
+        } catch (DateTimeParseException unreadable) {
+            return null;
+        }
     }
 
     /** Line breaks and control characters become spaces, so one utterance can never start a new line. */

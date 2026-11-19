@@ -31,7 +31,7 @@ class SyncPlaudAccountTest {
     private final CaptureFakes.Documents documents = new CaptureFakes.Documents();
     private final CaptureFakes.Picks picks = new CaptureFakes.Picks();
     private final SyncRecorder sync = new SyncRecorder(sources, new CaptureFakes.Plaud(), new CaptureFakes.Connections(),
-            account, connections, picks, documents,
+            account, connections, picks, documents, new CaptureFakes.History(),
             new CaptureContext(FixedWorkspace.standard(), new RecordedEvents(), new ImmediateUnitOfWork(),
                     TestClock.fixed()),
             2_000_000);

@@ -11,6 +11,10 @@ import com.conxist.capture.application.ConnectionView;
 import com.conxist.capture.application.DocumentSummary;
 import com.conxist.capture.application.ListDocuments;
 import com.conxist.capture.application.ListRecorderConnections;
+import com.conxist.capture.application.ListSyncHistory;
+import com.conxist.capture.application.ListSyncHistory.SyncRunView;
+import com.conxist.capture.application.ReadDocument;
+import com.conxist.capture.application.ReadDocument.DocumentView;
 import com.conxist.capture.application.RecorderKeys.PublicKey;
 import com.conxist.capture.application.SyncRecorder;
 import com.conxist.capture.application.SyncRecorder.SyncResult;
@@ -21,7 +25,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,9 +47,14 @@ class CaptureController {
     private final ConnectPlaudTeam connectPlaudTeam;
     private final ListRecorderConnections listConnections;
     private final ListDocuments listDocuments;
+    private final ReadDocument readDocument;
+    private final ListSyncHistory listSyncHistory;
 
     CaptureController(CaptureUpload captureUpload, SyncRecorder syncRecorder, ConnectPlaudTeam connectPlaudTeam,
-            ListRecorderConnections listConnections, ListDocuments listDocuments) {
+            ListRecorderConnections listConnections, ListDocuments listDocuments, ReadDocument readDocument,
+            ListSyncHistory listSyncHistory) {
+        this.readDocument = readDocument;
+        this.listSyncHistory = listSyncHistory;
         this.captureUpload = captureUpload;
         this.syncRecorder = syncRecorder;
         this.connectPlaudTeam = connectPlaudTeam;
@@ -60,6 +71,18 @@ class CaptureController {
     @GetMapping("/sources/{sourceId}/documents")
     List<DocumentSummary> documents(@PathVariable UUID sourceId) {
         return listDocuments.list(sourceId);
+    }
+
+    /** The document's text is customer data: never cached by the browser or a proxy. */
+    @GetMapping("/sources/{sourceId}/documents/{documentId}")
+    ResponseEntity<DocumentView> document(@PathVariable UUID sourceId, @PathVariable UUID documentId) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(readDocument.read(sourceId, documentId));
+    }
+
+    /** {@code all=false} (the default) leaves out checks that found nothing new. */
+    @GetMapping("/sources/{sourceId}/syncs")
+    List<SyncRunView> syncs(@PathVariable UUID sourceId, @RequestParam(defaultValue = "false") boolean all) {
+        return listSyncHistory.list(sourceId, !all);
     }
 
     /** A new key pair; only the public half is returned, for the Plaud Team admin to register. */

@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.DocumentOrigin;
 import com.conxist.capture.adapter.secrets.SecretBox;
@@ -79,6 +80,21 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
                 .param("sourceId", sourceId)
                 .query(this::toDocument)
                 .list();
+    }
+
+    @Override
+    public Optional<CapturedDocument> find(UUID workspaceId, UUID sourceId, UUID documentId) {
+        return jdbc.sql("""
+                select id, workspace_id, source_id, title, media_type, size_bytes, text_content, text_sealed,
+                       origin, origin_reference, captured_at
+                from captured_documents
+                where workspace_id = :workspaceId and source_id = :sourceId and id = :id
+                """)
+                .param("workspaceId", workspaceId)
+                .param("sourceId", sourceId)
+                .param("id", documentId)
+                .query(this::toDocument)
+                .optional();
     }
 
     static byte[] seal(SecretBox box, UUID documentId, String text) {
