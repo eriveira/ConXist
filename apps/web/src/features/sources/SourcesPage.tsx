@@ -25,6 +25,7 @@ export function SourcesPage() {
   const t = useT();
   const { state, retry, refresh } = useWorkspace();
   const [dialog, setDialog] = useState<OpenDialog>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [imported, setImported] = useState<Record<string, number>>({});
   const [problems, setProblems] = useState<Record<string, string>>({});
@@ -77,15 +78,16 @@ export function SourcesPage() {
     <section className="page" aria-labelledby="sources-title">
       <div className="page-h">
         <h1 id="sources-title">{t('sources.title')}</h1>
-        <AddMenu providers={state.providers} onChoose={chooseProvider} />
+        <AddMenu providers={state.providers} onChoose={chooseProvider} open={addMenuOpen} onOpenChange={setAddMenuOpen} />
         <p>{t('sources.lead')}</p>
       </div>
       {sources.length === 0 ? (
-        <div className="empty">
+        <button type="button" className="empty empty-action" aria-haspopup="true" aria-expanded={addMenuOpen}
+          onClick={() => setAddMenuOpen(true)}>
           <span className="nico"><Icon name="plus" /></span>
-          <h2>{t('sources.empty.title')}</h2>
-          <p>{t('sources.empty.body')}</p>
-        </div>
+          <span className="empty-title">{t('sources.empty.title')}</span>
+          <span className="empty-body">{t('sources.empty.body')}</span>
+        </button>
       ) : (
         <div className="grid">
           {sources.map((source) => (

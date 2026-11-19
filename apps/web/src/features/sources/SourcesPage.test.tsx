@@ -89,6 +89,16 @@ describe('SourcesPage', () => {
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
+  it('opens the Add source menu from the first-source card', async () => {
+    workspace({ 'GET /api/sources': () => ({ body: [] }), 'GET /api/recorders/plaud/connections': () => ({ body: [] }) });
+    render(<SourcesPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Connect your first source/ }));
+
+    expect(screen.getByRole('button', { name: 'Add source' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Capture/ })).toBeInTheDocument();
+  });
+
   it('has no accessibility violations with sources', async () => {
     workspace();
     const { container } = render(<SourcesPage />);

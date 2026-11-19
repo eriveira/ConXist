@@ -70,7 +70,8 @@ a.btn.ghost { color: var(--cx-accent-text); }
 .pill.error { background: var(--cx-err-bg); color: var(--cx-err-fg); }
 
 /* page */
-.page { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
+:root { --page-max: 1120px; --page-gutter: 16px; }
+.page { max-width: var(--page-max); margin: 0 auto; padding: 28px var(--page-gutter) 48px; }
 .page-h { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 16px; margin-bottom: 22px; }
 .page-h h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
 .page-h p { grid-column: 1 / -1; margin: 0; color: var(--cx-fg-muted); max-width: 60ch; }
@@ -85,6 +86,11 @@ a.btn.ghost { color: var(--cx-accent-text); }
 .panel p, .empty p { margin: 0 0 16px; color: var(--cx-fg-muted); }
 .empty { max-width: 520px; margin: 32px auto 0; text-align: center; display: flex; flex-direction: column; align-items: center; }
 .empty .nico { margin-bottom: 12px; }
+/* the first-source card opens the Add source menu, like the button above it */
+.empty-action { width: 100%; font: inherit; color: inherit; }
+.empty-action:hover { border-color: var(--cx-accent); box-shadow: var(--cx-shadow-glow); }
+.empty-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--cx-fg); }
+.empty-body { color: var(--cx-fg-muted); }
 @media (max-width: 560px) {
   .page { padding: 20px 16px 40px; }
   .page-h h1 { font-size: 24px; }
