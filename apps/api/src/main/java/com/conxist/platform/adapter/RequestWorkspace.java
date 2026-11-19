@@ -1,6 +1,7 @@
 package com.conxist.platform.adapter;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
@@ -18,6 +19,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 class RequestWorkspace implements CurrentWorkspace {
 
     static final String HEADER = "X-Workspace-Id";
+    /** Only the full 36-character form; {@link UUID#fromString} alone also takes short forms such as 0-0-0-0-1. */
+    private static final Pattern UUID_FORM =
+            Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     private static final String CHECKED = RequestWorkspace.class.getName() + ".checked";
 
     private final WorkspaceDirectory directory;
@@ -50,10 +54,10 @@ class RequestWorkspace implements CurrentWorkspace {
 
     /** A missing or malformed header both mean the app has not chosen a workspace. */
     private static UUID parse(String header) {
-        try {
-            return UUID.fromString(header == null ? "" : header.strip());
-        } catch (IllegalArgumentException missingOrMalformed) {
+        String value = header == null ? "" : header.strip();
+        if (!UUID_FORM.matcher(value).matches()) {
             throw new RuleViolation("workspace.required", "Choose a workspace first.");
         }
+        return UUID.fromString(value);
     }
 }

@@ -54,6 +54,8 @@ class RequestWorkspaceTest {
                 .extracting(e -> ((RuleViolation) e).code()).isEqualTo("workspace.required");
         request("not-an-id");
         assertThatThrownBy(workspace::id).extracting(e -> ((RuleViolation) e).code()).isEqualTo("workspace.required");
+        request("0-0-0-0-aa");
+        assertThatThrownBy(workspace::id).extracting(e -> ((RuleViolation) e).code()).isEqualTo("workspace.required");
         request(UUID.randomUUID().toString());
         assertThatThrownBy(workspace::id).isInstanceOf(NotFound.class);
     }

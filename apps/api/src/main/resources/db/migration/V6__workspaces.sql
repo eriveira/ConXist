@@ -17,14 +17,17 @@ create table workspace_sources (
 );
 
 -- Data made before workspaces existed belongs to the one configured workspace: give it a row, so it stays
--- reachable. A database with no sources gets no row, and the app asks for a first workspace.
+-- reachable (sources, and Plaud Team keys made before any source). A database with neither gets no row, and the
+-- app asks for a first workspace.
 insert into workspaces (id, name, created_at)
 select workspace_id,
        case when position = 1 then 'My workspace' else 'My workspace ' || position end,
-       first_added
-from (select workspace_id, min(added_at) as first_added,
-             row_number() over (order by min(added_at)) as position
-      from sources group by workspace_id) existing;
+       first_seen
+from (select workspace_id, min(seen) as first_seen, row_number() over (order by min(seen), workspace_id) as position
+      from (select workspace_id, added_at as seen from sources
+            union all
+            select workspace_id, created_at as seen from recorder_keys) owned
+      group by workspace_id) existing;
 
 insert into workspace_sources (workspace_id, source_id)
 select workspace_id, id from sources;
