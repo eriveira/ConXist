@@ -1,11 +1,11 @@
 import { pickerEn, pickerEs } from './pickerMessages';
+import { shellEn, shellEs } from './shellMessages';
 import { sourceEn, sourceEs } from './sourceMessages';
 
 const en = {
   ...pickerEn,
   ...sourceEn,
-  'app.workspace': 'Workspace',
-  'app.sources': 'Sources',
+  ...shellEn,
   'app.theme': 'Theme',
   'app.theme.system': 'System',
   'app.theme.light': 'Light',
@@ -196,8 +196,7 @@ export type Messages = Record<MessageKey, string>;
 const es: Messages = {
   ...pickerEs,
   ...sourceEs,
-  'app.workspace': 'Espacio de trabajo',
-  'app.sources': 'Fuentes',
+  ...shellEs,
   'app.theme': 'Tema',
   'app.theme.system': 'Sistema',
   'app.theme.light': 'Claro',

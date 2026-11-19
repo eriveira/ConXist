@@ -47,7 +47,8 @@ class ArchitectureTest {
 
     @Test
     void published_module_apis_are_plain_java() {
-        noClasses().that().resideInAnyPackage("com.conxist.platform", "com.conxist.sources", "com.conxist.capture")
+        noClasses().that().resideInAnyPackage("com.conxist.platform", "com.conxist.sources", "com.conxist.capture",
+                        "com.conxist.workspaces")
                 .should().dependOnClassesThat().resideInAnyPackage(OUTER_RING)
                 .check(classes);
     }

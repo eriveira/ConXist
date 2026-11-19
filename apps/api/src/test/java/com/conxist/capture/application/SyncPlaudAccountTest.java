@@ -102,12 +102,12 @@ class SyncPlaudAccountTest {
         connections.save(connections.bySource.get(paused.id()).paused(TestClock.NOW));
         account.record("of_1", "Weekly sync", RECENT, true);
 
-        assertThat(sync.syncAll()).singleElement().satisfies(s -> {
+        assertThat(sync.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement().satisfies(s -> {
             assertThat(s.sourceId()).isEqualTo(first.id());
             assertThat(s.result().imported()).isEqualTo(1);
         });
         account.down = true;
-        assertThat(sync.syncAll()).singleElement()
+        assertThat(sync.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement()
                 .satisfies(s -> assertThat(s.problemCode()).isEqualTo("plaud.unavailable"));
     }
 

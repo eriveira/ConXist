@@ -1,4 +1,4 @@
-/* Sources page. Colors, fonts, radii and shadows come only from the brand tokens. */
+/* The app. Colors, fonts, radii and shadows come only from the brand tokens. */
 @import '@brand/tokens/conxist.css';
 
 * { box-sizing: border-box; }
@@ -17,12 +17,13 @@ button { cursor: pointer; }
 }
 
 /* layout */
-.app { display: grid; grid-template-rows: 60px 1fr; height: 100vh; height: 100dvh; }
+.app { display: grid; grid-template-rows: auto 1fr; height: 100vh; height: 100dvh; }
 .top {
-  display: flex; align-items: center; gap: 12px; padding: 0 16px; min-width: 0;
-  background: var(--cx-surface-raised); border-bottom: 1px solid var(--cx-border);
+  display: flex; align-items: center; gap: 14px; padding: 0 24px; min-width: 0; min-height: 64px;
+  background: var(--cx-surface-raised); border-bottom: 1px solid var(--cx-border); position: relative; z-index: 20;
 }
-.logo-chip img { height: 36px; width: auto; display: block; }
+.logo-chip { display: inline-flex; flex: none; border-radius: var(--cx-radius-sm); }
+.logo-chip img, .first-run-top img { height: 30px; width: auto; display: block; }
 .logo-d, .em-d { display: none !important; }
 /* Native controls (date pickers, select lists) follow the theme. */
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
@@ -34,21 +35,8 @@ button { cursor: pointer; }
 }
 :root[data-theme="dark"] .logo-l, :root[data-theme="dark"] .em-l { display: none !important; }
 :root[data-theme="dark"] .logo-d, :root[data-theme="dark"] .em-d { display: block !important; }
-.crumbs { display: flex; align-items: center; gap: 8px; color: var(--cx-fg-muted); font-weight: 500; min-width: 0; }
-.crumbs b { color: var(--cx-fg); font-weight: 700; white-space: nowrap; }
-.crumbs .sep { opacity: .5; }
-.spacer { flex: 1; }
-.pick select {
-  height: 36px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-pill);
-  background: var(--cx-surface-raised); padding: 0 10px;
-}
-.stage { position: relative; min-height: 0; overflow: auto; }
-@media (max-width: 560px) {
-  .crumbs { display: none; }
-  .top { gap: 8px; padding: 0 12px; }
-  .logo-chip img { height: 28px; }
-  .pick select { padding: 0 6px; font-size: 14px; }
-}
+.divider { width: 1px; height: 28px; background: var(--cx-border); margin: 0 4px; flex: none; }
+.stage { position: relative; min-height: 0; overflow: auto; padding-bottom: 72px; }
 
 /* buttons and pills */
 .btn {

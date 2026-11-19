@@ -158,7 +158,7 @@ class SyncRecorderTest {
         plaud.record("f1", "Sprint planning", RECENT);
 
         syncRecorder.sync(source.id());
-        syncRecorder.syncAll();
+        syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID);
         plaud.down = true;
         assertThatThrownBy(() -> syncRecorder.sync(source.id())).isInstanceOf(RuleViolation.class);
 
@@ -178,7 +178,7 @@ class SyncRecorderTest {
 
         assertThat(syncRecorder.sync(source.id())).isEqualTo(new SyncResult(1, 0, 0));
         assertThat(documents.saved).hasSize(1);
-        assertThat(syncRecorder.syncAll()).singleElement()
+        assertThat(syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement()
                 .satisfies(sync -> assertThat(sync.problemCode()).isNull());
         plaud.down = true;
         assertThatThrownBy(() -> syncRecorder.sync(source.id()))
@@ -191,7 +191,7 @@ class SyncRecorderTest {
         SourceSummary source = connected(StartFrom.LAST_30_DAYS, false);
         plaud.broken = true;
 
-        assertThat(syncRecorder.syncAll()).singleElement().satisfies(sync -> {
+        assertThat(syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement().satisfies(sync -> {
             assertThat(sync.sourceId()).isEqualTo(source.id());
             assertThat(sync.problemCode()).isEqualTo(SyncRecorder.SYNC_FAILED);
         });
@@ -219,13 +219,13 @@ class SyncRecorderTest {
         connections.save(connections.bySource.get(paused.id()).paused(TestClock.NOW));
         plaud.record("f1", "One", RECENT);
 
-        assertThat(syncRecorder.syncAll()).singleElement().satisfies(sync -> {
+        assertThat(syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement().satisfies(sync -> {
             assertThat(sync.sourceId()).isEqualTo(first.id());
             assertThat(sync.result().imported()).isEqualTo(1);
         });
 
         plaud.down = true;
-        assertThat(syncRecorder.syncAll()).singleElement()
+        assertThat(syncRecorder.syncAll(FixedWorkspace.WORKSPACE_ID)).singleElement()
                 .satisfies(sync -> assertThat(sync.problemCode()).isEqualTo("plaud.unavailable"));
     }
 

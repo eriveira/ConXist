@@ -2,6 +2,7 @@ import type {
   CapturedDocument, DocumentView, PlaudSignIn, Provider, ProviderId, RecorderConnection, SignInStart, Source, SyncResult, SyncRun,
 } from '../domain/model';
 import type { RecordingList } from '../domain/recordings';
+import type { Workspace } from '../domain/workspaces';
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
 export class ApiError extends Error {
@@ -10,8 +11,19 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+/** Every request acts for this workspace; the API refuses workspace data without it. */
+const WORKSPACE_HEADER = 'X-Workspace-Id';
+let currentWorkspace: string | null = null;
+
+/** Names the workspace that later requests act for, or none. */
+export function setRequestWorkspace(workspaceId: string | null): void {
+  currentWorkspace = workspaceId;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (currentWorkspace) headers.set(WORKSPACE_HEADER, currentWorkspace);
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     const problem = await problemOf(response);
     throw new ApiError(response.status, problem.code, problem.detail);
@@ -60,7 +72,14 @@ export interface DateRange {
   to: string;
 }
 
+export interface NewWorkspace {
+  name: string;
+  description: string;
+}
+
 export const api = {
+  workspaces: () => request<Workspace[]>('/api/workspaces'),
+  createWorkspace: (workspace: NewWorkspace) => postJson<Workspace>('/api/workspaces', workspace),
   providers: () => request<Provider[]>('/api/providers'),
   sources: () => request<Source[]>('/api/sources'),
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),

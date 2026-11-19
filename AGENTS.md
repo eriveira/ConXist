@@ -53,7 +53,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
   coming soon. Plaud Team workspaces (ADR 0003) are on hold: the API code stays,
   the app does not offer them (owner, 2026-11-19). Captured text, files and tokens are encrypted at rest (ADR 0004). The API needs `CONXIST_SECRETS_KEY` (32 bytes, Base64) to start;
   `mvn spring-boot:test-run` runs a fake Plaud that signs in as `alex@acme.test`.
-- No sign-in yet: the API is single-workspace and listens on 127.0.0.1 only.
+- Workspaces (ADR 0007): a person keeps several; first run asks for one (name, optional description up to 500
+  characters). Every workspace request sends `X-Workspace-Id`; the app keeps the last one used. The header menu is
+  Home (empty for now), Flow, Agents, Sources, Knowledge; Flow, Agents, Knowledge and Ask ConXist show "coming soon".
+- No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 
 ## Brand

@@ -61,16 +61,18 @@ public final class SyncRecorder {
         UUID workspaceId = context.workspace().id();
         Optional<PlaudTeamConnection> team = connections.find(workspaceId, sourceId);
         if (team.isPresent()) {
-            return recorded(sourceId, StartedBy.PERSON, () -> run(team.get()));
+            return recorded(workspaceId, sourceId, StartedBy.PERSON, () -> run(team.get()));
         }
         PlaudAccountConnection account = accounts.find(workspaceId, sourceId)
                 .orElseThrow(() -> new RuleViolation("plaud.not-connected", "Connect this source to Plaud first."));
-        return recorded(sourceId, StartedBy.PERSON, () -> accountSync.run(account));
+        return recorded(workspaceId, sourceId, StartedBy.PERSON, () -> accountSync.run(account));
     }
 
-    /** The scheduled check: every active connection of the workspace. One failing Team does not stop the others. */
-    public List<SourceSync> syncAll() {
-        UUID workspaceId = context.workspace().id();
+    /**
+     * The scheduled check: every active connection of one workspace. It runs outside a request, so it is told the
+     * workspace. One failing connection does not stop the others.
+     */
+    public List<SourceSync> syncAll(UUID workspaceId) {
         safely("forget old import history", () -> history.forgetBefore(workspaceId, context.clock().instant().minus(SyncHistory.KEEP)));
         Stream<Map.Entry<UUID, Supplier<SyncResult>>> teams = connections.findAll(workspaceId).stream()
                 .filter(connection -> connection.status() == ConnectionStatus.ACTIVE)
@@ -82,7 +84,7 @@ public final class SyncRecorder {
                 .map(entry -> {
                     UUID sourceId = entry.getKey();
                     try {
-                        return new SourceSync(sourceId, recorded(sourceId, StartedBy.SCHEDULE, entry.getValue()), null);
+                        return new SourceSync(sourceId, recorded(workspaceId, sourceId, StartedBy.SCHEDULE, entry.getValue()), null);
                     } catch (RuleViolation problem) {
                         return new SourceSync(sourceId, null, problem.code());
                     } catch (RuntimeException failure) {
@@ -95,19 +97,19 @@ public final class SyncRecorder {
     }
 
     /** Runs one check and writes it to the import history, failed or not; a failure is then passed on. */
-    private SyncResult recorded(UUID sourceId, StartedBy startedBy, Supplier<SyncResult> check) {
+    private SyncResult recorded(UUID workspaceId, UUID sourceId, StartedBy startedBy, Supplier<SyncResult> check) {
         Instant startedAt = context.clock().instant();
         SyncResult result;
         try {
             result = check.get();
         } catch (RuleViolation problem) {
-            remember(failed(sourceId, startedBy, startedAt, problem.code()));
+            remember(failed(workspaceId, sourceId, startedBy, startedAt, problem.code()));
             throw problem;
         } catch (RuntimeException failure) {
-            remember(failed(sourceId, startedBy, startedAt, SYNC_FAILED));
+            remember(failed(workspaceId, sourceId, startedBy, startedAt, SYNC_FAILED));
             throw failure;
         }
-        remember(new SyncRun(UUID.randomUUID(), context.workspace().id(), sourceId, startedAt,
+        remember(new SyncRun(UUID.randomUUID(), workspaceId, sourceId, startedAt,
                 context.clock().instant(), startedBy, result.imported() > 0 ? Outcome.IMPORTED : Outcome.UP_TO_DATE,
                 result.imported(), result.alreadyImported(), result.waitingForTranscript(), result.queued(), null));
         return result;
@@ -126,8 +128,8 @@ public final class SyncRecorder {
         }
     }
 
-    private SyncRun failed(UUID sourceId, StartedBy startedBy, Instant startedAt, String problemCode) {
-        return new SyncRun(UUID.randomUUID(), context.workspace().id(), sourceId, startedAt, context.clock().instant(),
+    private SyncRun failed(UUID workspaceId, UUID sourceId, StartedBy startedBy, Instant startedAt, String problemCode) {
+        return new SyncRun(UUID.randomUUID(), workspaceId, sourceId, startedAt, context.clock().instant(),
                 startedBy, Outcome.FAILED, 0, 0, 0, 0, problemCode);
     }
 

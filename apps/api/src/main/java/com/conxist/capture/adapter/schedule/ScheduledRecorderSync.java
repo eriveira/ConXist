@@ -4,13 +4,14 @@ import java.util.List;
 import java.util.UUID;
 import com.conxist.capture.application.SyncRecorder;
 import com.conxist.capture.application.SyncRecorder.SourceSync;
+import com.conxist.platform.WorkspaceDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Checks every active meeting recorder for new recordings, so they arrive without anyone pressing Sync. */
+/** Checks every active meeting recorder of every workspace, so recordings arrive without anyone pressing Sync. */
 @Component
 class ScheduledRecorderSync {
 
@@ -20,18 +21,29 @@ class ScheduledRecorderSync {
     private static final String JOB_LOG_KEY = "requestId";
 
     private final SyncRecorder syncRecorder;
+    private final WorkspaceDirectory workspaces;
 
-    ScheduledRecorderSync(SyncRecorder syncRecorder) {
+    ScheduledRecorderSync(SyncRecorder syncRecorder, WorkspaceDirectory workspaces) {
         this.syncRecorder = syncRecorder;
+        this.workspaces = workspaces;
     }
 
     @Scheduled(initialDelayString = "${conxist.plaud.sync-interval}", fixedDelayString = "${conxist.plaud.sync-interval}")
     void checkRecorders() {
         MDC.put(JOB_LOG_KEY, "recorder-sync-" + UUID.randomUUID());
         try {
-            report(syncRecorder.syncAll());
+            workspaces.ids().forEach(this::checkWorkspace);
         } finally {
             MDC.remove(JOB_LOG_KEY);
+        }
+    }
+
+    /** One workspace failing does not stop the check of the others. */
+    private void checkWorkspace(UUID workspaceId) {
+        try {
+            report(syncRecorder.syncAll(workspaceId));
+        } catch (RuntimeException failure) {
+            log.error("Recorder check failed for workspace {}: {}", workspaceId, failure.getClass().getSimpleName());
         }
     }
 

@@ -16,23 +16,30 @@ interface DialogProps {
   footer: ReactNode;
   /** A wider dialog, for a step that shows a list. */
   wide?: boolean;
+  /** Where focus goes on each step instead of the step heading, such as the first field of a one-step form. */
+  focusFirst?: string;
 }
 
 /**
  * A modal dialog. Focus moves in on open, to each new step's heading, stays inside while open, and returns to the
  * opener on close. Escape closes it; a click outside does not, so typed names and picked files are not lost.
  */
-export function Dialog({ title, subtitle, icon, closeLabel, onClose, step, closable = true, children, footer, wide = false }: DialogProps) {
+export function Dialog({ title, subtitle, icon, closeLabel, onClose, step, closable = true, children, footer, wide = false, focusFirst }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const subtitleId = useId();
   useFocusTrap(panel, onClose, closable);
 
   useEffect(() => {
+    const field = focusFirst ? panel.current?.querySelector<HTMLElement>(focusFirst) : null;
+    if (field) {
+      field.focus();
+      return;
+    }
     const heading = panel.current?.querySelector<HTMLElement>('.m-body h3');
     heading?.setAttribute('tabindex', '-1');
     (heading ?? firstFocusable(panel.current))?.focus();
-  }, [step]);
+  }, [step, focusFirst]);
 
   return (
     <div className="scrim">

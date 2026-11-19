@@ -21,6 +21,7 @@ import com.conxist.testing.FakePlaudConfiguration;
 import com.conxist.testing.FakePlaudMcpServer;
 import com.conxist.testing.FakePlaudServer;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** The whole slice against a real PostgreSQL: add sources, capture, and see it arrive in the hub. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({PostgresContainerConfiguration.class, FakePlaudConfiguration.class})
+@Import({PostgresContainerConfiguration.class, FakePlaudConfiguration.class, WorkspaceHeaderConfiguration.class})
 class CaptureFlowIntegrationTest {
 
     @TempDir
@@ -66,11 +67,13 @@ class CaptureFlowIntegrationTest {
     @Autowired
     FakePlaudMcpServer plaudMcp;
 
-    @Autowired
-    com.conxist.capture.application.SyncHistory history;
+    @BeforeEach
+    void workspace() {
+        WorkspaceHeaderConfiguration.ensure(jdbc);
+    }
 
     @Autowired
-    com.conxist.platform.CurrentWorkspace workspace;
+    com.conxist.capture.application.SyncHistory history;
 
     @Test
     void the_import_history_keeps_90_days_and_returns_the_newest_changes_first() throws Exception {
@@ -78,7 +81,7 @@ class CaptureFlowIntegrationTest {
         java.time.Instant now = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
         java.util.function.BiFunction<Integer, com.conxist.capture.application.SyncHistory.Outcome,
                 com.conxist.capture.application.SyncHistory.SyncRun> run = (daysAgo, outcome) ->
-                new com.conxist.capture.application.SyncHistory.SyncRun(UUID.randomUUID(), workspace.id(), sourceId,
+                new com.conxist.capture.application.SyncHistory.SyncRun(UUID.randomUUID(), WorkspaceHeaderConfiguration.TEST_WORKSPACE, sourceId,
                         now.minus(Duration.ofDays(daysAgo)), now.minus(Duration.ofDays(daysAgo)),
                         com.conxist.capture.application.SyncHistory.StartedBy.SCHEDULE, outcome,
                         outcome == com.conxist.capture.application.SyncHistory.Outcome.IMPORTED ? 1 : 0, 0, 0, 0, null);
@@ -88,15 +91,15 @@ class CaptureFlowIntegrationTest {
         history.record(run.apply(1, com.conxist.capture.application.SyncHistory.Outcome.IMPORTED));
 
         history.forgetBefore(UUID.randomUUID(), now.minus(com.conxist.capture.application.SyncHistory.KEEP));
-        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, false, 10)).hasSize(4);
-        history.forgetBefore(workspace.id(), now.minus(com.conxist.capture.application.SyncHistory.KEEP));
+        org.assertj.core.api.Assertions.assertThat(history.recent(WorkspaceHeaderConfiguration.TEST_WORKSPACE, sourceId, false, 10)).hasSize(4);
+        history.forgetBefore(WorkspaceHeaderConfiguration.TEST_WORKSPACE, now.minus(com.conxist.capture.application.SyncHistory.KEEP));
 
-        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, false, 10))
+        org.assertj.core.api.Assertions.assertThat(history.recent(WorkspaceHeaderConfiguration.TEST_WORKSPACE, sourceId, false, 10))
                 .extracting(r -> r.startedAt().isAfter(now.minus(Duration.ofDays(4)))).containsOnly(true).hasSize(3);
-        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, true, 1))
+        org.assertj.core.api.Assertions.assertThat(history.recent(WorkspaceHeaderConfiguration.TEST_WORKSPACE, sourceId, true, 1))
                 .singleElement().satisfies(r -> org.assertj.core.api.Assertions.assertThat(r.startedAt())
                         .isEqualTo(now.minus(Duration.ofDays(1))));
-        org.assertj.core.api.Assertions.assertThat(history.recent(workspace.id(), sourceId, true, 10)).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(history.recent(WorkspaceHeaderConfiguration.TEST_WORKSPACE, sourceId, true, 10)).hasSize(2);
     }
 
     @Test
