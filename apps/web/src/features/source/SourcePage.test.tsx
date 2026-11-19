@@ -69,6 +69,9 @@ describe('SourcePage', () => {
     expect(within(panel).getByRole('button', { name: 'Close' })).toHaveFocus();
     expect(within(panel).getByText(/Ship sign-in first\.\s+- Owner: Alex/)).toBeInTheDocument();
     expect(within(panel).getAllByRole('listitem').map((item) => item.textContent)).toContain('Sam');
+    // Each speaker keeps one colour, in the list and on their lines.
+    expect(panel.querySelectorAll('.speakers .dot.s0, .who .dot.s0')).toHaveLength(2);
+    expect(panel.querySelectorAll('.speakers .dot.s1, .who .dot.s1')).toHaveLength(2);
     await userEvent.type(within(panel).getByLabelText('Find in transcript'), 'sign-in');
     expect(within(panel).getByText('2 lines match')).toBeInTheDocument();
     expect(within(panel).getAllByText(/sign-in/i, { selector: 'mark' })).toHaveLength(2);
@@ -76,6 +79,24 @@ describe('SourcePage', () => {
 
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('narrows the meetings to recent dates and says what Plaud is still transcribing', async () => {
+    workspace();
+    render(<SourcePage sourceId="p1" />);
+
+    expect(await screen.findByText('1 recording is still being transcribed by Plaud. It appears here when it is ready.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Customer call: Contoso/ })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Recorded'), 'LAST_7_DAYS');
+    expect(screen.queryByRole('button', { name: /Customer call: Contoso/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sprint planning/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Search by title'), 'contoso');
+    expect(screen.getByRole('heading', { name: 'No meetings match "contoso"' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show all' }));
+    expect(screen.getByLabelText('Recorded')).toHaveValue('ANY');
+    expect(screen.getByRole('button', { name: /Customer call: Contoso/ })).toBeInTheDocument();
+    expect(await accessibilityViolations(document.body)).toEqual([]);
   });
 
   it('deletes a meeting after a clear question, says it will not come back, and can back out', async () => {

@@ -19,7 +19,8 @@
 .search input { width: 100%; min-height: 40px; border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); padding: 0 12px 0 34px; background: var(--cx-surface-raised); color: var(--cx-fg); font: inherit; }
 .search svg { position: absolute; left: 10px; top: 12px; color: var(--cx-fg-muted); }
 .show { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 700; }
-.show select { min-height: 40px; border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); padding: 0 10px; background: var(--cx-surface-raised); color: var(--cx-fg); font: inherit; font-weight: 400; }
+.source-page .toolbar.start { justify-content: flex-start; }
+.show select, .toolbar select.sel { min-height: 40px; border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); padding: 0 10px; background: var(--cx-surface-raised); color: var(--cx-fg); font: inherit; font-weight: 400; }
 .source-page .list { background: var(--cx-surface-raised); border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); overflow: hidden; }
 .source-page .list ul { list-style: none; margin: 0; padding: 0; }
 .group-h { margin: 0; padding: 10px 16px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--cx-fg-muted); background: var(--cx-surface); border-bottom: 1px solid var(--cx-border); }
@@ -46,6 +47,17 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 .history .when { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .history .problem { color: var(--cx-err-fg); min-width: 220px; }
 .history tr:last-child td { border-bottom: 0; }
+/* On a phone each check becomes a small card of label and value, so nothing scrolls sideways. */
+@media (max-width: 640px) {
+  .history thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .history tr { display: block; padding: 8px 14px; border-bottom: 1px solid var(--cx-border); }
+  .history tr:last-child { border-bottom: 0; }
+  .history td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0; border: 0; text-align: right; }
+  .history td::before { content: attr(data-label); flex: none; color: var(--cx-fg-muted); font-family: var(--cx-font); font-size: 13px; text-align: left; padding: 4px 0; }
+  .history td.problem { min-width: 0; }
+  .history td.problem.none { display: none; }
+}
+}
 .small { font-size: 13px; }
 
 .scrim.side { justify-content: flex-end; align-items: stretch; padding: 0; }
@@ -62,14 +74,19 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 .psummary { background: var(--cx-surface); border-radius: var(--cx-radius-sm); padding: 12px 14px; font-size: 14px; }
 .psummary + .psummary { margin-top: 8px; }
 .speakers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.spk { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-pill); padding: 3px 12px; font-size: 13px; font-weight: 600; }
+.spk { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-pill); padding: 3px 12px; font-size: 13px; font-weight: 600; }
 .thead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; margin-bottom: 8px; }
 .thead .section-l { margin: 0; }
 .thead .search { flex: 0 1 280px; }
 .transcript { list-style: none; margin: 0; padding: 0; }
 .tline { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 2px 12px; padding: 6px 0; }
 .tline .ts { font-family: var(--cx-font-mono); font-size: 12px; color: var(--cx-fg-muted); padding-top: 3px; grid-row: 1 / span 2; }
-.tline .who { font-weight: 700; font-size: 13px; }
+.tline .who { font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: var(--cx-radius-pill); flex: none; background: var(--cx-action); }
+.dot.s1 { background: var(--cx-ok-fg); }
+.dot.s2 { background: var(--cx-warn-fg); }
+.toolbar .on-way { margin: 0 0 0 auto; max-width: 52ch; }
+.on-way + .state, .on-way:first-child { margin-top: 0; }
 .tline .txt { grid-column: 2; max-width: 68ch; overflow-wrap: anywhere; }
 mark { background: var(--cx-warn-bg); color: var(--cx-fg); border-radius: var(--cx-radius-sm); }
 @media (max-width: 640px) {

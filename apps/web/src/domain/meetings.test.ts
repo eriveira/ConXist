@@ -1,5 +1,5 @@
 import type { CapturedDocument, Meeting } from './model';
-import { byDay, highlight, linesMatching, speakersOf, summaryText, transcriptText } from './meetings';
+import { byDay, highlight, recordedWithin, linesMatching, speakersOf, summaryText, transcriptText } from './meetings';
 
 const doc = (id: string, recordedAt: string | null, capturedAt = '2026-11-18T20:00:00Z'): CapturedDocument => ({
   id, sourceId: 's', title: id, mediaType: 'text/markdown', sizeBytes: 1, origin: 'RECORDING', textLength: 1,
@@ -22,6 +22,15 @@ describe('meetings', () => {
       doc('upload', null, '2026-11-17T09:00:00Z'), doc('same', '2026-11-18T09:00:00Z')], 'UTC');
     expect(groups.map((group) => [group.day, group.documents.map((d) => d.id)])).toEqual([
       ['2026-11-18', ['new', 'same']], ['2026-11-17', ['upload']], ['2026-11-16', ['old']]]);
+  });
+
+  it('keeps the meetings of the last 7 or 30 days, placed by recording, else import', () => {
+    const now = new Date('2026-11-19T12:00:00Z');
+    const docs = [doc('week', '2026-11-13T12:00:00Z'), doc('month', '2026-10-25T12:00:00Z'), doc('old', '2026-09-01T12:00:00Z'),
+      doc('upload', null, '2026-11-18T09:00:00Z')];
+    expect(recordedWithin(docs, 'ANY', now)).toHaveLength(4);
+    expect(recordedWithin(docs, 'LAST_7_DAYS', now).map((d) => d.id)).toEqual(['week', 'upload']);
+    expect(recordedWithin(docs, 'LAST_30_DAYS', now).map((d) => d.id)).toEqual(['week', 'month', 'upload']);
   });
 
   it('lists speakers once in the order they first speak', () => {
