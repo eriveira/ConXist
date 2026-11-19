@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../api/client';
+import { ApiError, api } from '../../api/client';
 import type { Translate } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 
 /** How often the dialog asks whether the person finished on Plaud's page. */
 export const SIGN_IN_POLL_MS = 2_000;
+/** A little longer than the API keeps a sign-in open (15 minutes), so the API's answer normally comes first. */
+const GIVE_UP_AFTER_MS = 16 * 60_000;
 
 export type PlaudSignInState =
   | { phase: 'idle' }
@@ -45,18 +47,32 @@ export function usePlaudSignIn(t: Translate) {
   useEffect(() => {
     if (!signInId) return undefined;
     let stopped = false;
+    const startedAt = Date.now();
+    const stop = (problemText: string | null) => {
+      stopped = true;
+      window.clearInterval(timer);
+      setState({ phase: 'idle' });
+      setProblem(problemText);
+    };
     const timer = window.setInterval(() => {
+      if (Date.now() - startedAt > GIVE_UP_AFTER_MS) {
+        stop(t('plaud.signIn.failed'));
+        return;
+      }
       void api.plaudSignIn(signInId).then((signIn) => {
         if (stopped || signIn.status === 'WAITING') return;
-        stopped = true;
-        window.clearInterval(timer);
         if (signIn.status === 'SIGNED_IN') {
+          stopped = true;
+          window.clearInterval(timer);
           setState({ phase: 'signedIn', signInId, accountLabel: signIn.accountLabel ?? '' });
         } else {
-          setState({ phase: 'idle' });
-          setProblem(t(signIn.status === 'CANCELLED' ? 'plaud.signIn.cancelled' : 'plaud.signIn.failed'));
+          stop(t(signIn.status === 'CANCELLED' ? 'plaud.signIn.cancelled' : 'plaud.signIn.failed'));
         }
-      }).catch(() => undefined); // A missed answer is asked again on the next tick.
+      }).catch((error: unknown) => {
+        // The API refused the question itself (the sign-in expired or is unknown): asking again will not help.
+        // Anything else, such as a dropped connection, is asked again on the next tick.
+        if (!stopped && error instanceof ApiError && error.status >= 400 && error.status < 500) stop(problemMessage(error, t));
+      });
     }, SIGN_IN_POLL_MS);
     return () => {
       stopped = true;
@@ -66,7 +82,9 @@ export function usePlaudSignIn(t: Translate) {
 
   useEffect(() => () => popup.current?.close(), []);
 
+  /** Back to the start; a Plaud window still open is closed, and a sign-in finished there later is never used. */
   const reset = () => {
+    popup.current?.close();
     setState({ phase: 'idle' });
     setProblem(null);
   };

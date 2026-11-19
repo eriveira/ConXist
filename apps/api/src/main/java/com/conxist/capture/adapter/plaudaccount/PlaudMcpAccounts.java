@@ -7,12 +7,17 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.format.DateTimeParseException;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import com.conxist.capture.adapter.plaudaccount.PlaudOAuth.Tokens;
 import com.conxist.capture.adapter.plaudaccount.PlaudAccountStore.Waiting;
@@ -36,6 +41,8 @@ public class PlaudMcpAccounts implements PlaudAccounts {
 
     /** How long a person has to finish signing in on Plaud's page. */
     static final Duration SIGN_IN_TIME = Duration.ofMinutes(15);
+    /** How long a finished sign-in can still be given to a source; after that its tokens are dropped unused. */
+    static final Duration SIGNED_IN_TIME = Duration.ofHours(1);
     static final int PAGE_SIZE = 50;
     private static final int TRANSCRIPT_PAGE_SIZE = 500;
     private static final int MAX_TRANSCRIPT_PAGES = 100;
@@ -48,20 +55,25 @@ public class PlaudMcpAccounts implements PlaudAccounts {
     private final McpClient mcp;
     private final PlaudAccountStore store;
     private final Clock clock;
+    private final int maxTextCharacters;
     private final JsonMapper json = JsonMapper.builder().build();
+    /** One refresh at a time per source: Plaud rotates refresh tokens, so two at once would sign the person out. */
+    private final Map<UUID, Object> refreshLocks = new ConcurrentHashMap<>();
 
     /** {@code mcpUrl} is Plaud's MCP endpoint; its authorization server is found from it. */
     public static PlaudMcpAccounts create(RestClient http, URI mcpUrl, URI redirectUri, Clock clock, JdbcClient jdbc,
-            SecretBox box) {
+            SecretBox box, int maxTextCharacters) {
         PlaudOAuth oauth = new PlaudOAuth(http, mcpUrl, redirectUri, "ConXist", clock, new ClientRegistrations(jdbc));
-        return new PlaudMcpAccounts(oauth, new McpClient(http, mcpUrl), new PlaudAccountStore(jdbc, box), clock);
+        return new PlaudMcpAccounts(oauth, new McpClient(http, mcpUrl), new PlaudAccountStore(jdbc, box), clock,
+                maxTextCharacters);
     }
 
-    PlaudMcpAccounts(PlaudOAuth oauth, McpClient mcp, PlaudAccountStore store, Clock clock) {
+    PlaudMcpAccounts(PlaudOAuth oauth, McpClient mcp, PlaudAccountStore store, Clock clock, int maxTextCharacters) {
         this.oauth = oauth;
         this.mcp = mcp;
         this.store = store;
         this.clock = clock;
+        this.maxTextCharacters = maxTextCharacters;
     }
 
     @Override
@@ -71,6 +83,7 @@ public class PlaudMcpAccounts implements PlaudAccounts {
         String verifier = oauth.newSecret() + oauth.newSecret();
         try {
             URI url = oauth.authorizationUrl(state, verifier);
+            store.forgetOldSignIns(clock.instant().minus(SIGNED_IN_TIME));
             store.startSignIn(id, workspaceId, state, verifier, clock.instant());
             return new SignInStart(id, url);
         } catch (PlaudOAuth.Unreachable | PlaudOAuth.SignedOut unreachable) {
@@ -90,13 +103,17 @@ public class PlaudMcpAccounts implements PlaudAccounts {
         }
         UUID id = waiting.get().id();
         if (error != null || code == null || code.isBlank()) {
-            store.ended(id, "access_denied".equals(error) || error == null ? SignInStatus.CANCELLED
-                    : SignInStatus.FAILED, clock.instant());
+            if ("invalid_client".equals(error) || "unauthorized_client".equals(error)) {
+                oauth.forgetRegistration();
+            }
+            store.ended(id, "access_denied".equals(error) ? SignInStatus.CANCELLED : SignInStatus.FAILED,
+                    clock.instant());
             return;
         }
         try {
             Tokens tokens = oauth.exchange(code, waiting.get().verifier());
-            store.signedIn(id, accountLabel(tokens), tokens, clock.instant());
+            Account account = account(tokens);
+            store.signedIn(id, account.label(), account.key(), tokens, clock.instant());
         } catch (RuntimeException failure) {
             log.warn("A Plaud sign-in could not be finished: {}", failure.getClass().getSimpleName());
             store.ended(id, SignInStatus.FAILED, clock.instant());
@@ -105,20 +122,27 @@ public class PlaudMcpAccounts implements PlaudAccounts {
 
     @Override
     public Optional<SignIn> signIn(UUID workspaceId, UUID signInId) {
-        return store.signIn(workspaceId, signInId, clock.instant().minus(SIGN_IN_TIME));
+        Instant now = clock.instant();
+        return store.signIn(workspaceId, signInId, now.minus(SIGN_IN_TIME), now.minus(SIGNED_IN_TIME));
     }
 
     @Override
     public void attach(UUID workspaceId, UUID signInId, UUID sourceId) {
-        if (!store.attach(workspaceId, signInId, sourceId, clock.instant())) {
+        Instant now = clock.instant();
+        if (!store.attach(workspaceId, signInId, sourceId, now.minus(SIGNED_IN_TIME), now)) {
             throw new AccessDenied("sign-in not finished");
         }
     }
 
     @Override
     public FilePage files(UUID sourceId, LocalDate from, int page) {
-        JsonNode answer = parse(call(sourceId, "list_files",
-                Map.of("date_from", from.toString(), "page", page, "page_size", PAGE_SIZE)));
+        JsonNode answer;
+        try {
+            answer = parse(call(sourceId, "list_files",
+                    Map.of("date_from", from.toString(), "page", page, "page_size", PAGE_SIZE)));
+        } catch (McpClient.ToolFailed failed) {
+            throw new Unavailable("list_files failed");
+        }
         List<AccountFile> files = new ArrayList<>();
         JsonNode data = answer.path("data");
         for (JsonNode file : data) {
@@ -134,6 +158,7 @@ public class PlaudMcpAccounts implements PlaudAccounts {
     @Override
     public Optional<Transcript> transcript(UUID sourceId, String fileId) {
         List<Line> lines = new ArrayList<>();
+        long characters = 0;
         String cursor = null;
         for (int page = 0; page < MAX_TRANSCRIPT_PAGES; page++) {
             Map<String, Object> arguments = cursor == null
@@ -151,11 +176,14 @@ public class PlaudMcpAccounts implements PlaudAccounts {
             }
             JsonNode answer = parse(text);
             for (JsonNode segment : answer.path("segments")) {
-                lines.add(new Line(segment.path("speaker").asString(""), segment.path("start_time").asLong(0),
-                        segment.path("content").asString("")));
+                Line line = new Line(segment.path("speaker").asString(""), segment.path("start_time").asLong(0),
+                        segment.path("content").asString(""));
+                lines.add(line);
+                characters += line.text().length() + line.speaker().length();
             }
             String next = answer.path("next_cursor").asString("");
-            if (next.isEmpty() || next.equals(cursor) || next.length() > 2048) {
+            // Past the most ConXist keeps of one meeting, more pages would only be read and dropped.
+            if (characters > maxTextCharacters || next.isEmpty() || next.equals(cursor) || next.length() > 2048) {
                 return lines.isEmpty() ? Optional.empty() : Optional.of(new Transcript(null, lines));
             }
             cursor = next;
@@ -171,6 +199,9 @@ public class PlaudMcpAccounts implements PlaudAccounts {
         } catch (McpClient.ToolFailed failed) {
             return List.of();
         }
+        if (!text.contains("<untrusted-user-data-")) {
+            return List.of(); // Plain text such as "no notes yet".
+        }
         List<String> notes = new ArrayList<>();
         for (JsonNode note : parse(text)) {
             String content = note.path("data_content").asString("");
@@ -181,10 +212,22 @@ public class PlaudMcpAccounts implements PlaudAccounts {
         return notes;
     }
 
-    private String accountLabel(Tokens tokens) {
+    /** Who signed in. Without Plaud's user id the sign-in fails: the label alone cannot tell two accounts apart. */
+    private Account account(Tokens tokens) {
         JsonNode user = parse(mcp.callTool(tokens.accessToken(), "get_current_user", Map.of()));
-        String email = user.path("email").asString("");
-        return email.isBlank() ? user.path("nickname").asString("Plaud account") : email;
+        String id = user.path("id").asString("");
+        if (id.isBlank()) {
+            throw new Unavailable("current user without an id");
+        }
+        String email = user.path("email").asString("").strip();
+        String label = email.isBlank() ? user.path("nickname").asString("").strip() : email;
+        if (label.isBlank()) {
+            label = "Plaud account";
+        }
+        return new Account(label.length() > 200 ? label.substring(0, 200) : label, sha256("plaud-user:" + id));
+    }
+
+    private record Account(String label, String key) {
     }
 
     /** One tool call with the source's tokens: refreshed before expiry, and once more if Plaud refuses them. */
@@ -207,29 +250,57 @@ public class PlaudMcpAccounts implements PlaudAccounts {
             }
         } catch (PlaudOAuth.SignedOut signedOut) {
             throw new AccessDenied(signedOut.getMessage());
-        } catch (PlaudOAuth.Unreachable unreachable) {
-            throw new Unavailable(unreachable.getMessage());
+        } catch (PlaudOAuth.Unreachable | McpClient.SessionGone unreachable) {
+            throw new Unavailable(unreachable.getClass().getSimpleName());
         }
     }
 
-    private Tokens refresh(UUID sourceId, Tokens tokens) {
-        Tokens fresh = oauth.refresh(tokens);
-        store.replaceTokens(sourceId, fresh, clock.instant());
-        return fresh;
+    /**
+     * Swaps {@code used} for new tokens, one refresh per source at a time. If another sync already refreshed them,
+     * the stored tokens are newer than {@code used} and are taken as they are.
+     */
+    private Tokens refresh(UUID sourceId, Tokens used) {
+        synchronized (refreshLocks.computeIfAbsent(sourceId, id -> new Object())) {
+            Tokens stored = store.tokens(sourceId).orElseThrow(() -> new AccessDenied("no tokens"));
+            if (!stored.accessToken().equals(used.accessToken())) {
+                return stored;
+            }
+            Tokens fresh = oauth.refresh(used);
+            store.replaceTokens(sourceId, fresh, clock.instant());
+            mcp.forget(used.accessToken());
+            log.info("Refreshed the Plaud sign-in of source {}", sourceId);
+            return fresh;
+        }
     }
 
-    /** Plaud wraps recording data in a tagged block marking it as untrusted; the JSON is inside. */
     private JsonNode parse(String text) {
-        String payload = text;
-        var open = WRAPPER_OPEN.matcher(text);
-        if (open.find()) {
-            int end = text.lastIndexOf("</untrusted-user-data-");
-            payload = text.substring(open.end(), end > open.end() ? end : text.length());
-        }
         try {
-            return json.readTree(payload);
+            return json.readTree(unwrap(text));
         } catch (RuntimeException unreadable) {
             throw new Unavailable("plaud answer unreadable");
+        }
+    }
+
+    /**
+     * Plaud wraps recording data in a tagged block marking it as untrusted; the JSON is inside, up to the last closing
+     * tag, so a closing tag written inside a recording cannot cut it short. What is inside stays data: it is stored as
+     * text and is never followed as an instruction.
+     */
+    static String unwrap(String text) {
+        var open = WRAPPER_OPEN.matcher(text);
+        if (!open.find()) {
+            return text;
+        }
+        int end = text.lastIndexOf("</untrusted-user-data-");
+        return text.substring(open.end(), end > open.end() ? end : text.length());
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
         }
     }
 

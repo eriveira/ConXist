@@ -25,7 +25,8 @@ ENGINEERING_STANDARDS §5 asks for personal data to be encrypted at rest.
   `text_content` be empty, with a check that exactly one holds the text.
   `SealPlaintextDocuments` seals any older plaintext rows when the API starts.
   A later migration drops `text_content` once every environment has run it.
-- Titles stay plaintext: they are needed for lists and are short. Files uploaded
+- Titles and account labels (a Plaud Team name, or the email of a personal Plaud
+  account) stay plaintext: they are needed for lists and are short. Files uploaded
   before this change stay as they are on disk (local development only; nothing
   is deployed).
 

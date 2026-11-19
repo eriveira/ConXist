@@ -20,14 +20,16 @@ public final class ConnectPlaudTeam {
     private final RecorderKeys keys;
     private final PlaudTeam plaud;
     private final PlaudTeamConnections connections;
+    private final PlaudAccountConnections accounts;
     private final CaptureContext context;
 
     public ConnectPlaudTeam(SourceCatalog catalog, RecorderKeys keys, PlaudTeam plaud,
-            PlaudTeamConnections connections, CaptureContext context) {
+            PlaudTeamConnections connections, PlaudAccountConnections accounts, CaptureContext context) {
         this.sources = new CaptureSources(catalog);
         this.keys = keys;
         this.plaud = plaud;
         this.connections = connections;
+        this.accounts = accounts;
         this.context = context;
     }
 
@@ -44,7 +46,7 @@ public final class ConnectPlaudTeam {
             boolean includeSummaries) {
         sources.require(sourceId, Provider.PLAUD);
         UUID workspaceId = context.workspace().id();
-        if (connections.find(workspaceId, sourceId).isPresent()) {
+        if (connections.find(workspaceId, sourceId).isPresent() || accounts.find(workspaceId, sourceId).isPresent()) {
             throw new RuleViolation("plaud.already-connected", "This source is already connected to Plaud.");
         }
         Credential credential = credential(clientId, keyId);

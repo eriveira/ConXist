@@ -9,20 +9,19 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
- * OAuth 2.1 against the authorization server in front of Plaud's MCP server: metadata discovery (RFC 8414), dynamic
+ * OAuth 2.1 against the authorization server in front of Plaud's MCP server: the MCP server names its authorization
+ * server (RFC 9728, falling back to the MCP server's own host), whose metadata (RFC 8414) gives the endpoints; dynamic
  * client registration (RFC 7591) as a public client, authorization code with PKCE (S256), refresh, and the MCP
  * resource indicator (RFC 8707). Nothing here is Plaud-specific beyond the URLs.
  */
@@ -32,6 +31,9 @@ class PlaudOAuth {
     /** Used when the token answer has no {@code expires_in}: short, so a guess never outlives the real token. */
     private static final long DEFAULT_TOKEN_LIFETIME_SECONDS = 300;
     private static final Base64.Encoder URL_SAFE = Base64.getUrlEncoder().withoutPadding();
+    /** OAuth answers are small JSON documents. */
+    private static final int MAX_ANSWER_BYTES = 256 * 1024;
+    private final JsonMapper json = JsonMapper.builder().build();
 
     private final RestClient http;
     private final URI resource;
@@ -97,9 +99,9 @@ class PlaudOAuth {
     }
 
     private Tokens token(Metadata server, MultiValueMap<String, String> form, String previousRefresh) {
-        JsonNode answer = send(() -> http.post().uri(server.tokenEndpoint())
+        JsonNode answer = send(http.post().uri(server.tokenEndpoint())
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED).accept(MediaType.APPLICATION_JSON)
-                .body(form).retrieve().body(JsonNode.class), true);
+                .body(form), Kind.TOKEN);
         String access = answer == null ? "" : answer.path("access_token").asString("");
         if (access.isEmpty()) {
             throw new Unreachable("token answer without a token");
@@ -107,6 +109,15 @@ class PlaudOAuth {
         long lifetime = answer.path("expires_in").asLong(DEFAULT_TOKEN_LIFETIME_SECONDS);
         String refresh = answer.path("refresh_token").asString("");
         return new Tokens(access, refresh.isEmpty() ? previousRefresh : refresh, clock.instant().plusSeconds(lifetime));
+    }
+
+    /** The authorization server no longer knows ConXist's client: register again on the next sign-in. */
+    void forgetRegistration() {
+        Metadata known = metadata;
+        if (known != null) {
+            registrations.forget(known.issuer(), redirectUri.toString());
+            log.info("Forgot the OAuth client registration with {}", known.issuer());
+        }
     }
 
     private String clientId(Metadata server) {
@@ -123,9 +134,9 @@ class PlaudOAuth {
                 "grant_types", List.of("authorization_code", "refresh_token"),
                 "response_types", List.of("code"),
                 "token_endpoint_auth_method", "none");
-        JsonNode answer = send(() -> http.post().uri(server.registrationEndpoint())
+        JsonNode answer = send(http.post().uri(server.registrationEndpoint())
                 .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON)
-                .body(request).retrieve().body(JsonNode.class), false);
+                .body(request), Kind.OTHER);
         String clientId = answer == null ? "" : answer.path("client_id").asString("");
         if (clientId.isEmpty() || clientId.length() > 2000) {
             throw new Unreachable("registration answer without a usable client id");
@@ -140,26 +151,73 @@ class PlaudOAuth {
         if (known != null) {
             return known;
         }
-        URI wellKnown = resource.resolve("/.well-known/oauth-authorization-server");
-        JsonNode answer = send(() -> http.get().uri(wellKnown).accept(MediaType.APPLICATION_JSON)
-                .retrieve().body(JsonNode.class), false);
+        URI issuer = authorizationServer();
+        JsonNode answer = optional(wellKnown(issuer, "oauth-authorization-server"));
+        if (answer == null) {
+            answer = optional(wellKnown(issuer, "openid-configuration"));
+        }
         if (answer == null) {
             throw new Unreachable("no authorization server metadata");
         }
-        Metadata found = new Metadata(
-                answer.path("issuer").asString(resource.resolve("/").toString()),
-                https(answer.path("authorization_endpoint").asString("")),
-                https(answer.path("token_endpoint").asString("")),
+        String declared = answer.path("issuer").asString("");
+        if (!declared.isEmpty() && !withoutSlash(declared).equals(withoutSlash(issuer.toString()))) {
+            throw new Unreachable("metadata of another issuer");
+        }
+        Metadata found = new Metadata(withoutSlash(issuer.toString()),
+                onServer(issuer, answer.path("authorization_endpoint").asString("")),
+                onServer(issuer, answer.path("token_endpoint").asString("")),
                 answer.path("registration_endpoint").isMissingNode() ? null
-                        : https(answer.path("registration_endpoint").asString("")));
+                        : onServer(issuer, answer.path("registration_endpoint").asString("")));
         metadata = found;
         return found;
     }
 
-    /** Endpoints must live on the same scheme and host as the MCP server, so metadata cannot send tokens elsewhere. */
-    private URI https(String value) {
-        URI uri = URI.create(value);
-        if (!uri.getScheme().equals(resource.getScheme()) || !uri.getAuthority().equals(resource.getAuthority())) {
+    /** The authorization server the MCP server names (RFC 9728), or else the MCP server's own host. */
+    private URI authorizationServer() {
+        URI own = trusted(resource.resolve("/").toString());
+        JsonNode named = optional(wellKnown(resource, "oauth-protected-resource"));
+        if (named == null && !path(resource).isEmpty()) {
+            named = optional(wellKnown(own, "oauth-protected-resource"));
+        }
+        String server = named == null ? "" : named.path("authorization_servers").path(0).asString("");
+        return server.isEmpty() ? own : trusted(server);
+    }
+
+    /** RFC 8414 / 9728: the well-known name goes between the host and the path. */
+    private static URI wellKnown(URI base, String name) {
+        return base.resolve("/.well-known/" + name + path(base));
+    }
+
+    private static String path(URI uri) {
+        String path = uri.getRawPath();
+        return path == null || path.equals("/") ? "" : withoutSlash(path);
+    }
+
+    private static String withoutSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    /** Absolute and https; plain http only on this computer (tests and the local fake). */
+    private static URI trusted(String value) {
+        URI uri;
+        try {
+            uri = URI.create(value);
+        } catch (IllegalArgumentException unreadable) {
+            throw new Unreachable("unreadable address");
+        }
+        String host = uri.getHost();
+        boolean loopback = "127.0.0.1".equals(host) || "localhost".equals(host) || "[::1]".equals(host);
+        if (!uri.isAbsolute() || host == null || !("https".equals(uri.getScheme())
+                || "http".equals(uri.getScheme()) && loopback)) {
+            throw new Unreachable("address not https");
+        }
+        return uri;
+    }
+
+    /** Endpoints must be on the authorization server's own scheme and host, so metadata cannot send tokens elsewhere. */
+    private static URI onServer(URI issuer, String value) {
+        URI uri = trusted(value);
+        if (!uri.getScheme().equals(issuer.getScheme()) || !uri.getRawAuthority().equals(issuer.getRawAuthority())) {
             throw new Unreachable("authorization endpoint on another host");
         }
         return uri;
@@ -174,17 +232,36 @@ class PlaudOAuth {
         }
     }
 
-    private static <T> T send(Supplier<T> request, boolean tokenRequest) {
+    /** A metadata document, or null when the server has none (404). */
+    private JsonNode optional(URI uri) {
+        return send(http.get().uri(uri).accept(MediaType.APPLICATION_JSON), Kind.OPTIONAL);
+    }
+
+    private enum Kind { TOKEN, OPTIONAL, OTHER }
+
+    private JsonNode send(RestClient.RequestHeadersSpec<?> request, Kind kind) {
         try {
-            return request.get();
-        } catch (RestClientResponseException refused) {
-            int status = refused.getStatusCode().value();
-            log.info("Plaud's authorization server answered {}", status);
-            if (tokenRequest && (status == 400 || status == 401)) {
-                throw new SignedOut("token request refused");
-            }
-            throw new Unreachable("authorization server " + status);
-        } catch (RestClientException | IllegalArgumentException | NullPointerException unreadable) {
+            return request.exchange((sent, answer) -> {
+                int status = answer.getStatusCode().value();
+                byte[] body = BoundedBody.read(answer.getBody(), MAX_ANSWER_BYTES);
+                if (status == 404 && kind == Kind.OPTIONAL) {
+                    return null;
+                }
+                if (status >= 400) {
+                    log.info("Plaud's authorization server answered {}", status);
+                    if (kind == Kind.TOKEN && (status == 400 || status == 401)) {
+                        if (new String(body, java.nio.charset.StandardCharsets.UTF_8).contains("invalid_client")) {
+                            forgetRegistration();
+                        }
+                        throw new SignedOut("token request refused");
+                    }
+                    throw new Unreachable("authorization server " + status);
+                }
+                return json.readTree(body);
+            });
+        } catch (SignedOut | Unreachable known) {
+            throw known;
+        } catch (RuntimeException unreadable) {
             log.warn("Plaud's authorization server could not be reached: {}", unreadable.getClass().getSimpleName());
             throw new Unreachable("authorization server unreachable");
         }

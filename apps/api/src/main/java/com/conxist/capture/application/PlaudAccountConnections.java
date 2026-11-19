@@ -7,6 +7,9 @@ import com.conxist.capture.domain.PlaudAccountConnection;
 
 public interface PlaudAccountConnections {
 
+    /** Adds a new connection; false when the source already has one. */
+    boolean add(PlaudAccountConnection connection);
+
     void save(PlaudAccountConnection connection);
 
     Optional<PlaudAccountConnection> find(UUID workspaceId, UUID sourceId);

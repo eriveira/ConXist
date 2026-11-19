@@ -22,6 +22,13 @@ class ClientRegistrations {
                 .optional();
     }
 
+    void forget(String issuer, String redirectUri) {
+        jdbc.sql("delete from oauth_clients where issuer = :issuer and redirect_uri = :redirect")
+                .param("issuer", issuer)
+                .param("redirect", redirectUri)
+                .update();
+    }
+
     void save(String issuer, String redirectUri, String clientId, Instant at) {
         jdbc.sql("""
                 insert into oauth_clients (issuer, redirect_uri, client_id, registered_at)

@@ -3,6 +3,7 @@ package com.conxist.capture.adapter.web;
 import java.util.UUID;
 import com.conxist.capture.application.ConnectionView;
 import com.conxist.capture.application.PlaudAccounts.SignIn;
+import com.conxist.capture.application.PlaudAccounts.SignInStatus;
 import com.conxist.capture.application.PlaudAccounts.SignInStart;
 import com.conxist.capture.application.SignInToPlaud;
 import com.conxist.capture.domain.StartFrom;
@@ -37,6 +38,9 @@ class PlaudSignInController {
             <p lang="es">Puedes cerrar esta ventana. ConXist muestra el resultado en la ventana de la que viniste.</p>
             <script>window.close()</script></body></html>
             """;
+    /** Only the one inline script above may run on that page, and it may load nothing. */
+    private static final String DONE_PAGE_POLICY = "default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-"
+            + scriptHash("window.close()") + "'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
     private final SignInToPlaud signInToPlaud;
 
@@ -51,8 +55,13 @@ class PlaudSignInController {
     }
 
     @GetMapping("/recorders/plaud/sign-ins/{signInId}")
-    SignIn status(@PathVariable UUID signInId) {
-        return signInToPlaud.status(signInId);
+    SignInView status(@PathVariable UUID signInId) {
+        SignIn signIn = signInToPlaud.status(signInId);
+        return new SignInView(signIn.id(), signIn.status(), signIn.accountLabel());
+    }
+
+    /** What the dialog needs; the account key stays on the server. */
+    record SignInView(UUID id, SignInStatus status, String accountLabel) {
     }
 
     /** Plaud's sign-in page sends the person here, with a code or an error. */
@@ -65,6 +74,7 @@ class PlaudSignInController {
                 .contentType(MediaType.TEXT_HTML)
                 .cacheControl(CacheControl.noStore())
                 .header("Referrer-Policy", "no-referrer")
+                .header("Content-Security-Policy", DONE_PAGE_POLICY)
                 .body(DONE_PAGE);
     }
 
@@ -83,5 +93,14 @@ class PlaudSignInController {
     }
 
     record ReconnectRequest(@NotNull UUID signInId) {
+    }
+
+    private static String scriptHash(String script) {
+        try {
+            return java.util.Base64.getEncoder().encodeToString(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(script.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 }

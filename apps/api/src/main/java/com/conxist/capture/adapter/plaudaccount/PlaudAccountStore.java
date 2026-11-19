@@ -54,14 +54,15 @@ class PlaudAccountStore {
                 .optional();
     }
 
-    void signedIn(UUID id, String accountLabel, Tokens tokens, Instant at) {
+    void signedIn(UUID id, String accountLabel, String accountKey, Tokens tokens, Instant at) {
         jdbc.sql("""
-                update plaud_sign_ins set status = 'SIGNED_IN', account_label = :label, tokens_sealed = :tokens,
-                  finished_at = :at
+                update plaud_sign_ins set status = 'SIGNED_IN', account_label = :label, account_key = :key,
+                  tokens_sealed = :tokens, finished_at = :at
                 where id = :id and status = 'WAITING'
                 """)
                 .param("id", id)
                 .param("label", accountLabel)
+                .param("key", accountKey)
                 .param("tokens", seal(tokens, context("sign-in", id)))
                 .param("at", Timestamp.from(at))
                 .update();
@@ -75,32 +76,38 @@ class PlaudAccountStore {
                 .update();
     }
 
-    /** A sign-in as the dialog sees it; one still waiting after {@code notBefore} counts as failed. */
-    Optional<SignIn> signIn(UUID workspaceId, UUID id, Instant notBefore) {
+    /**
+     * A sign-in as the dialog sees it. One still waiting when started before {@code waitingSince} counts as failed;
+     * one finished but not used by a source since before {@code usableSince} counts as failed too.
+     */
+    Optional<SignIn> signIn(UUID workspaceId, UUID id, Instant waitingSince, Instant usableSince) {
         return jdbc.sql("""
-                select status, account_label, started_at from plaud_sign_ins
+                select status, account_label, account_key, started_at from plaud_sign_ins
                 where id = :id and workspace_id = :workspaceId and status <> 'USED'
                 """)
                 .param("id", id)
                 .param("workspaceId", workspaceId)
                 .query((row, n) -> {
                     SignInStatus status = SignInStatus.valueOf(row.getString("status"));
-                    boolean expired = status == SignInStatus.WAITING
-                            && row.getTimestamp("started_at").toInstant().isBefore(notBefore);
-                    return new SignIn(id, expired ? SignInStatus.FAILED : status, row.getString("account_label"));
+                    Instant started = row.getTimestamp("started_at").toInstant();
+                    boolean expired = status == SignInStatus.WAITING && started.isBefore(waitingSince)
+                            || status == SignInStatus.SIGNED_IN && started.isBefore(usableSince);
+                    return expired ? new SignIn(id, SignInStatus.FAILED, null, null)
+                            : new SignIn(id, status, row.getString("account_label"), row.getString("account_key"));
                 })
                 .optional();
     }
 
     /** Moves a finished sign-in's tokens to the source and marks the sign-in used. False when there was none. */
-    boolean attach(UUID workspaceId, UUID signInId, UUID sourceId, Instant at) {
+    boolean attach(UUID workspaceId, UUID signInId, UUID sourceId, Instant usableSince, Instant at) {
         Optional<byte[]> sealed = jdbc.sql("""
                 select tokens_sealed from plaud_sign_ins
-                where id = :id and workspace_id = :workspaceId and status = 'SIGNED_IN'
+                where id = :id and workspace_id = :workspaceId and status = 'SIGNED_IN' and started_at >= :since
                 for update
                 """)
                 .param("id", signInId)
                 .param("workspaceId", workspaceId)
+                .param("since", Timestamp.from(usableSince))
                 .query(byte[].class)
                 .optional();
         if (sealed.isEmpty()) {
@@ -112,6 +119,13 @@ class PlaudAccountStore {
         Tokens tokens = open(sealed.get(), context("sign-in", signInId));
         saveTokens(workspaceId, sourceId, tokens, at);
         return true;
+    }
+
+    /** Sign-ins started before {@code before} are deleted, with any tokens a person never used. */
+    void forgetOldSignIns(Instant before) {
+        jdbc.sql("delete from plaud_sign_ins where started_at < :before")
+                .param("before", Timestamp.from(before))
+                .update();
     }
 
     Optional<Tokens> tokens(UUID sourceId) {

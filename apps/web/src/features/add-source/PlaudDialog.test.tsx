@@ -192,8 +192,7 @@ describe('PlaudDialog personal sign-in', () => {
 
     expect(await screen.findByRole('alert', {}, { timeout: 4000 })).toHaveTextContent('Plaud sign-in was cancelled. Nothing was connected.');
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Sign in with Plaud first.');
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   });
 
   it('offers a plain link when the browser blocks the Plaud window', async () => {
@@ -204,7 +203,20 @@ describe('PlaudDialog personal sign-in', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByText(/Your browser blocked the Plaud window/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Plaud sign-in' })).toHaveAttribute('href', START.authorizationUrl);
+    expect(screen.getByRole('link', { name: /Open Plaud sign-in/ })).toHaveAttribute('href', START.authorizationUrl);
     expect(await accessibilityViolations(document.body)).toEqual([]);
+  });
+
+  it('stops waiting and says so when the sign-in has expired on ConXist', async () => {
+    signInRoutes('WAITING', {
+      'GET /api/recorders/plaud/sign-ins/si-1': () => ({ status: 404, body: { code: 'plaud.sign-in-not-found' } }),
+    });
+    stubPopup();
+    render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: /Sign in with Plaud/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByRole('alert', {}, { timeout: 4000 })).toHaveTextContent('This Plaud sign-in has expired.');
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
   });
 });

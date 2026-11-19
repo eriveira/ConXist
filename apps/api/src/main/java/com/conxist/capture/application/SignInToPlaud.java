@@ -55,14 +55,17 @@ public final class SignInToPlaud {
         sources.require(sourceId, Provider.PLAUD);
         UUID workspaceId = context.workspace().id();
         if (connections.find(workspaceId, sourceId).isPresent() || teams.find(workspaceId, sourceId).isPresent()) {
-            throw new RuleViolation("plaud.already-connected", "This source is already connected to Plaud.");
+            throw alreadyConnected();
         }
         SignIn signIn = signedIn(signInId);
         PlaudAccountConnection connection = PlaudAccountConnection.connect(sourceId, workspaceId,
-                signIn.accountLabel(), startFrom, includeSummaries, context.clock().instant());
+                signIn.accountLabel(), signIn.accountKey(), startFrom, includeSummaries, context.clock().instant());
         context.unitOfWork().inTransaction(() -> {
+            // Added before the tokens move, so two connects racing for one source cannot both win.
+            if (!connections.add(connection)) {
+                throw alreadyConnected();
+            }
             plaud.attach(workspaceId, signInId, sourceId);
-            connections.save(connection);
             return null;
         });
         return ConnectionView.of(connection);
@@ -74,7 +77,7 @@ public final class SignInToPlaud {
         UUID workspaceId = context.workspace().id();
         PlaudAccountConnection connection = connections.find(workspaceId, sourceId)
                 .orElseThrow(() -> new RuleViolation("plaud.not-connected", "Connect this source to Plaud first."));
-        if (!connection.accountLabel().equalsIgnoreCase(signedIn(signInId).accountLabel())) {
+        if (!connection.isAccount(signedIn(signInId).accountKey())) {
             // A different account would mix its meetings into this source and break "each meeting imported once".
             throw RecorderProblems.otherAccount();
         }
@@ -85,6 +88,10 @@ public final class SignInToPlaud {
             return null;
         });
         return ConnectionView.of(active);
+    }
+
+    private static RuleViolation alreadyConnected() {
+        return new RuleViolation("plaud.already-connected", "This source is already connected to Plaud.");
     }
 
     private SignIn signedIn(UUID signInId) {

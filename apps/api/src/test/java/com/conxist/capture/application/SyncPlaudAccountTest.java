@@ -113,6 +113,7 @@ class SyncPlaudAccountTest {
     private SourceSummary connected(StartFrom startFrom, boolean notes) {
         SourceSummary source = sources.add(Provider.PLAUD, "alex@acme.test");
         connections.save(PlaudAccountConnection.connect(source.id(), FixedWorkspace.WORKSPACE_ID, "alex@acme.test",
+                CaptureFakes.Account.keyOf("alex@acme.test"),
                 startFrom, notes, TestClock.NOW));
         return source;
     }

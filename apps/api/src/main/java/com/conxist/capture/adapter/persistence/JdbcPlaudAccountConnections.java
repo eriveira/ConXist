@@ -18,7 +18,7 @@ import org.springframework.stereotype.Repository;
 class JdbcPlaudAccountConnections implements PlaudAccountConnections {
 
     private static final String COLUMNS = """
-            source_id, workspace_id, account_label, start_from, start_cutoff, include_summaries, read_through,
+            source_id, workspace_id, account_label, account_key, start_from, start_cutoff, include_summaries, read_through,
             status, last_checked_at, connected_at""";
 
     private final JdbcClient jdbc;
@@ -28,18 +28,29 @@ class JdbcPlaudAccountConnections implements PlaudAccountConnections {
     }
 
     @Override
+    public boolean add(PlaudAccountConnection c) {
+        return insert(c, "on conflict (source_id) do nothing") == 1;
+    }
+
+    @Override
     public void save(PlaudAccountConnection c) {
-        jdbc.sql("insert into plaud_account_connections (" + COLUMNS + """
-                ) values (:sourceId, :workspaceId, :label, :startFrom, :cutoff, :summaries, :readThrough,
-                  :status, :lastCheckedAt, :connectedAt)
+        insert(c, """
                 on conflict (source_id) do update set
                   read_through = excluded.read_through, status = excluded.status,
                   last_checked_at = excluded.last_checked_at
                 where plaud_account_connections.workspace_id = excluded.workspace_id
-                """)
+                """);
+    }
+
+    private int insert(PlaudAccountConnection c, String onConflict) {
+        return jdbc.sql("insert into plaud_account_connections (" + COLUMNS + """
+                ) values (:sourceId, :workspaceId, :label, :key, :startFrom, :cutoff, :summaries, :readThrough,
+                  :status, :lastCheckedAt, :connectedAt)
+                """ + onConflict)
                 .param("sourceId", c.sourceId())
                 .param("workspaceId", c.workspaceId())
                 .param("label", c.accountLabel())
+                .param("key", c.accountKey())
                 .param("startFrom", c.startFrom().name())
                 .param("cutoff", Timestamp.from(c.cutoff()))
                 .param("summaries", c.includeSummaries())
@@ -74,6 +85,7 @@ class JdbcPlaudAccountConnections implements PlaudAccountConnections {
                 row.getObject("source_id", UUID.class),
                 row.getObject("workspace_id", UUID.class),
                 row.getString("account_label"),
+                row.getString("account_key"),
                 StartFrom.valueOf(row.getString("start_from")),
                 row.getTimestamp("start_cutoff").toInstant(),
                 row.getBoolean("include_summaries"),

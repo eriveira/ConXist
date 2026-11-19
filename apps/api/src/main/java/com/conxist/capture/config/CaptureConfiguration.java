@@ -80,9 +80,10 @@ class CaptureConfiguration {
     }
 
     @Bean
-    PlaudAccounts plaudAccounts(PlaudProperties plaud, JdbcClient jdbc, SecretBox box, Clock clock) {
+    PlaudAccounts plaudAccounts(PlaudProperties plaud, CaptureProperties capture, JdbcClient jdbc, SecretBox box,
+            Clock clock) {
         return PlaudMcpAccounts.create(plaudHttp(plaud), plaud.account().mcpUrl(), plaud.account().redirectUri(),
-                clock, jdbc, box);
+                clock, jdbc, box, capture.maxTextCharacters());
     }
 
     @Bean
@@ -103,8 +104,8 @@ class CaptureConfiguration {
 
     @Bean
     ConnectPlaudTeam connectPlaudTeam(SourceCatalog catalog, JdbcRecorderKeys keys, PlaudTeam plaud,
-            PlaudTeamConnections connections, CaptureContext context) {
-        return new ConnectPlaudTeam(catalog, keys, plaud, connections, context);
+            PlaudTeamConnections connections, PlaudAccountConnections accounts, CaptureContext context) {
+        return new ConnectPlaudTeam(catalog, keys, plaud, connections, accounts, context);
     }
 
     @Bean

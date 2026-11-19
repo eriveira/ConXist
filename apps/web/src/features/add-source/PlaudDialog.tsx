@@ -7,6 +7,7 @@ import { Stepper } from '../../components/Stepper';
 import { MAX_SOURCE_NAME_LENGTH, START_FROM, type RecorderKey, type StartFrom } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
+import { SignInWaiting } from './SignInWaiting';
 import { usePlaudSignIn } from './usePlaudSignIn';
 
 type Step = 'door' | 'connect' | 'recordings' | 'review' | 'result';
@@ -33,6 +34,16 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
   const [mode, setMode] = useState<Mode>('account');
   const signIn = usePlaudSignIn(t);
   const account = signIn.state.phase === 'signedIn' ? signIn.state : null;
+  const waitingForPlaud = signIn.state.phase === 'waiting';
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const reopenRef = useRef<HTMLAnchorElement>(null);
+  // The Sign in button goes away as the person presses it: keep focus on what they need next.
+  useEffect(() => {
+    if (waitingForPlaud) reopenRef.current?.focus();
+  }, [waitingForPlaud]);
+  useEffect(() => {
+    if (account) nextRef.current?.focus();
+  }, [account]);
   const [key, setKey] = useState<RecorderKey | null>(null);
   const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no');
   const [clientId, setClientId] = useState('');
@@ -161,9 +172,14 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
             {busy && key ? t('plaud.testing') : t('plaud.test')}
           </button>
         )}
-        {step === 'review'
-          ? <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? t('dialog.adding') : t('dialog.add')}</button>
-          : <button type="button" className={connected || step !== 'connect' ? 'btn primary' : 'btn'} onClick={next} disabled={busy}>{t('dialog.next')}</button>}
+        {step === 'connect' && mode === 'account' && waitingForPlaud
+          ? <button type="button" className="btn" onClick={signIn.reset}>{t('dialog.cancel')}</button>
+          : step === 'review'
+            ? <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? t('dialog.adding') : t('dialog.add')}</button>
+            : (
+              <button ref={nextRef} type="button" className={connected || step !== 'connect' ? 'btn primary' : 'btn'} onClick={next}
+                disabled={busy || (step === 'connect' && mode === 'account' && !account)}>{t('dialog.next')}</button>
+            )}
       </>
     );
   })();
@@ -216,13 +232,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
               <>
                 <p className="lead">{t('plaud.signIn.lead')}</p>
                 {signIn.state.phase === 'waiting' ? (
-                  <>
-                    <p className="note" role="status"><Icon name="sync" size={16} /><span>{t('plaud.signIn.waiting')}</span></p>
-                    <p className="note"><Icon name="info" size={16} />
-                      <span>{t(signIn.state.blocked ? 'plaud.signIn.blocked' : 'plaud.signIn.reopen')}{' '}
-                        <a href={signIn.state.authorizationUrl} target="_blank" rel="noopener noreferrer">{t('plaud.signIn.open')}</a></span>
-                    </p>
-                  </>
+                  <SignInWaiting ref={reopenRef} authorizationUrl={signIn.state.authorizationUrl} blocked={signIn.state.blocked} />
                 ) : (
                   <button type="button" className="btn primary" onClick={signIn.start} disabled={signIn.starting}>
                     {t('plaud.signIn')}
@@ -230,6 +240,7 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
                 )}
               </>
             )}
+            <p className="sr-only" role="status">{account ? t('plaud.signedInAs', { account: account.accountLabel }) : ''}</p>
             {readOnly}
           </>
         )}

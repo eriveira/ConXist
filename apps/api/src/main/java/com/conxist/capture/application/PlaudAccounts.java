@@ -41,7 +41,11 @@ public interface PlaudAccounts {
 
     enum SignInStatus { WAITING, SIGNED_IN, CANCELLED, FAILED }
 
-    record SignIn(UUID id, SignInStatus status, String accountLabel) {
+    /**
+     * {@code accountLabel} is for people (the email); {@code accountKey} names the Plaud account and never changes,
+     * so it decides whether two sign-ins are the same account. Both are null until signed in.
+     */
+    record SignIn(UUID id, SignInStatus status, String accountLabel, String accountKey) {
     }
 
     record AccountFile(String id, String title, Instant recordedAt) {

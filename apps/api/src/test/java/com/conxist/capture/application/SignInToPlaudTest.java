@@ -86,6 +86,7 @@ class SignInToPlaudTest {
     void signing_in_again_brings_a_paused_account_back() {
         SourceSummary source = sources.add(Provider.PLAUD, "");
         connections.save(PlaudAccountConnection.connect(source.id(), FixedWorkspace.WORKSPACE_ID, "alex@acme.test",
+                CaptureFakes.Account.keyOf("alex@acme.test"),
                 StartFrom.LAST_30_DAYS, true, TestClock.NOW).paused(TestClock.NOW));
 
         ConnectionView view = signIn.reconnect(source.id(), account.signedIn("alex@acme.test"));
@@ -98,9 +99,10 @@ class SignInToPlaudTest {
     void signing_in_again_with_another_account_is_refused_and_the_source_stays_paused() {
         SourceSummary source = sources.add(Provider.PLAUD, "");
         connections.save(PlaudAccountConnection.connect(source.id(), FixedWorkspace.WORKSPACE_ID, "alex@acme.test",
+                CaptureFakes.Account.keyOf("alex@acme.test"),
                 StartFrom.LAST_30_DAYS, true, TestClock.NOW).paused(TestClock.NOW));
 
-        assertThatThrownBy(() -> signIn.reconnect(source.id(), account.signedIn("sam@acme.test")))
+        assertThatThrownBy(() -> signIn.reconnect(source.id(), account.signedIn("alex@acme.test", "key:someone-else")))
                 .hasMessageContaining("different Plaud account");
         assertThat(connections.bySource.get(source.id()).status()).isEqualTo(ConnectionStatus.PAUSED);
     }

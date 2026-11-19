@@ -54,6 +54,7 @@ public final class FakePlaudMcpServer implements AutoCloseable {
 
     private FakePlaudMcpServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/.well-known/oauth-protected-resource", this::protectedResource);
         server.createContext("/.well-known/oauth-authorization-server", this::metadata);
         server.createContext("/register", this::register);
         server.createContext("/authorize", this::authorize);
@@ -118,6 +119,12 @@ public final class FakePlaudMcpServer implements AutoCloseable {
 
     private String base() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    /** RFC 9728: the MCP server names its authorization server (here, itself). */
+    private void protectedResource(HttpExchange exchange) throws IOException {
+        send(exchange, 200, "application/json", json.writeValueAsString(Map.of(
+                "resource", mcpUrl().toString(), "authorization_servers", List.of(base()))));
     }
 
     private void metadata(HttpExchange exchange) throws IOException {

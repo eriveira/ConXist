@@ -13,6 +13,7 @@ public record PlaudAccountConnection(
         UUID sourceId,
         UUID workspaceId,
         String accountLabel,
+        String accountKey,
         StartFrom startFrom,
         Instant cutoff,
         boolean includeSummaries,
@@ -21,13 +22,17 @@ public record PlaudAccountConnection(
         Instant lastCheckedAt,
         Instant connectedAt) {
 
-    /** How far before the last sync to look again for recordings whose transcript was not ready. */
-    public static final Duration LOOK_BACK = Duration.ofDays(3);
+    /**
+     * How far before the last sync to look again for recordings whose transcript was not ready. Long, because a
+     * recorder may upload days after the meeting and personal accounts often start transcription by hand.
+     */
+    public static final Duration LOOK_BACK = Duration.ofDays(30);
     public static final int MAX_LABEL_LENGTH = 200;
 
     public PlaudAccountConnection {
         Objects.requireNonNull(sourceId);
         Objects.requireNonNull(workspaceId);
+        Objects.requireNonNull(accountKey);
         Objects.requireNonNull(startFrom);
         Objects.requireNonNull(cutoff);
         Objects.requireNonNull(status);
@@ -39,8 +44,8 @@ public record PlaudAccountConnection(
     }
 
     public static PlaudAccountConnection connect(UUID sourceId, UUID workspaceId, String accountLabel,
-            StartFrom startFrom, boolean includeSummaries, Instant now) {
-        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, startFrom, startFrom.cutoff(now),
+            String accountKey, StartFrom startFrom, boolean includeSummaries, Instant now) {
+        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, accountKey, startFrom, startFrom.cutoff(now),
                 includeSummaries, null, ConnectionStatus.ACTIVE, null, now);
     }
 
@@ -53,17 +58,22 @@ public record PlaudAccountConnection(
         return lookBack.isAfter(cutoff) ? lookBack : cutoff;
     }
 
+    /** One source holds one person's meetings: a sign-in to another account must not take it over. */
+    public boolean isAccount(String key) {
+        return accountKey.equals(key);
+    }
+
     public boolean wasRecordedInRange(Instant recordedAt) {
         return recordedAt != null && !recordedAt.isBefore(cutoff);
     }
 
     public PlaudAccountConnection checked(Instant startedAt, Instant at) {
-        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, startFrom, cutoff, includeSummaries,
+        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, accountKey, startFrom, cutoff, includeSummaries,
                 startedAt, ConnectionStatus.ACTIVE, at, connectedAt);
     }
 
     public PlaudAccountConnection paused(Instant at) {
-        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, startFrom, cutoff, includeSummaries,
+        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, accountKey, startFrom, cutoff, includeSummaries,
                 readThrough, ConnectionStatus.PAUSED, at, connectedAt);
     }
 }

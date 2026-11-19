@@ -7,10 +7,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import java.nio.charset.StandardCharsets;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -25,13 +23,13 @@ class McpClient {
     private static final Logger log = LoggerFactory.getLogger(McpClient.class);
     private static final String SESSION_HEADER = "Mcp-Session-Id";
     /** Bounds what one answer may hold, so a broken or hostile server cannot fill the memory. */
-    private static final int MAX_ANSWER_CHARACTERS = 8_000_000;
+    private static final int MAX_ANSWER_BYTES = 8 * 1024 * 1024;
 
     private final RestClient http;
     private final URI endpoint;
     private final JsonMapper json = JsonMapper.builder().build();
     private final AtomicLong ids = new AtomicLong();
-    /** One MCP session per access token. */
+    /** One MCP session per access token; an entry goes when its token is refreshed or refused. */
     private final Map<String, String> sessions = new ConcurrentHashMap<>();
 
     McpClient(RestClient http, URI endpoint) {
@@ -60,22 +58,27 @@ class McpClient {
                 "protocolVersion", PROTOCOL_VERSION,
                 "capabilities", Map.of(),
                 "clientInfo", Map.of("name", "ConXist", "version", "1"));
-        ResponseEntity<String> answer = post(accessToken, null, message("initialize", params));
-        rpcResult(answer);
-        String session = answer.getHeaders().getFirst(SESSION_HEADER);
+        long id = ids.incrementAndGet();
+        Answer answer = post(accessToken, null, message(id, "initialize", params));
+        rpcResult(answer, id);
+        String session = answer.session();
         post(accessToken, session, Map.of("jsonrpc", "2.0", "method", "notifications/initialized"));
         return session == null ? "" : session;
     }
 
     private JsonNode request(String accessToken, String session, String method, Map<String, Object> params) {
-        return rpcResult(post(accessToken, session, message(method, params)));
+        long id = ids.incrementAndGet();
+        return rpcResult(post(accessToken, session, message(id, method, params)), id);
     }
 
-    private Map<String, Object> message(String method, Map<String, Object> params) {
-        return Map.of("jsonrpc", "2.0", "id", ids.incrementAndGet(), "method", method, "params", params);
+    private static Map<String, Object> message(long id, String method, Map<String, Object> params) {
+        return Map.of("jsonrpc", "2.0", "id", id, "method", method, "params", params);
     }
 
-    private ResponseEntity<String> post(String accessToken, String session, Map<String, Object> body) {
+    private record Answer(String body, MediaType type, String session) {
+    }
+
+    private Answer post(String accessToken, String session, Map<String, Object> body) {
         try {
             return http.post().uri(endpoint)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -88,35 +91,43 @@ class McpClient {
                         }
                     })
                     .body(body)
-                    .retrieve()
-                    .toEntity(String.class);
-        } catch (RestClientResponseException refused) {
-            int status = refused.getStatusCode().value();
-            log.info("Plaud's MCP server answered {}", status);
-            if (status == 401) {
-                throw new TokenRefused();
-            }
-            if (status == 403) {
-                throw new PlaudOAuth.SignedOut("forbidden");
-            }
-            if (status == 404 && session != null && !session.isEmpty()) {
-                throw new SessionGone();
-            }
-            throw new PlaudOAuth.Unreachable("mcp " + status);
-        } catch (RestClientException unreachable) {
+                    .exchange((sent, answer) -> {
+                        int status = answer.getStatusCode().value();
+                        if (status >= 400) {
+                            refused(status, session);
+                        }
+                        String text = new String(BoundedBody.read(answer.getBody(), MAX_ANSWER_BYTES),
+                                StandardCharsets.UTF_8);
+                        return new Answer(text, answer.getHeaders().getContentType(),
+                                answer.getHeaders().getFirst(SESSION_HEADER));
+                    });
+        } catch (TokenRefused | SessionGone | PlaudOAuth.SignedOut | PlaudOAuth.Unreachable known) {
+            throw known;
+        } catch (RuntimeException unreachable) {
             log.warn("Plaud's MCP server could not be reached: {}", unreachable.getClass().getSimpleName());
             throw new PlaudOAuth.Unreachable("mcp unreachable");
         }
     }
 
-    /** The JSON-RPC result, from a JSON body or from the event stream's data lines. */
-    private JsonNode rpcResult(ResponseEntity<String> answer) {
-        String body = answer.getBody() == null ? "" : answer.getBody();
-        if (body.length() > MAX_ANSWER_CHARACTERS) {
-            throw new PlaudOAuth.Unreachable("mcp answer too large");
+    private static void refused(int status, String session) {
+        log.info("Plaud's MCP server answered {}", status);
+        if (status == 401) {
+            throw new TokenRefused();
         }
-        MediaType type = answer.getHeaders().getContentType();
-        String payload = type != null && type.isCompatibleWith(MediaType.TEXT_EVENT_STREAM) ? lastEvent(body) : body;
+        if (status == 403) {
+            throw new PlaudOAuth.SignedOut("forbidden");
+        }
+        if (status == 404 && session != null && !session.isEmpty()) {
+            throw new SessionGone();
+        }
+        throw new PlaudOAuth.Unreachable("mcp " + status);
+    }
+
+    /** The JSON-RPC result, from a JSON body or from the event stream's data lines. */
+    private JsonNode rpcResult(Answer answer, long id) {
+        String body = answer.body();
+        MediaType type = answer.type();
+        String payload = type != null && type.isCompatibleWith(MediaType.TEXT_EVENT_STREAM) ? response(body, id) : body;
         JsonNode message;
         try {
             message = json.readTree(payload);
@@ -130,24 +141,29 @@ class McpClient {
         return message.path("result");
     }
 
-    /** The last JSON-RPC response in a server-sent event stream. */
-    private static String lastEvent(String stream) {
-        String found = "";
+    /** The event in a server-sent event stream that answers request {@code id}; other events are skipped. */
+    private String response(String stream, long id) {
         StringBuilder data = new StringBuilder();
-        for (String line : stream.split("\r?\n", -1)) {
+        for (String line : (stream + "\n\n").split("\r?\n", -1)) {
             if (line.startsWith("data:")) {
                 data.append(line.substring(5).strip());
             } else if (line.isEmpty() && !data.isEmpty()) {
-                if (data.indexOf("\"id\"") >= 0) {
-                    found = data.toString();
+                if (answers(data.toString(), id)) {
+                    return data.toString();
                 }
                 data.setLength(0);
             }
         }
-        if (!data.isEmpty() && data.indexOf("\"id\"") >= 0) {
-            found = data.toString();
+        return "";
+    }
+
+    private boolean answers(String event, long id) {
+        try {
+            JsonNode message = json.readTree(event);
+            return message.path("id").asLong(-1) == id && (message.has("result") || message.has("error"));
+        } catch (RuntimeException unreadable) {
+            return false;
         }
-        return found;
     }
 
     private static String toolText(JsonNode result) {

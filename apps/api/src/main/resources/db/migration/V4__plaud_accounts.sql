@@ -19,6 +19,8 @@ create table plaud_sign_ins (
     verifier_sealed bytea       not null,
     status          text        not null check (status in ('WAITING', 'SIGNED_IN', 'CANCELLED', 'FAILED', 'USED')),
     account_label   text        check (length(account_label) <= 200),
+    -- SHA-256 of Plaud's user id: says whether two sign-ins are the same account, without storing the id.
+    account_key     text        check (length(account_key) = 64),
     tokens_sealed   bytea,
     started_at      timestamptz not null,
     finished_at     timestamptz
@@ -29,6 +31,7 @@ create table plaud_account_connections (
     source_id         uuid        primary key,
     workspace_id      uuid        not null,
     account_label     text        not null check (length(account_label) <= 200),
+    account_key       text        not null check (length(account_key) = 64),
     start_from        text        not null check (start_from in ('LAST_30_DAYS', 'LAST_7_DAYS', 'NEW_ONLY')),
     start_cutoff      timestamptz not null,
     include_summaries boolean     not null,

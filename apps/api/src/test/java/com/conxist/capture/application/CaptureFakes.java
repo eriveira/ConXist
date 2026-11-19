@@ -144,6 +144,11 @@ final class CaptureFakes {
         final Map<UUID, PlaudAccountConnection> bySource = new HashMap<>();
 
         @Override
+        public boolean add(PlaudAccountConnection connection) {
+            return bySource.putIfAbsent(connection.sourceId(), connection) == null;
+        }
+
+        @Override
         public void save(PlaudAccountConnection connection) {
             bySource.put(connection.sourceId(), connection);
         }
@@ -181,8 +186,16 @@ final class CaptureFakes {
         }
 
         UUID signedIn(String label) {
+            return signedIn(label, keyOf(label));
+        }
+
+        static String keyOf(String label) {
+            return "key:" + label;
+        }
+
+        UUID signedIn(String label, String key) {
             UUID id = UUID.randomUUID();
-            signIns.put(id, new SignIn(id, SignInStatus.SIGNED_IN, label));
+            signIns.put(id, new SignIn(id, SignInStatus.SIGNED_IN, label, key));
             return id;
         }
 
@@ -192,15 +205,15 @@ final class CaptureFakes {
                 throw new Unavailable("down");
             }
             UUID id = UUID.randomUUID();
-            signIns.put(id, new SignIn(id, SignInStatus.WAITING, null));
+            signIns.put(id, new SignIn(id, SignInStatus.WAITING, null, null));
             return new SignInStart(id, java.net.URI.create("https://plaud.test/authorize?state=" + id));
         }
 
         @Override
         public void finishSignIn(String state, String code, String error) {
             UUID id = UUID.fromString(state);
-            signIns.put(id, error == null ? new SignIn(id, SignInStatus.SIGNED_IN, "alex@acme.test")
-                    : new SignIn(id, SignInStatus.CANCELLED, null));
+            signIns.put(id, error == null ? new SignIn(id, SignInStatus.SIGNED_IN, "alex@acme.test", keyOf("alex@acme.test"))
+                    : new SignIn(id, SignInStatus.CANCELLED, null, null));
         }
 
         @Override
