@@ -33,13 +33,15 @@ public final class ListPlaudRecordings {
     static final int MAX_RANGES = 20;
 
     private final PlaudAccounts plaud;
+    private final CapturedDocumentRepository documents;
     private final CaptureContext context;
     private final Map<Key, Listed> lists = new LinkedHashMap<>();
     /** The ranges each sign-in listed, kept longer than the lists themselves. */
     private final Map<SignInKey, Set<DateRange>> ranges = new LinkedHashMap<>();
 
-    public ListPlaudRecordings(PlaudAccounts plaud, CaptureContext context) {
+    public ListPlaudRecordings(PlaudAccounts plaud, CapturedDocumentRepository documents, CaptureContext context) {
         this.plaud = plaud;
+        this.documents = documents;
         this.context = context;
     }
 
@@ -49,8 +51,11 @@ public final class ListPlaudRecordings {
             throw RecorderProblems.datesReversed();
         }
         RecentFiles files = read(new Key(new SignInKey(context.workspace().id(), signInId), dates));
-        return new RecordingList(files.files().stream().map(Recording::of).toList(), files.capped(),
-                PlaudAccounts.MAX_RECENT_FILES);
+        // Read fresh each time, not kept with the list: a meeting deleted a minute ago shows as deleted.
+        Map<String, CapturedDocumentRepository.Known> known = documents.known(context.workspace().id(),
+                files.files().stream().map(AccountFile::id).toList());
+        return new RecordingList(files.files().stream().map(file -> Recording.of(file, known.get(file.id()))).toList(),
+                files.capped(), PlaudAccounts.MAX_RECENT_FILES);
     }
 
     /**
@@ -74,6 +79,10 @@ public final class ListPlaudRecordings {
                 throw RecorderProblems.pickNotListed();
             }
             picks.add(new Pick(id, file.recordedAt()));
+        }
+        // The list marks these and the app will not tick them; this holds for any other caller too.
+        if (documents.known(workspaceId, fileIds).containsValue(CapturedDocumentRepository.Known.HELD)) {
+            throw RecorderProblems.pickAlreadyHeld();
         }
         return picks;
     }
@@ -155,12 +164,16 @@ public final class ListPlaudRecordings {
     public record RecordingList(List<Recording> recordings, boolean capped, int max) {
     }
 
-    /** {@code lengthSeconds} is null when Plaud does not give it. The title is customer data, shown, never logged. */
-    public record Recording(String id, String title, Instant recordedAt, Long lengthSeconds) {
+    /**
+     * {@code lengthSeconds} is null when Plaud does not give it. {@code inConxist} says whether this workspace already
+     * holds the recording or a person deleted it; null when it is new. The title is customer data, shown, never logged.
+     */
+    public record Recording(String id, String title, Instant recordedAt, Long lengthSeconds,
+            CapturedDocumentRepository.Known inConxist) {
 
-        static Recording of(AccountFile file) {
+        static Recording of(AccountFile file, CapturedDocumentRepository.Known known) {
             return new Recording(file.id(), file.title(), file.recordedAt(),
-                    file.length() == null ? null : file.length().toSeconds());
+                    file.length() == null ? null : file.length().toSeconds(), known);
         }
     }
 

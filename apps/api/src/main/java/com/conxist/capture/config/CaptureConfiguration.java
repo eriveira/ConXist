@@ -93,8 +93,9 @@ class CaptureConfiguration {
     }
 
     @Bean
-    ListPlaudRecordings listPlaudRecordings(PlaudAccounts plaud, CaptureContext context) {
-        return new ListPlaudRecordings(plaud, context);
+    ListPlaudRecordings listPlaudRecordings(PlaudAccounts plaud, CapturedDocumentRepository documents,
+            CaptureContext context) {
+        return new ListPlaudRecordings(plaud, documents, context);
     }
 
     @Bean

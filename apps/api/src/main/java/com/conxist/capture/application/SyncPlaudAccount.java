@@ -138,7 +138,7 @@ final class SyncPlaudAccount {
         }
         List<String> notes = connection.includeSummaries() ? plaud.notes(connection.sourceId(), file.id()) : List.of();
         return meetings.save(connection.workspaceId(), connection.sourceId(), file.id(), file.title(),
-                file.recordedAt(), transcript, notes) ? Outcome.IMPORTED : Outcome.ALREADY;
+                file.recordedAt(), file.length(), transcript, notes) ? Outcome.IMPORTED : Outcome.ALREADY;
     }
 
     private enum Outcome { IMPORTED, ALREADY, WAITING }

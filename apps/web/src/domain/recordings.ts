@@ -5,6 +5,8 @@ export interface Recording {
   recordedAt: string;
   /** Null when Plaud does not give the length. */
   lengthSeconds: number | null;
+  /** HELD: this workspace already has it, so it cannot be picked. DELETED: a person deleted it here; shown for information. */
+  inConxist: 'HELD' | 'DELETED' | null;
 }
 
 export interface RecordingList {

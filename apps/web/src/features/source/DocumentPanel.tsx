@@ -6,7 +6,7 @@ import { highlight, linesMatching, speakersOf, summaryText, transcriptText } fro
 import type { DocumentView } from '../../domain/model';
 import { useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
-import { dateTime } from '../../domain/time';
+import { dateTime, minutesOf } from '../../domain/time';
 
 type Load = { state: 'loading' } | { state: 'failed'; problem: string } | { state: 'ready'; document: DocumentView };
 
@@ -138,6 +138,7 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
           {document && (
             <ul className="facts">
               {meeting?.recordedAt && <li>{t('doc.recorded', { when: dateTime(meeting.recordedAt, language) })}</li>}
+              {meeting?.lengthSeconds ? <li>{t('doc.length', { count: minutesOf(meeting.lengthSeconds) })}</li> : null}
               {meeting?.language && <li>{t('doc.language', { language: languageName(meeting.language, language) })}</li>}
               <li>{t('doc.imported', { when: dateTime(document.capturedAt, language) })}</li>
               <li>{sourceName}</li>

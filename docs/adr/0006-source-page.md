@@ -32,7 +32,31 @@ computer.
 
 ## Consequences
 
-- The history does not name the meetings a check imported. The Meetings tab shows when each was imported.
+- The history did not name the meetings a check imported; the amendment below adds that.
 - A transcript line with no speaker whose text starts with "Word: " reads back as said by "Word". Plaud gives a
   speaker on every line it transcribes, so this has not been seen.
 - Delete and edit (slices 2 and 3) build on this page and the side panel.
+
+## Amendment, 2026-11-19: closing the gaps with the agreed mock
+
+The owner asked to match the agreed mocks and to close the gaps that need the API before edit starts. No migration.
+
+- Meeting length: the import writes it on the meeting text's first line,
+  `Recorded yyyy-MM-dd HH:mm UTC · Language: xx · Length: hh:mm:ss`, when Plaud gives it. `MeetingText.read` reads it
+  back. The documents list and the meeting view return `lengthSeconds`; meetings imported before show none. It lives
+  in the encrypted text instead of a column so no migration is needed; if a query ever needs it, it moves to a column.
+  Plaud Team imports (on hold) carry no length.
+- Speaker count: the documents list returns `speakerCount`, read from the transcript's lines. The list now reads each
+  meeting's text; at today's sizes that is cheap. Columns are the fix if it is not.
+- Meetings per check: the history's last column, "Meetings or problem", names up to three meetings each check
+  imported, and a name opens the meeting. The web app links a meeting to a check when it was imported between the
+  check's start and end, and never names more than the check's own count. Two checks can overlap (the schedule and a
+  person), so in that case a name can belong to the other check. Storing the check's id on each imported document
+  is exact and needs a migration: REFACTOR LATER, with the owner's go.
+- First sync: the web app labels as "First sync" the earliest check a person started within five minutes of the
+  source being added (the connect dialog starts it). The API keeps `SCHEDULE` and `PERSON` only.
+- The Plaud picker marks recordings this workspace already holds ("Already in ConXist", not pickable; the API refuses
+  them too with `plaud.pick-already-held`) and ones a person deleted here ("Deleted in ConXist", information only).
+  The recording list carries `inConxist` (`HELD`, `DELETED` or null), looked up for this workspace only.
+- "Still transcribing" on picker rows is not built: Plaud's recording list does not say whether a transcript is
+  ready, and asking per recording would mean up to 500 calls per list.

@@ -4,7 +4,7 @@ import { Icon } from '../../components/Icon';
 import { byDay, recordedWithin, RECENT_RANGES, type RecentRange, whenOf } from '../../domain/meetings';
 import type { CapturedDocument, Source, SyncRun } from '../../domain/model';
 import { localDay, matching } from '../../domain/recordings';
-import { clock, dateTime } from '../../domain/time';
+import { clock, dateTime, minutesOf } from '../../domain/time';
 import { useLanguage, useT, type Translate } from '../../i18n/i18n';
 import { DocumentPanel } from './DocumentPanel';
 
@@ -156,6 +156,8 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
                       <span className="t">{document.title}</span>
                       <span className="m">
                         <span>{t(document.recordedAt ? 'meetings.recorded' : 'meetings.added', { time: clock(whenOf(document), language) })}</span>
+                        {document.lengthSeconds ? <span>{t('meetings.length', { count: minutesOf(document.lengthSeconds) })}</span> : null}
+                        {document.speakerCount ? <span>{t('meetings.speakers', { count: document.speakerCount })}</span> : null}
                         {document.recordedAt && <span>{t('meetings.imported', { when: dateTime(document.capturedAt, language) })}</span>}
                       </span>
                     </button>

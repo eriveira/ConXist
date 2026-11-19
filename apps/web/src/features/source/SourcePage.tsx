@@ -134,7 +134,7 @@ export function SourcePage({ sourceId }: { sourceId: string }) {
       <div id={`${tabsId}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${tab}`}>
         {tab === 'documents'
           ? <MeetingsTab key={version} source={source} recorder={recorder} onSync={recorder && connection && !paused ? () => void sync(source) : undefined} syncing={syncing} onChanged={refresh} />
-          : <HistoryTab key={version} sourceId={source.id} />}
+          : <HistoryTab key={version} source={source} onChanged={refresh} />}
       </div>
     </section>
   );

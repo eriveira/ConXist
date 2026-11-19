@@ -5,7 +5,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.DocumentOrigin;
@@ -95,6 +98,29 @@ class JdbcCapturedDocumentRepository implements CapturedDocumentRepository {
                 .param("sourceId", document.sourceId())
                 .param("id", document.id())
                 .update() == 1;
+    }
+
+    @Override
+    public Map<String, Known> known(UUID workspaceId, Collection<String> originReferences) {
+        if (originReferences.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Known> known = new HashMap<>();
+        jdbc.sql("""
+                select origin_reference, 'DELETED' as known from deleted_recordings
+                where workspace_id = :workspaceId and origin_reference in (:references)
+                union all
+                select origin_reference, 'HELD' from captured_documents
+                where workspace_id = :workspaceId and origin = 'RECORDING' and origin_reference in (:references)
+                """)
+                .param("workspaceId", workspaceId)
+                .param("references", List.copyOf(originReferences))
+                .query((row, n) -> Map.entry(row.getString(1), Known.valueOf(row.getString(2))))
+                .list()
+                // Held wins: a recording deleted from one source and held by another is still in ConXist.
+                .forEach(entry -> known.merge(entry.getKey(), entry.getValue(),
+                        (a, b) -> a == Known.HELD || b == Known.HELD ? Known.HELD : Known.DELETED));
+        return known;
     }
 
     @Override

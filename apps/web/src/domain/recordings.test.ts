@@ -1,6 +1,6 @@
 import { dayOf, grouped, matching, pageCount, pageOf, sorted, type Recording } from './recordings';
 
-const rec = (id: string, title: string, recordedAt: string): Recording => ({ id, title, recordedAt, lengthSeconds: 60 });
+const rec = (id: string, title: string, recordedAt: string): Recording => ({ id, title, recordedAt, lengthSeconds: 60, inConxist: null });
 const LIST = [
   rec('a', 'Weekly sync', '2026-11-18T15:00:00Z'),
   rec('b', 'Revisión de diseño', '2026-11-18T09:00:00Z'),

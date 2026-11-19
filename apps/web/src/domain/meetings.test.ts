@@ -1,13 +1,13 @@
 import type { CapturedDocument, Meeting } from './model';
-import { byDay, highlight, recordedWithin, linesMatching, speakersOf, summaryText, transcriptText } from './meetings';
+import { byDay, firstSync, highlight, importedBy, recordedWithin, linesMatching, speakersOf, summaryText, transcriptText } from './meetings';
 
 const doc = (id: string, recordedAt: string | null, capturedAt = '2026-11-18T20:00:00Z'): CapturedDocument => ({
   id, sourceId: 's', title: id, mediaType: 'text/markdown', sizeBytes: 1, origin: 'RECORDING', textLength: 1,
-  capturedAt, recordedAt,
+  capturedAt, recordedAt, lengthSeconds: null, speakerCount: null,
 });
 
 const meeting: Meeting = {
-  recordedAt: null, language: 'en', summaries: [], truncated: false,
+  recordedAt: null, lengthSeconds: null, language: 'en', summaries: [], truncated: false,
   lines: [
     { at: '00:00:01', speaker: 'Alex', text: 'Ship sign-in first.' },
     { at: '00:00:05', speaker: '', text: 'Background noise.' },
@@ -58,5 +58,38 @@ describe('summaryText', () => {
 
   it('keeps a summary that starts with its own text', () => {
     expect(summaryText('Summary of the call: ship it')).toBe('Summary of the call: ship it');
+  });
+});
+
+describe('importedBy', () => {
+  it('links a check to the recorded meetings imported while it ran, newest meeting first', () => {
+    const run = { startedAt: '2026-11-18T20:00:00.000Z', finishedAt: '2026-11-18T20:00:04.000Z' };
+    const documents = [
+      doc('before', '2026-11-18T10:00:00Z', '2026-11-18T19:59:59.999Z'),
+      doc('older', '2026-11-17T10:00:00Z', '2026-11-18T20:00:00.000Z'),
+      doc('newer', '2026-11-18T10:00:00Z', '2026-11-18T20:00:04.000Z'),
+      doc('after', '2026-11-18T10:00:00Z', '2026-11-18T20:00:04.001Z'),
+      { ...doc('upload', null, '2026-11-18T20:00:02Z'), origin: 'UPLOAD' as const },
+    ];
+
+    expect(importedBy(run, documents).map((document) => document.id)).toEqual(['newer', 'older']);
+  });
+});
+
+describe('firstSync', () => {
+  const run = (id: string, startedAt: string, startedBy: 'SCHEDULE' | 'PERSON' = 'PERSON') => ({
+    id, startedAt, finishedAt: startedAt, startedBy, outcome: 'IMPORTED' as const, imported: 1, alreadyImported: 0,
+    waiting: 0, queued: 0, problemCode: null,
+  });
+
+  it('is the earliest check a person started right after the source was added, a failed first try included', () => {
+    const runs = [run('retry', '2026-11-18T10:01:00Z'), run('failed', '2026-11-18T10:00:05Z'),
+      run('schedule', '2026-11-18T10:00:01Z', 'SCHEDULE'), run('later', '2026-11-18T11:00:00Z')];
+
+    expect(firstSync(runs, '2026-11-18T10:00:00Z')).toBe('failed');
+  });
+
+  it('is none once the history no longer holds it', () => {
+    expect(firstSync([run('later', '2026-11-18T10:05:01Z')], '2026-11-18T10:00:00Z')).toBeNull();
   });
 });

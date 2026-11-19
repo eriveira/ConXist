@@ -1,6 +1,7 @@
 package com.conxist.capture.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
@@ -8,10 +9,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.conxist.capture.DocumentOrigin;
 import com.conxist.capture.application.PlaudAccounts.SignInStart;
 import com.conxist.capture.application.PlaudAccounts.SignInStatus;
 import com.conxist.capture.application.SignInToPlaud.AccountChoice;
+import com.conxist.capture.domain.CapturedDocument;
 import com.conxist.capture.domain.ConnectionStatus;
+import com.conxist.capture.domain.DocumentTitle;
 import com.conxist.capture.domain.PlaudAccountConnection;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
@@ -30,10 +34,11 @@ class SignInToPlaudTest {
     private final CaptureFakes.AccountConnections connections = new CaptureFakes.AccountConnections();
     private final CaptureFakes.Connections teams = new CaptureFakes.Connections();
     private final CaptureFakes.Picks picks = new CaptureFakes.Picks();
+    private final CaptureFakes.Documents documents = new CaptureFakes.Documents();
     private final TestClock.Moving clock = TestClock.moving();
     private final CaptureContext context = new CaptureContext(FixedWorkspace.standard(), new RecordedEvents(),
             new ImmediateUnitOfWork(), clock);
-    private final ListPlaudRecordings recordings = new ListPlaudRecordings(account, context);
+    private final ListPlaudRecordings recordings = new ListPlaudRecordings(account, documents, context);
     private final SignInToPlaud signIn = new SignInToPlaud(sources, account, connections, teams, recordings, picks,
             context);
 
@@ -124,6 +129,40 @@ class SignInToPlaudTest {
         signIn.connect(source.id(), new AccountChoice(signInId, List.of("of_old"), false, false));
 
         assertThat(picks.next(source.id(), 10)).containsExactly(new RecordingPicks.Pick("of_old", old));
+    }
+
+    @Test
+    void the_list_says_which_recordings_this_workspace_already_holds_or_deleted() {
+        UUID signInId = account.signedIn("alex@acme.test");
+        account.record("of_new", "New", TestClock.NOW.minus(Duration.ofDays(1)), true);
+        account.record("of_held", "Held", TestClock.NOW.minus(Duration.ofDays(2)), true);
+        account.record("of_gone", "Deleted", TestClock.NOW.minus(Duration.ofDays(3)), true);
+        hold("of_held");
+        documents.keptOut.add(UUID.randomUUID() + "/of_gone");
+
+        assertThat(recordings.list(signInId, null, null).recordings())
+                .extracting(ListPlaudRecordings.Recording::id, ListPlaudRecordings.Recording::inConxist)
+                .containsExactly(tuple("of_new", null), tuple("of_held", CapturedDocumentRepository.Known.HELD),
+                        tuple("of_gone", CapturedDocumentRepository.Known.DELETED));
+    }
+
+    @Test
+    void refuses_to_pick_a_recording_this_workspace_already_holds() {
+        SourceSummary source = sources.add(Provider.PLAUD, "alex@acme.test");
+        UUID signInId = account.signedIn("alex@acme.test");
+        account.record("of_held", "Held", TestClock.NOW.minus(Duration.ofDays(2)), true);
+        hold("of_held");
+        recordings.list(signInId, null, null);
+
+        assertThatThrownBy(() -> signIn.connect(source.id(), new AccountChoice(signInId, List.of("of_held"), true, false)))
+                .isInstanceOf(RuleViolation.class)
+                .extracting(e -> ((RuleViolation) e).code()).isEqualTo("plaud.pick-already-held");
+        assertThat(connections.bySource).isEmpty();
+    }
+
+    private void hold(String fileId) {
+        documents.saved.add(new CapturedDocument(UUID.randomUUID(), FixedWorkspace.WORKSPACE_ID, UUID.randomUUID(),
+                new DocumentTitle("Held"), "text/markdown", 1, "x", DocumentOrigin.RECORDING, fileId, TestClock.NOW));
     }
 
     @Test

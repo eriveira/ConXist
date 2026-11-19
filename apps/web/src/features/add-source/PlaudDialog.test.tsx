@@ -14,6 +14,7 @@ describe('PlaudDialog', () => {
     title: `Meeting ${String(index + 1).padStart(2, '0')}`,
     recordedAt: new Date(Date.UTC(2026, 9, 1 - Math.floor(index / 3), 12 - (index % 3))).toISOString(),
     lengthSeconds: 1800,
+    inConxist: null as 'HELD' | 'DELETED' | null,
   }));
 
   function signInRoutes(status: string, overrides: Record<string, Parameters<typeof stubApi>[0][string]> = {}) {
@@ -184,6 +185,29 @@ describe('PlaudDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(screen.getByRole('button', { name: 'Selected only (0)' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getAllByRole('checkbox', { name: /^Meeting/ })).toHaveLength(25);
+  });
+
+  it('tags recordings already in ConXist, which cannot be picked again, and ones deleted there, which can', async () => {
+    const tagged = RECORDINGS.map((recording, index) => ({
+      ...recording, inConxist: index === 0 ? 'HELD' as const : index === 1 ? 'DELETED' as const : null,
+    }));
+    signInRoutes('SIGNED_IN', {
+      'GET /api/recorders/plaud/sign-ins/si-1/recordings': () => ({ body: { recordings: tagged, capped: false, max: 500 } }),
+    });
+    stubPopup();
+    render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await screen.findByText('alex@acme.test', {}, { timeout: 4000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    const held = await screen.findByRole('checkbox', { name: /Meeting 01 Already in ConXist/ });
+    expect(held).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /Meeting 02 Deleted in ConXist/ })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: /^Select all 2: / })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all 29' }));
+    expect(screen.getByText('29 selected')).toBeInTheDocument();
+    expect(held).not.toBeChecked();
+    expect(await accessibilityViolations(document.body)).toEqual([]);
   });
 
   it("selects a whole day with the day's checkbox", async () => {

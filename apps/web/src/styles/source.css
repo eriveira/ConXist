@@ -46,6 +46,10 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
 .history td.num { font-family: var(--cx-font-mono); font-variant-numeric: tabular-nums; }
 .history .when { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .history .problem { color: var(--cx-err-fg); min-width: 220px; }
+.history .meetings { min-width: 220px; }
+.history .meetings .names { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.history .meetings .link { text-align: left; overflow-wrap: anywhere; }
+.history .meetings .muted { font-size: 13px; }
 .history tr:last-child td { border-bottom: 0; }
 /* On a phone each check becomes a small card of label and value, so nothing scrolls sideways. */
 @media (max-width: 640px) {
@@ -54,8 +58,10 @@ table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
   .history tr:last-child { border-bottom: 0; }
   .history td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0; border: 0; text-align: right; }
   .history td::before { content: attr(data-label); flex: none; color: var(--cx-fg-muted); font-family: var(--cx-font); font-size: 13px; text-align: left; padding: 4px 0; }
-  .history td.problem { min-width: 0; }
-  .history td.problem.none { display: none; }
+  .history td.problem, .history td.meetings { min-width: 0; }
+  .history td.meetings .names { align-items: flex-end; }
+  .history td.meetings .link { text-align: right; }
+  .history td.none { display: none; }
 }
 }
 .small { font-size: 13px; }

@@ -1,6 +1,7 @@
 package com.conxist.capture.application;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -27,11 +28,14 @@ final class MeetingImport {
         return documents.exists(workspaceId, sourceId, fileId);
     }
 
-    /** False when another sync saved the same meeting first. */
-    boolean save(UUID workspaceId, UUID sourceId, String fileId, String rawTitle, Instant recordedAt,
+    /**
+     * False when another sync saved the same meeting first. {@code length} is how long the recording runs, when the
+     * recorder says; null otherwise.
+     */
+    boolean save(UUID workspaceId, UUID sourceId, String fileId, String rawTitle, Instant recordedAt, Duration length,
             Transcript transcript, List<String> summaries) {
         DocumentTitle title = DocumentTitle.ofMeeting(rawTitle);
-        String text = MeetingText.compose(title.value(), recordedAt, transcript.language(), summaries,
+        String text = MeetingText.compose(title.value(), recordedAt, transcript.language(), length, summaries,
                 transcript.lines(), maxTextCharacters);
         CapturedDocument document = new CapturedDocument(UUID.randomUUID(), workspaceId, sourceId, title,
                 MeetingText.MEDIA_TYPE, text.getBytes(StandardCharsets.UTF_8).length, text, DocumentOrigin.RECORDING,

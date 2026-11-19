@@ -1,7 +1,9 @@
 package com.conxist.capture.application;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.domain.CapturedDocument;
@@ -19,6 +21,12 @@ public interface CapturedDocumentRepository {
      * into the same source again. Returns false when it was already gone.
      */
     boolean delete(CapturedDocument document, boolean keepOut, Instant deletedAt);
+
+    /** What this workspace already has of these recordings, in any source; a reference not listed is new to it. */
+    Map<String, Known> known(UUID workspaceId, Collection<String> originReferences);
+
+    /** HELD: a source holds it now. DELETED: a person deleted it and ConXist keeps it out of that source. */
+    enum Known { HELD, DELETED }
 
     List<CapturedDocument> findBySource(UUID workspaceId, UUID sourceId);
 

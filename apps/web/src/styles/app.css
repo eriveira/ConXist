@@ -279,6 +279,11 @@ a.btn.ghost { color: var(--cx-accent-text); }
 .pick-row .title { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
 .pick-row .when, .pick-row .len { font-size: 13px; color: var(--cx-fg-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pick-row .len { min-width: 52px; text-align: right; }
+.pick-row .title .pill { margin-left: 4px; vertical-align: 1px; white-space: nowrap; }
+.pick-check:disabled { opacity: .55; cursor: not-allowed; }
+.pick-row.held { cursor: default; }
+.pick-row.held:hover { background: transparent; }
+.pick-row.held .title { color: var(--cx-fg-muted); }
 .pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; margin-bottom: 12px; }
 .pager .grow { flex: 1; }
 .pager .of { color: var(--cx-fg-muted); font-variant-numeric: tabular-nums; }

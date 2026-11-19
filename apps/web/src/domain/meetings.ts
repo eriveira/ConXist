@@ -1,4 +1,4 @@
-import type { CapturedDocument, Meeting } from './model';
+import type { CapturedDocument, Meeting, SyncRun } from './model';
 import { localDay } from './recordings';
 
 /** When a document is placed in time: when the meeting took place, else when it was imported. */
@@ -84,4 +84,43 @@ export function summaryText(summary: string): string {
   const first = rows.findIndex((row) => row.trim() !== '');
   if (first >= 0 && /^(summary|resumen)$/i.test(rows[first].trim())) rows.splice(0, first + 1);
   return rows.join('\n').trim();
+}
+
+/**
+ * The recorded meetings a check brought in: those imported between its start and its end. ConXist imports a meeting
+ * only during a check of its source, but two checks can overlap (the schedule and a person), so this can name a
+ * meeting the other check imported; callers show no more than the check's own count. A meeting deleted since is gone.
+ */
+export function importedBy(
+  run: { startedAt: string; finishedAt: string },
+  documents: readonly CapturedDocument[],
+): CapturedDocument[] {
+  const from = Date.parse(run.startedAt);
+  const to = Date.parse(run.finishedAt);
+  return documents
+    .filter((document) => document.origin === 'RECORDING')
+    .filter((document) => {
+      const at = Date.parse(document.capturedAt);
+      return at >= from && at <= to;
+    })
+    .sort((a, b) => Date.parse(whenOf(b)) - Date.parse(whenOf(a)));
+}
+
+/** How soon after a source is added its first check starts: the connect dialog starts it right away. */
+const FIRST_CHECK_WITHIN_MS = 5 * 60_000;
+
+/**
+ * The check a person started when connecting the source, shown as its first sync: the earliest check a person started
+ * within a few minutes of the source being added. Null when the history no longer holds it.
+ */
+export function firstSync(runs: readonly SyncRun[], sourceAddedAt: string): string | null {
+  const added = Date.parse(sourceAddedAt);
+  const first = runs
+    .filter((run) => run.startedBy === 'PERSON')
+    .filter((run) => {
+      const started = Date.parse(run.startedAt);
+      return started >= added && started - added <= FIRST_CHECK_WITHIN_MS;
+    })
+    .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt))[0];
+  return first?.id ?? null;
 }

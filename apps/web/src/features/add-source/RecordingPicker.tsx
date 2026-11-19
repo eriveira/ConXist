@@ -1,10 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api, type DateRange } from '../../api/client';
 import { Icon } from '../../components/Icon';
+import { Pill } from '../../components/Pill';
 import {
   dayOf, grouped, isSortedByDay, matching, pageCount, pageOf, RECORDING_SORTS, RECORDINGS_PER_PAGE, sorted,
   type Recording, type RecordingList, type RecordingSort,
 } from '../../domain/recordings';
+import { minutesOf } from '../../domain/time';
 import { useLanguage, useT, type Translate } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 
@@ -130,8 +132,10 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
     return <div className="pick-empty"><b>{t('pick.none.heading')}</b><p>{t('pick.none.lead')}</p></div>;
   }
 
-  const allOn = shown.length > 0 && shown.every((recording) => picked.has(recording.id));
-  const someOn = !allOn && shown.some((recording) => picked.has(recording.id));
+  /** A recording this workspace already holds cannot be picked again, so the "all" boxes leave it out. */
+  const pickable = shown.filter(canPick);
+  const allOn = pickable.length > 0 && pickable.every((recording) => picked.has(recording.id));
+  const someOn = !allOn && pickable.some((recording) => picked.has(recording.id));
   const first = shown.length ? (currentPage - 1) * RECORDINGS_PER_PAGE + 1 : 0;
   const last = Math.min(currentPage * RECORDINGS_PER_PAGE, shown.length);
 
@@ -151,8 +155,8 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
         <>
           <div className="pick-bar">
             <label>
-              <Tick checked={allOn} mixed={someOn} onChange={(on) => toggle(shown, on)} />
-              {t('pick.selectAll', { count: shown.length })}
+              <Tick checked={allOn} mixed={someOn} disabled={pickable.length === 0} onChange={(on) => toggle(pickable, on)} />
+              {t('pick.selectAll', { count: pickable.length })}
             </label>
             <span className="grow" />
             <button type="button" className="chip" aria-pressed={pickedOnly} disabled={picked.size === 0}
@@ -191,7 +195,7 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
 interface DayGroupProps {
   day: string | null;
   recordings: Recording[];
-  /** Every shown recording of that day, also those on other pages: the day's checkbox picks them all. */
+  /** Every shown recording of that day, also those on other pages: the day's checkbox picks those it can. */
   wholeDay: Recording[];
   picked: ReadonlyMap<string, Recording>;
   toggle: (recordings: readonly Recording[], on: boolean) => void;
@@ -200,16 +204,17 @@ interface DayGroupProps {
 }
 
 function DayGroup({ day, recordings, wholeDay, picked, toggle, language, t }: DayGroupProps) {
-  const dayOn = wholeDay.length > 0 && wholeDay.every((recording) => picked.has(recording.id));
-  const daySome = !dayOn && wholeDay.some((recording) => picked.has(recording.id));
+  const dayPickable = wholeDay.filter(canPick);
+  const dayOn = dayPickable.length > 0 && dayPickable.every((recording) => picked.has(recording.id));
+  const daySome = !dayOn && dayPickable.some((recording) => picked.has(recording.id));
   const label = day ? dayLabel(day, language, t) : '';
   return (
     <>
       {day && (
         <li className="pick-day">
           <label>
-            <Tick checked={dayOn} mixed={daySome} onChange={(on) => toggle(wholeDay, on)}
-              label={t('pick.selectDay', { count: wholeDay.length, day: label })} />
+            <Tick checked={dayOn} mixed={daySome} disabled={dayPickable.length === 0} onChange={(on) => toggle(dayPickable, on)}
+              label={dayPickable.length ? t('pick.selectDay', { count: dayPickable.length, day: label }) : t('pick.dayHeld', { day: label })} />
             <span aria-hidden="true">{label}</span>
           </label>
           <span>{t('pick.dayCount', { count: wholeDay.length })}</span>
@@ -217,12 +222,15 @@ function DayGroup({ day, recordings, wholeDay, picked, toggle, language, t }: Da
       )}
       {recordings.map((recording) => (
         <li key={recording.id}>
-          <label className="pick-row">
-            <input type="checkbox" className="pick-check" checked={picked.has(recording.id)}
+          <label className={canPick(recording) ? 'pick-row' : 'pick-row held'}>
+            <input type="checkbox" className="pick-check" checked={picked.has(recording.id)} disabled={!canPick(recording)}
               onChange={(event) => toggle([recording], event.target.checked)} />
-            <span className="title">{recording.title}</span>
+            <span className="title">
+              {recording.title}
+              {recording.inConxist && <> <Pill tone={recording.inConxist === 'HELD' ? 'live' : 'soon'}>{t(`pick.in.${recording.inConxist}`)}</Pill></>}
+            </span>
             <span className="when">{when(recording, day !== null, language)}</span>
-            <span className="len">{recording.lengthSeconds ? t('pick.minutes', { count: Math.max(1, Math.round(recording.lengthSeconds / 60)) }) : ''}</span>
+            <span className="len">{recording.lengthSeconds ? t('pick.minutes', { count: minutesOf(recording.lengthSeconds) }) : ''}</span>
           </label>
         </li>
       ))}
@@ -231,18 +239,25 @@ function DayGroup({ day, recordings, wholeDay, picked, toggle, language, t }: Da
 }
 
 /** A checkbox that can show "some picked". */
-function Tick({ checked, mixed, onChange, label }: { checked: boolean; mixed: boolean; onChange: (on: boolean) => void; label?: string }) {
+function Tick({ checked, mixed, disabled, onChange, label }: {
+  checked: boolean; mixed: boolean; disabled?: boolean; onChange: (on: boolean) => void; label?: string;
+}) {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (ref.current) ref.current.indeterminate = mixed;
   }, [mixed]);
-  return <input ref={ref} type="checkbox" className="pick-check" checked={checked} aria-label={label}
+  return <input ref={ref} type="checkbox" className="pick-check" checked={checked} disabled={disabled} aria-label={label}
     onChange={(event) => onChange(event.target.checked)} />;
+}
+
+/** A recording the workspace already holds is shown, so the list matches Plaud, but cannot be picked twice. */
+function canPick(recording: Recording): boolean {
+  return recording.inConxist !== 'HELD';
 }
 
 function dayLabel(day: string, language: string, t: Translate): string {
   const today = new Date();
-  const local = (date: Date) => dayOf({ id: '', title: '', recordedAt: date.toISOString(), lengthSeconds: null });
+  const local = (date: Date) => dayOf({ id: '', title: '', recordedAt: date.toISOString(), lengthSeconds: null, inConxist: null });
   if (day === local(today)) return t('pick.today');
   if (day === local(new Date(today.getTime() - 86_400_000))) return t('pick.yesterday');
   const date = new Date(`${day}T12:00:00`);
