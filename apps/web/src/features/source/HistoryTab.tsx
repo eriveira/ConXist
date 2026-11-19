@@ -77,13 +77,13 @@ export function HistoryTab({ sourceId }: { sourceId: string }) {
               <tbody>
                 {load.runs.map((run) => (
                   <tr key={run.id}>
-                    <td className="when">{dateTime(run.startedAt, language)}</td>
-                    <td>{t(`history.by.${run.startedBy}`)}</td>
-                    <td><Pill tone={TONES[run.outcome]}>{t(`history.outcome.${run.outcome}`)}</Pill></td>
-                    <td className="num">{run.imported}</td>
-                    <td className="num">{run.alreadyImported}</td>
-                    <td className="num">{run.waiting + run.queued}</td>
-                    <td className="problem">{run.problemCode ? problemText(run.problemCode, t) : ''}</td>
+                    <td className="when" data-label={t('history.when')}>{dateTime(run.startedAt, language)}</td>
+                    <td data-label={t('history.by')}>{t(`history.by.${run.startedBy}`)}</td>
+                    <td data-label={t('history.result')}><Pill tone={TONES[run.outcome]}>{t(`history.outcome.${run.outcome}`)}</Pill></td>
+                    <td className="num" data-label={t('history.imported')}>{run.imported}</td>
+                    <td className="num" data-label={t('history.already')}>{run.alreadyImported}</td>
+                    <td className="num" data-label={t('history.waiting')}>{run.waiting + run.queued}</td>
+                    <td className={run.problemCode ? 'problem' : 'problem none'} data-label={t('history.problem')}>{run.problemCode ? problemText(run.problemCode, t) : ''}</td>
                   </tr>
                 ))}
               </tbody>

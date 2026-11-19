@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
-import { byDay, whenOf } from '../../domain/meetings';
-import type { CapturedDocument, Source } from '../../domain/model';
+import { byDay, recordedWithin, RECENT_RANGES, type RecentRange, whenOf } from '../../domain/meetings';
+import type { CapturedDocument, Source, SyncRun } from '../../domain/model';
 import { localDay, matching } from '../../domain/recordings';
 import { clock, dateTime } from '../../domain/time';
 import { useLanguage, useT, type Translate } from '../../i18n/i18n';
@@ -27,6 +27,10 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
   const searchId = useId();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [query, setQuery] = useState('');
+  const [range, setRange] = useState<RecentRange>('ANY');
+  const rangeId = useId();
+  /** The newest check of a recorder: what it left waiting is said above the list. */
+  const [lastCheck, setLastCheck] = useState<SyncRun | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   /** Says what was just deleted; it takes the focus, since the row that had it is gone. */
   const [notice, setNotice] = useState<string | null>(null);
@@ -60,6 +64,26 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
 
   useEffect(() => fetchDocuments(), [fetchDocuments]);
 
+  useEffect(() => {
+    if (!recorder) return undefined;
+    let current = true;
+    // Only a hint above the list: if the history does not load, the list still works and says nothing.
+    api.syncs(source.id, true)
+      .then((runs) => { if (current) setLastCheck(runs[0] ?? null); })
+      .catch(() => undefined);
+    return () => { current = false; };
+    // A finished sync changes what is waiting, so the line is read again when one ends.
+  }, [source.id, recorder, syncing]);
+
+  const onTheirWay = lastCheck && (lastCheck.waiting > 0 || lastCheck.queued > 0) && (
+    <p className="muted small on-way">
+      {[
+        lastCheck.waiting > 0 ? t('meetings.transcribing', { count: lastCheck.waiting }) : '',
+        lastCheck.queued > 0 ? t('meetings.queued', { count: lastCheck.queued }) : '',
+      ].filter(Boolean).join(' ')}
+    </p>
+  );
+
   if (load.state === 'loading') {
     return (
       <div className="list" aria-busy="true" aria-label={t('meetings.loading')}>
@@ -79,6 +103,7 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
     return (
       <>
       {noticeLine}
+      {onTheirWay}
       <div className="state">
         <h2>{t(recorder ? 'meetings.empty.title' : 'documents.empty.title')}</h2>
         <p>{t(recorder ? 'meetings.empty.body' : 'documents.empty.body')}</p>
@@ -92,23 +117,31 @@ export function MeetingsTab({ source, recorder, onSync, syncing, onChanged }: Me
     );
   }
 
-  const shown = matching(load.documents, query);
+  const shown = recordedWithin(matching(load.documents, query), range, new Date());
+  const filtered = query.trim() !== '' || range !== 'ANY';
   return (
     <>
       {noticeLine}
-      <div className="toolbar">
+      <div className="toolbar start">
         <label className="search" htmlFor={searchId}>
           <span className="sr-only">{t('meetings.search')}</span>
           <Icon name="search" size={16} />
           <input id={searchId} type="search" value={query} placeholder={t('meetings.search')} maxLength={200}
             onChange={(event) => setQuery(event.target.value)} />
         </label>
+        <label className="sr-only" htmlFor={rangeId}>{t(recorder ? 'meetings.range' : 'documents.range')}</label>
+        <select id={rangeId} className="sel" value={range} onChange={(event) => setRange(event.target.value as RecentRange)}>
+          {RECENT_RANGES.map((option) => <option key={option} value={option}>{t(`meetings.range.${option}`)}</option>)}
+        </select>
+        {onTheirWay}
       </div>
-      <p className="sr-only" role="status">{query.trim() ? t('meetings.found', { count: shown.length }) : ''}</p>
+      <p className="sr-only" role="status">{filtered ? t('meetings.found', { count: shown.length }) : ''}</p>
       {shown.length === 0 ? (
         <div className="state">
-          <h2>{t('meetings.noMatch', { query: query.trim() })}</h2>
-          <button type="button" className="btn" onClick={() => setQuery('')}>{t('meetings.clearSearch')}</button>
+          <h2>{query.trim() ? t('meetings.noMatch', { query: query.trim() }) : t(recorder ? 'meetings.noneInRange' : 'documents.noneInRange')}</h2>
+          <button type="button" className="btn" onClick={() => { setQuery(''); setRange('ANY'); }}>
+            {t(range === 'ANY' ? 'meetings.clearSearch' : 'meetings.clearFilters')}
+          </button>
         </div>
       ) : (
         <div className="list">

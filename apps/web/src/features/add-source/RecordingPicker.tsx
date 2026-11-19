@@ -30,6 +30,9 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<RecordingSort>('NEWEST');
   const [page, setPage] = useState(1);
+  /** Shows only the ticked recordings, to check the choice before going on. Off again once nothing is ticked. */
+  const [onlyPicked, setOnlyPicked] = useState(false);
+  const pickedOnly = onlyPicked && picked.size > 0;
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
@@ -47,14 +50,16 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
   }, [signInId, range, reversed, attempt, t]);
 
   const shown = useMemo(
-    () => (load.state === 'ready' ? sorted(matching(load.list.recordings, query), sort, language) : []),
-    [load, query, sort, language],
+    () => (load.state === 'ready'
+      ? sorted(matching(load.list.recordings, query), sort, language).filter((recording) => !pickedOnly || picked.has(recording.id))
+      : []),
+    [load, query, sort, language, pickedOnly, picked],
   );
   const pages = pageCount(shown.length);
   const currentPage = Math.min(page, pages);
   const onPage = pageOf(shown, currentPage);
   const byDay = isSortedByDay(sort);
-  const filtered = query.trim() !== '' || range.from !== '' || range.to !== '';
+  const filtered = query.trim() !== '' || range.from !== '' || range.to !== '' || pickedOnly;
 
   const toggle = (recordings: readonly Recording[], on: boolean) => {
     const next = new Map(picked);
@@ -75,9 +80,11 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
     <div className="pick-tools">
       <label className="pick-field search" htmlFor={ids.search}>
         {t('pick.search')}
-        <Icon name="search" size={16} />
-        <input id={ids.search} type="search" value={query} placeholder={t('pick.search.placeholder')}
-          maxLength={200} onChange={(event) => { setQuery(event.target.value); resetPage(); }} />
+        <span className="boxed">
+          <Icon name="search" size={16} />
+          <input id={ids.search} type="search" value={query} placeholder={t('pick.search.placeholder')}
+            maxLength={200} onChange={(event) => { setQuery(event.target.value); resetPage(); }} />
+        </span>
       </label>
       <div className="dates">
         <label className="pick-field" htmlFor={ids.from}>
@@ -136,7 +143,7 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
         <div className="pick-empty">
           <b>{t('pick.noMatch.heading')}</b>
           <p>{t('pick.noMatch.lead')}</p>
-          <button type="button" className="btn sm" onClick={() => { setQuery(''); setRange({ from: '', to: '' }); resetPage(); }}>
+          <button type="button" className="btn sm" onClick={() => { setQuery(''); setRange({ from: '', to: '' }); setOnlyPicked(false); resetPage(); }}>
             {t('pick.clearFilters')}
           </button>
         </div>
@@ -148,6 +155,10 @@ export function RecordingPicker({ signInId, picked, onPickedChange }: RecordingP
               {t('pick.selectAll', { count: shown.length })}
             </label>
             <span className="grow" />
+            <button type="button" className="chip" aria-pressed={pickedOnly} disabled={picked.size === 0}
+              onClick={() => { setOnlyPicked(!pickedOnly); resetPage(); }}>
+              {t('pick.onlySelected', { count: picked.size })}
+            </button>
             <span className="count" role="status">{picked.size ? t('pick.selected', { count: picked.size }) : t('pick.noneSelected')}</span>
             {picked.size > 0 && <button type="button" className="btn sm ghost" onClick={() => onPickedChange(new Map())}>{t('pick.clear')}</button>}
           </div>

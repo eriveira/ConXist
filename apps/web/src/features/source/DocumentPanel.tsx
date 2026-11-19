@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { useFocusTrap } from '../../components/useFocusTrap';
@@ -51,7 +51,8 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
 
   /** Backing out of the question gives the focus back to the Delete button that asked it. */
   const backedOut = useRef(false);
-  useEffect(() => {
+  // A layout effect: the focus moves in the same commit that shows the new state, never a frame later.
+  useLayoutEffect(() => {
     // The buttons turn off while the delete runs, so the question's heading holds the focus; a failure hands it back
     // to Delete, to try again or move on to Cancel.
     if (removal.state === 'confirming' || removal.state === 'deleting') confirmHeading.current?.focus();
@@ -81,7 +82,7 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
   }
   const deleting = removal.state === 'deleting';
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     closeRef.current?.focus();
   }, []);
 
@@ -109,6 +110,9 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
   }
 
   const found = meeting ? linesMatching(meeting, find) : 0;
+  const speakers = meeting ? speakersOf(meeting) : [];
+  /** The same colour marks a speaker in the list and on each of their lines; the name is always written too. */
+  const dot = (speaker: string) => <span className={`dot s${speakers.indexOf(speaker) % SPEAKER_COLOURS}`} aria-hidden="true" />;
   return (
     <div className="scrim side" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) onClose(); }}>
       <aside ref={panel} className="sidepanel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
@@ -189,11 +193,11 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
                   {meeting.summaries.map((summary, index) => <div key={index} className="psummary plain">{summaryText(summary)}</div>)}
                 </section>
               )}
-              {speakersOf(meeting).length > 0 && (
+              {speakers.length > 0 && (
                 <section>
                   <h3 className="section-l">{t('doc.speakers')}</h3>
                   <ul className="speakers">
-                    {speakersOf(meeting).map((speaker) => <li key={speaker} className="spk">{speaker}</li>)}
+                    {speakers.map((speaker) => <li key={speaker} className="spk">{dot(speaker)}{speaker}</li>)}
                   </ul>
                 </section>
               )}
@@ -213,7 +217,7 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
                     {meeting.lines.map((line, index) => (
                       <li key={index} className="tline">
                         <span className="ts">{line.at}</span>
-                        {line.speaker && <span className="who">{line.speaker}</span>}
+                        {line.speaker && <span className="who">{dot(line.speaker)}{line.speaker}</span>}
                         <span className="txt">
                           {highlight(line.text, find).map((part, at) => (part.match ? <mark key={at}>{part.text}</mark> : part.text))}
                         </span>
@@ -229,6 +233,9 @@ export function DocumentPanel({ sourceId, sourceName, documentId, onClose, onDel
     </div>
   );
 }
+
+/** How many speaker colours source.css defines (.dot.s0 to .s2); they repeat after that. */
+const SPEAKER_COLOURS = 3;
 
 /** "English" for "en", in the person's language; the code itself if the browser does not know it. */
 function languageName(code: string, language: string): string {

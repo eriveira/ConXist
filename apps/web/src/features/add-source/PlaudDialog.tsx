@@ -130,7 +130,9 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
           ? <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? t('dialog.adding') : t('dialog.add')}</button>
           : (
             <>
-              {nothingChosen && <span id={hintId} className="pick-hint">{t('plaud.pick.required')}</span>}
+              {nothingChosen
+                ? <span id={hintId} className="pick-hint">{t('plaud.pick.required')}</span>
+                : <span className="pick-sum">{picked.size > 0 ? t('plaud.pick.toImport', { count: picked.size }) : t('plaud.pick.newOnly')}</span>}
               <button type="button" className="btn primary" onClick={next} disabled={busy || nothingChosen}
                 aria-describedby={nothingChosen ? hintId : undefined}>
                 {t('dialog.next')}
@@ -200,13 +202,16 @@ export function PlaudDialog({ onClose, onCaptured }: PlaudDialogProps) {
             </div>
             <dl className="summary">
               <div><dt>{t('plaud.account')}</dt><dd>{account?.accountLabel}</dd></div>
-              <div><dt>{t('plaud.review.importNow')}</dt><dd>{t('plaud.review.count', { count: picked.size })}</dd></div>
+              <div><dt>{t('plaud.review.importNow')}</dt><dd>
+                {t('plaud.review.count', { count: picked.size })}
+                <button type="button" className="link change" onClick={back} disabled={busy}>{t('plaud.review.change')}</button>
+              </dd></div>
               <div><dt>{t('plaud.review.newRecordings')}</dt><dd>{importNew ? t('plaud.review.auto') : t('plaud.review.notImported')}</dd></div>
               <div><dt>{t('plaud.review.summaries')}</dt><dd>{summaries ? t('plaud.review.included') : t('plaud.review.notIncluded')}</dd></div>
             </dl>
             {picked.size > 0 && (
               <details className="picked">
-                <summary>{t('plaud.review.picked')}</summary>
+                <summary><Icon name="chevron" size={16} />{t('plaud.review.picked')}</summary>
                 <ul>{[...picked.values()].map((recording) => <li key={recording.id}>{recording.title}</li>)}</ul>
               </details>
             )}

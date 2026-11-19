@@ -44,7 +44,9 @@ export function SourceCard(props: SourceCardProps) {
       </div>
       <div className="nbody">
         <div className="nrow">
-          <span>{recorder ? t('node.meetings', { count: documentCount }) : t('node.documents', { count: documentCount })}</span>
+          <a className="link" href={sourceHref(source.id)}>
+            {recorder ? t('node.meetings', { count: documentCount }) : t('node.documents', { count: documentCount })}
+          </a>
           <SourceStatus syncing={syncing} failed={syncProblem !== null} paused={paused} unlinked={unlinked} />
         </div>
         {unlinked && <p className="nrow muted">{t('node.unlinked')}</p>}

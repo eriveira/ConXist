@@ -169,6 +169,23 @@ describe('PlaudDialog', () => {
     expect(screen.getByText('None selected')).toBeInTheDocument();
   });
 
+  it('shows only the selected recordings with Selected only', async () => {
+    await toRecordings();
+
+    expect(screen.getByRole('button', { name: 'Selected only (0)' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Meeting 02/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Meeting 05/ }));
+    const only = screen.getByRole('button', { name: 'Selected only (2)' });
+    await userEvent.click(only);
+    expect(only).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('checkbox', { name: /^Meeting/ })).toHaveLength(2);
+    expect(screen.getByText('1–2 of 2')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.getByRole('button', { name: 'Selected only (0)' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getAllByRole('checkbox', { name: /^Meeting/ })).toHaveLength(25);
+  });
+
   it("selects a whole day with the day's checkbox", async () => {
     await toRecordings();
 
@@ -205,6 +222,20 @@ describe('PlaudDialog', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toHaveAccessibleDescription('Pick a recording, or turn on new recordings.');
     await userEvent.click(screen.getByRole('checkbox', { name: /Meeting 05/ }));
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+    expect(screen.getByText('1 recording to import now')).toBeInTheDocument();
+  });
+
+  it('says how many recordings are picked next to Next, and Change on Review goes back to them', async () => {
+    await toRecordings();
+
+    expect(screen.getByText('Only new recordings')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Meeting 02/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Meeting 03/ }));
+    expect(screen.getByText('2 recordings to import now')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Change' }));
+    expect(screen.getByRole('checkbox', { name: /Meeting 02/ })).toBeChecked();
+    expect(screen.getByText('2 recordings to import now')).toBeInTheDocument();
   });
 
   it('says when the From date is after the To date, without asking Plaud', async () => {

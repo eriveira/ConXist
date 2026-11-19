@@ -25,6 +25,18 @@ export function byDay(documents: readonly CapturedDocument[], timeZone?: string)
   return groups;
 }
 
+/** How far back the meetings list reaches: any date, or the last 7 or 30 days. */
+export type RecentRange = 'ANY' | 'LAST_7_DAYS' | 'LAST_30_DAYS';
+export const RECENT_RANGES: readonly RecentRange[] = ['ANY', 'LAST_7_DAYS', 'LAST_30_DAYS'];
+
+/** The documents placed (recorded, else imported) within the range ending {@code now}. */
+export function recordedWithin<T extends CapturedDocument>(documents: readonly T[], range: RecentRange, now: Date): T[] {
+  if (range === 'ANY') return [...documents];
+  const days = range === 'LAST_7_DAYS' ? 7 : 30;
+  const since = now.getTime() - days * 86_400_000;
+  return documents.filter((document) => Date.parse(whenOf(document)) >= since);
+}
+
 /** The people who speak, in the order they first speak. Unnamed lines are left out. */
 export function speakersOf(meeting: Meeting): string[] {
   return [...new Set(meeting.lines.map((line) => line.speaker).filter(Boolean))];
