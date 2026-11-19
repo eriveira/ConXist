@@ -67,6 +67,30 @@ before it is applied anywhere but a developer's computer.
 | `plaud_account_connections` | The source's link to the account: email, account key, start choice, last sync | While the source exists |
 | `plaud_account_tokens` | The account's current tokens, sealed | While the source exists; replaced on every refresh |
 
+## Picking recordings (2026-11-19)
+
+The owner asked that the Recordings step list the newest recordings, 25 a page,
+with search, dates, sort by name or date, grouped by day, a checkbox per day and
+"Select all". This replaces the "last 30 days / last 7 days / new only" choice
+(mocks: `App/mocks/plaud-picker-v1`).
+
+- `GET /api/recorders/plaud/sign-ins/{id}/recordings?from&to` lists up to 500
+  recordings through `list_files` (dates filter on Plaud's side). Name search,
+  sorting and pages happen in the web app, because Plaud's own `query` only scans
+  the newest 500. The list is kept in memory for 10 minutes so paging does not
+  call Plaud again, and only ids from that list can be picked.
+- The person picks up to 500 recordings and decides whether new recordings keep
+  arriving (`import_new`, on by default). At least one of the two is needed.
+- Migration `V5__plaud_recording_picks.sql` adds `plaud_recording_picks`
+  (source, Plaud file id and recording time only: no title or text) and the
+  `import_new` column. Each check imports up to 10 picks, then new recordings.
+  A pick whose transcript is not ready waits behind the others; an imported or
+  vanished pick is removed. Plaud only transcribes a recording when asked, so a
+  pick still waiting a week after it was made is dropped. Recordings whose date
+  Plaud does not give are not listed. If the lists the person saw expired before
+  Add, the same date ranges are listed again to check the picks.
+- The migration needs the owner's go like V4 (asked 2026-11-19, with the 500 cap).
+
 ## Consequences
 
 - The redirect address is the API's own (`127.0.0.1` while there is no hosting).

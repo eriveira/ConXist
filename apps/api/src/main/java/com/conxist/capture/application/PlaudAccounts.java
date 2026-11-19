@@ -1,6 +1,7 @@
 package com.conxist.capture.application;
 
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -16,6 +17,11 @@ import com.conxist.capture.application.PlaudTeam.Transcript;
  */
 public interface PlaudAccounts {
 
+    /** What a Plaud file id looks like; anything else from Plaud or a request is refused. */
+    String FILE_ID = "[A-Za-z0-9_-]{1,128}";
+    /** The most recordings {@link #recentFiles} reads. Plaud's own search reaches the same number. */
+    int MAX_RECENT_FILES = 500;
+
     /** Starts a sign-in: the URL of Plaud's own sign-in page to open in a new window. */
     SignInStart startSignIn(UUID workspaceId);
 
@@ -27,8 +33,17 @@ public interface PlaudAccounts {
     /** Hands a finished sign-in's tokens to a source; the sign-in can no longer be used. */
     void attach(UUID workspaceId, UUID signInId, UUID sourceId);
 
-    /** Recordings with their date on or after {@code from}, newest first, one page at a time from 1. */
-    FilePage files(UUID sourceId, LocalDate from, int page);
+    /**
+     * A connected account's recordings dated from {@code from} to {@code to} (inclusive; {@code to} may be null for no
+     * end), newest first, one page at a time from 1.
+     */
+    FilePage files(UUID sourceId, LocalDate from, LocalDate to, int page);
+
+    /**
+     * The newest recordings of a finished sign-in that no source uses yet, at most {@link #MAX_RECENT_FILES},
+     * optionally within dates. Only what a list shows: no transcripts are read.
+     */
+    RecentFiles recentFiles(UUID workspaceId, UUID signInId, DateRange dates);
 
     /** Empty while Plaud has not finished the transcript. */
     Optional<Transcript> transcript(UUID sourceId, String fileId);
@@ -48,10 +63,29 @@ public interface PlaudAccounts {
     record SignIn(UUID id, SignInStatus status, String accountLabel, String accountKey) {
     }
 
-    record AccountFile(String id, String title, Instant recordedAt) {
+    /** {@code length} is null when Plaud does not say. */
+    record AccountFile(String id, String title, Instant recordedAt, Duration length) {
+
+        public AccountFile(String id, String title, Instant recordedAt) {
+            this(id, title, recordedAt, null);
+        }
     }
 
     record FilePage(List<AccountFile> files, boolean hasMore) {
+    }
+
+    /** Days from {@code from} to {@code to}, inclusive; either may be null for no limit. */
+    record DateRange(LocalDate from, LocalDate to) {
+
+        public static final DateRange ANY = new DateRange(null, null);
+
+        public boolean reversed() {
+            return from != null && to != null && from.isAfter(to);
+        }
+    }
+
+    /** {@code capped}: the account has more recordings in the range than were read. */
+    record RecentFiles(List<AccountFile> files, boolean capped) {
     }
 
     class AccessDenied extends RuntimeException {

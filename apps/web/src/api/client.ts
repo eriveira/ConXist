@@ -1,6 +1,7 @@
 import type {
-  CapturedDocument, PlaudSignIn, Provider, ProviderId, RecorderConnection, SignInStart, Source, StartFrom, SyncResult,
+  CapturedDocument, PlaudSignIn, Provider, ProviderId, RecorderConnection, SignInStart, Source, SyncResult,
 } from '../domain/model';
+import type { RecordingList } from '../domain/recordings';
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
 export class ApiError extends Error {
@@ -46,8 +47,17 @@ export interface NewSource {
 
 export interface PlaudAccountLink {
   signInId: string;
-  startFrom: StartFrom;
+  /** Plaud recordings the person picked to import now. */
+  recordingIds: string[];
+  /** Whether recordings made from now on come in on their own. */
+  importNew: boolean;
   includeSummaries: boolean;
+}
+
+export interface DateRange {
+  /** YYYY-MM-DD, or empty for no limit. */
+  from: string;
+  to: string;
 }
 
 export const api = {
@@ -62,6 +72,13 @@ export const api = {
   },
   startPlaudSignIn: () => request<SignInStart>('/api/recorders/plaud/sign-ins', { method: 'POST' }),
   plaudSignIn: (signInId: string) => request<PlaudSignIn>(`/api/recorders/plaud/sign-ins/${encodeURIComponent(signInId)}`),
+  plaudRecordings: (signInId: string, range: DateRange) => {
+    const query = new URLSearchParams();
+    if (range.from) query.set('from', range.from);
+    if (range.to) query.set('to', range.to);
+    const suffix = query.size ? `?${query.toString()}` : '';
+    return request<RecordingList>(`/api/recorders/plaud/sign-ins/${encodeURIComponent(signInId)}/recordings${suffix}`);
+  },
   connectPlaudAccount: (sourceId: string, link: PlaudAccountLink) =>
     postJson<RecorderConnection>(`/api/sources/${sourceId}/plaud-account`, link),
   signInAgain: (sourceId: string, signInId: string) =>

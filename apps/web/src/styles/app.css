@@ -24,6 +24,10 @@ button { cursor: pointer; }
 }
 .logo-chip img { height: 36px; width: auto; display: block; }
 .logo-d, .em-d { display: none !important; }
+/* Native controls (date pickers, select lists) follow the theme. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .logo-l, :root:not([data-theme="light"]) .em-l { display: none !important; }
   :root:not([data-theme="light"]) .logo-d, :root:not([data-theme="light"]) .em-d { display: block !important; }
@@ -240,3 +244,62 @@ button { cursor: pointer; }
 .choice b, .check b { display: block; font-size: 14px; }
 .choice small, .check small { display: block; font-size: 12.5px; color: var(--cx-fg-muted); }
 .m-body .account { margin-bottom: 14px; }
+
+/* Plaud recording picker */
+.modal.wide { width: min(780px, 100%); max-height: min(860px, calc(100dvh - 32px)); }
+.pick-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+.pick-tools .dates { display: flex; gap: 8px; }
+.pick-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; min-width: 0; }
+.pick-field input, .pick-field select {
+  min-height: 40px; border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); background: var(--cx-surface);
+  padding: 0 10px; font-weight: 400; font-size: 14px; width: 100%;
+}
+.pick-field.search { position: relative; }
+.pick-field.search input { padding-left: 34px; }
+.pick-field.search svg { position: absolute; left: 10px; bottom: 11px; color: var(--cx-fg-muted); }
+.pick-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 44px; padding: 2px 6px 2px 12px; margin-bottom: 8px;
+  border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); background: var(--cx-surface);
+}
+.pick-bar label { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; min-height: 40px; cursor: pointer; }
+.pick-bar .count { font-weight: 700; color: var(--cx-accent-text); font-size: 14px; }
+.pick-check { width: 18px; height: 18px; accent-color: var(--cx-accent); flex: none; margin: 0; }
+.pick-list { list-style: none; margin: 0 0 10px; padding: 0; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); overflow: hidden; }
+.pick-list > li + li { border-top: 1px solid var(--cx-border); }
+.pick-day {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 12px; min-height: 44px;
+  background: var(--cx-surface); font-size: 12px; color: var(--cx-fg-muted);
+}
+.pick-day label { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; cursor: pointer; color: var(--cx-fg); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.pick-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 8px 12px; min-height: 48px; cursor: pointer; }
+.pick-row:hover { background: var(--cx-surface); }
+.pick-row:has(input:checked) { background: var(--cx-accent-soft); }
+.pick-row .title { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
+.pick-row .when, .pick-row .len { font-size: 13px; color: var(--cx-fg-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pick-row .len { min-width: 52px; text-align: right; }
+.pager { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; margin-bottom: 12px; }
+.pager .grow { flex: 1; }
+.pager .of { color: var(--cx-fg-muted); font-variant-numeric: tabular-nums; }
+.pager .btn { min-width: 40px; }
+.pick-empty { text-align: center; padding: 24px 16px; border: 1px dashed var(--cx-input-border); border-radius: var(--cx-radius-md); margin-bottom: 12px; font-size: 14px; }
+.pick-empty b { display: block; margin-bottom: 4px; }
+.pick-empty p { margin: 0 0 10px; color: var(--cx-fg-muted); }
+.pick-loading { display: flex; align-items: center; gap: 10px; padding: 24px 12px; color: var(--cx-fg-muted); font-size: 14px; }
+.m-body .check + .check { margin-top: 8px; }
+.picked { margin-top: 12px; font-size: 13.5px; }
+.picked summary { cursor: pointer; font-weight: 700; min-height: 40px; display: flex; align-items: center; }
+.picked ul { list-style: none; margin: 4px 0 0; padding: 0; max-height: 180px; overflow: auto; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); }
+.picked li { padding: 8px 12px; overflow-wrap: anywhere; }
+.picked li + li { border-top: 1px solid var(--cx-border); }
+@media (max-width: 760px) {
+  .pick-tools { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pick-tools .search, .pick-tools .dates { grid-column: 1 / -1; }
+  .pick-tools .dates .pick-field { flex: 1; }
+  .pick-row { grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-areas: "c t l" "c w l"; row-gap: 0; }
+  .pick-row > :nth-child(1) { grid-area: c; } .pick-row .title { grid-area: t; } .pick-row .when { grid-area: w; } .pick-row .len { grid-area: l; }
+}
+@media (max-width: 680px) {
+  .scrim:has(.modal.wide) { padding: 0; }
+  .modal.wide { width: 100%; max-height: 100dvh; height: 100dvh; border-radius: 0; }
+}
+.pick-hint { color: var(--cx-fg-muted); font-size: 13px; text-align: right; }

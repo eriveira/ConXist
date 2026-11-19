@@ -92,6 +92,10 @@ public final class FakePlaudMcpServer implements AutoCloseable {
         meetings.add(meeting);
     }
 
+    public void remove(java.util.function.Predicate<Meeting> which) {
+        meetings.removeIf(which);
+    }
+
     /** The next authorization is cancelled, as if the person pressed Cancel on Plaud's page. */
     public void cancelNextSignIn() {
         cancelling = true;
@@ -246,10 +250,12 @@ public final class FakePlaudMcpServer implements AutoCloseable {
 
     private Map<String, Object> files(JsonNode arguments) {
         LocalDate from = arguments.has("date_from") ? LocalDate.parse(arguments.path("date_from").asString()) : LocalDate.MIN;
+        LocalDate to = arguments.has("date_to") ? LocalDate.parse(arguments.path("date_to").asString()) : LocalDate.MAX;
         int page = arguments.path("page").asInt(1);
         int size = arguments.path("page_size").asInt(20);
         List<Meeting> matching = meetings.stream()
                 .filter(m -> !LocalDate.ofInstant(m.recordedAt(), ZoneOffset.UTC).isBefore(from))
+                .filter(m -> !LocalDate.ofInstant(m.recordedAt(), ZoneOffset.UTC).isAfter(to))
                 .sorted(Comparator.comparing(Meeting::recordedAt).reversed())
                 .toList();
         List<Map<String, Object>> data = new ArrayList<>();

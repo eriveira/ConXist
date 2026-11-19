@@ -1,14 +1,20 @@
 package com.conxist.capture.adapter.web;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
+import com.conxist.capture.application.ListPlaudRecordings;
+import com.conxist.capture.application.ListPlaudRecordings.RecordingList;
 import com.conxist.capture.application.ConnectionView;
+import com.conxist.capture.application.PlaudAccounts;
 import com.conxist.capture.application.PlaudAccounts.SignIn;
 import com.conxist.capture.application.PlaudAccounts.SignInStatus;
 import com.conxist.capture.application.PlaudAccounts.SignInStart;
 import com.conxist.capture.application.SignInToPlaud;
-import com.conxist.capture.domain.StartFrom;
+import com.conxist.capture.application.SignInToPlaud.AccountChoice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -43,9 +49,11 @@ class PlaudSignInController {
             + scriptHash("window.close()") + "'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
     private final SignInToPlaud signInToPlaud;
+    private final ListPlaudRecordings recordings;
 
-    PlaudSignInController(SignInToPlaud signInToPlaud) {
+    PlaudSignInController(SignInToPlaud signInToPlaud, ListPlaudRecordings recordings) {
         this.signInToPlaud = signInToPlaud;
+        this.recordings = recordings;
     }
 
     @PostMapping("/recorders/plaud/sign-ins")
@@ -78,10 +86,21 @@ class PlaudSignInController {
                 .body(DONE_PAGE);
     }
 
+    /**
+     * The signed-in account's newest recordings (at most {@link PlaudAccounts#MAX_RECENT_FILES}), optionally
+     * between two dates, for the person to pick from. Titles are customer data: returned to the app, never logged.
+     */
+    @GetMapping("/recorders/plaud/sign-ins/{signInId}/recordings")
+    ResponseEntity<RecordingList> recordings(@PathVariable UUID signInId,
+            @RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(recordings.list(signInId, from, to));
+    }
+
     @PostMapping("/sources/{sourceId}/plaud-account")
     @ResponseStatus(HttpStatus.CREATED)
     ConnectionView connect(@PathVariable UUID sourceId, @Valid @RequestBody AccountRequest request) {
-        return signInToPlaud.connect(sourceId, request.signInId(), request.startFrom(), request.includeSummaries());
+        return signInToPlaud.connect(sourceId, new AccountChoice(request.signInId(), request.recordingIds(),
+                request.importNew(), request.includeSummaries()));
     }
 
     @PostMapping("/sources/{sourceId}/plaud-account/sign-in")
@@ -89,7 +108,11 @@ class PlaudSignInController {
         return signInToPlaud.reconnect(sourceId, request.signInId());
     }
 
-    record AccountRequest(@NotNull UUID signInId, @NotNull StartFrom startFrom, boolean includeSummaries) {
+    /** {@code recordingIds}: Plaud file ids the person picked from the list above; may be empty. */
+    record AccountRequest(@NotNull UUID signInId,
+            @NotNull @Size(max = PlaudAccounts.MAX_RECENT_FILES)
+            List<@NotNull @Pattern(regexp = PlaudAccounts.FILE_ID) String> recordingIds,
+            boolean importNew, boolean includeSummaries) {
     }
 
     record ReconnectRequest(@NotNull UUID signInId) {

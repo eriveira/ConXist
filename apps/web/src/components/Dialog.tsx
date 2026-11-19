@@ -15,13 +15,15 @@ interface DialogProps {
   closable?: boolean;
   children: ReactNode;
   footer: ReactNode;
+  /** A wider dialog, for a step that shows a list. */
+  wide?: boolean;
 }
 
 /**
  * A modal dialog. Focus moves in on open, to each new step's heading, stays inside while open, and returns to the
  * opener on close. Escape closes it; a click outside does not, so typed names and picked files are not lost.
  */
-export function Dialog({ title, subtitle, icon, closeLabel, onClose, step, closable = true, children, footer }: DialogProps) {
+export function Dialog({ title, subtitle, icon, closeLabel, onClose, step, closable = true, children, footer, wide = false }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const subtitleId = useId();
@@ -68,7 +70,7 @@ export function Dialog({ title, subtitle, icon, closeLabel, onClose, step, closa
 
   return (
     <div className="scrim">
-      <div ref={panel} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitleId}>
+      <div ref={panel} className={wide ? 'modal wide' : 'modal'} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitleId}>
         <header className="m-head">
           <span className="nico">{icon}</span>
           <div>

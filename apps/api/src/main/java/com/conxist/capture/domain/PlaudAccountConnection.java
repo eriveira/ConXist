@@ -8,6 +8,8 @@ import java.util.UUID;
 /**
  * A recorder source's link to one person's own Plaud account. {@code readThrough} is when the last complete sync
  * started; the next sync looks back a little before it, so recordings Plaud was still transcribing are picked up.
+ * {@code importNew} says whether recordings made after connecting come in on their own; older ones come in only when
+ * the person picked them.
  */
 public record PlaudAccountConnection(
         UUID sourceId,
@@ -17,6 +19,7 @@ public record PlaudAccountConnection(
         StartFrom startFrom,
         Instant cutoff,
         boolean includeSummaries,
+        boolean importNew,
         Instant readThrough,
         ConnectionStatus status,
         Instant lastCheckedAt,
@@ -43,10 +46,11 @@ public record PlaudAccountConnection(
         }
     }
 
+    /** New recordings are those made from {@code now} on; anything older is imported only if picked. */
     public static PlaudAccountConnection connect(UUID sourceId, UUID workspaceId, String accountLabel,
-            String accountKey, StartFrom startFrom, boolean includeSummaries, Instant now) {
-        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, accountKey, startFrom, startFrom.cutoff(now),
-                includeSummaries, null, ConnectionStatus.ACTIVE, null, now);
+            String accountKey, boolean importNew, boolean includeSummaries, Instant now) {
+        return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, accountKey, StartFrom.NEW_ONLY,
+                StartFrom.NEW_ONLY.cutoff(now), includeSummaries, importNew, null, ConnectionStatus.ACTIVE, null, now);
     }
 
     /** The earliest recording time the next sync must look at. */
@@ -69,11 +73,11 @@ public record PlaudAccountConnection(
 
     public PlaudAccountConnection checked(Instant startedAt, Instant at) {
         return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, accountKey, startFrom, cutoff, includeSummaries,
-                startedAt, ConnectionStatus.ACTIVE, at, connectedAt);
+                importNew, startedAt, ConnectionStatus.ACTIVE, at, connectedAt);
     }
 
     public PlaudAccountConnection paused(Instant at) {
         return new PlaudAccountConnection(sourceId, workspaceId, accountLabel, accountKey, startFrom, cutoff, includeSummaries,
-                readThrough, ConnectionStatus.PAUSED, at, connectedAt);
+                importNew, readThrough, ConnectionStatus.PAUSED, at, connectedAt);
     }
 }

@@ -18,8 +18,8 @@ import org.springframework.stereotype.Repository;
 class JdbcPlaudAccountConnections implements PlaudAccountConnections {
 
     private static final String COLUMNS = """
-            source_id, workspace_id, account_label, account_key, start_from, start_cutoff, include_summaries, read_through,
-            status, last_checked_at, connected_at""";
+            source_id, workspace_id, account_label, account_key, start_from, start_cutoff, include_summaries, import_new,
+            read_through, status, last_checked_at, connected_at""";
 
     private final JdbcClient jdbc;
 
@@ -44,7 +44,7 @@ class JdbcPlaudAccountConnections implements PlaudAccountConnections {
 
     private int insert(PlaudAccountConnection c, String onConflict) {
         return jdbc.sql("insert into plaud_account_connections (" + COLUMNS + """
-                ) values (:sourceId, :workspaceId, :label, :key, :startFrom, :cutoff, :summaries, :readThrough,
+                ) values (:sourceId, :workspaceId, :label, :key, :startFrom, :cutoff, :summaries, :importNew, :readThrough,
                   :status, :lastCheckedAt, :connectedAt)
                 """ + onConflict)
                 .param("sourceId", c.sourceId())
@@ -54,6 +54,7 @@ class JdbcPlaudAccountConnections implements PlaudAccountConnections {
                 .param("startFrom", c.startFrom().name())
                 .param("cutoff", Timestamp.from(c.cutoff()))
                 .param("summaries", c.includeSummaries())
+                .param("importNew", c.importNew())
                 .param("readThrough", timestamp(c.readThrough()))
                 .param("status", c.status().name())
                 .param("lastCheckedAt", timestamp(c.lastCheckedAt()))
@@ -89,6 +90,7 @@ class JdbcPlaudAccountConnections implements PlaudAccountConnections {
                 StartFrom.valueOf(row.getString("start_from")),
                 row.getTimestamp("start_cutoff").toInstant(),
                 row.getBoolean("include_summaries"),
+                row.getBoolean("import_new"),
                 instant(row.getTimestamp("read_through")),
                 ConnectionStatus.valueOf(row.getString("status")),
                 instant(row.getTimestamp("last_checked_at")),

@@ -12,15 +12,16 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import com.conxist.capture.adapter.plaudaccount.PlaudOAuth.Tokens;
 import com.conxist.capture.adapter.plaudaccount.PlaudAccountStore.Waiting;
+import com.conxist.capture.adapter.plaudaccount.PlaudTokenSlots.Slot;
 import com.conxist.capture.application.PlaudAccounts;
 import com.conxist.capture.application.PlaudTeam.Transcript;
 import com.conxist.capture.domain.MeetingText.Line;
@@ -46,8 +47,7 @@ public class PlaudMcpAccounts implements PlaudAccounts {
     static final int PAGE_SIZE = 50;
     private static final int TRANSCRIPT_PAGE_SIZE = 500;
     private static final int MAX_TRANSCRIPT_PAGES = 100;
-    private static final Duration REFRESH_MARGIN = Duration.ofSeconds(60);
-    private static final Pattern FILE_ID = Pattern.compile("[A-Za-z0-9_-]{1,128}");
+    private static final Pattern FILE_ID = Pattern.compile(PlaudAccounts.FILE_ID);
     private static final Pattern WRAPPER_OPEN = Pattern.compile("<untrusted-user-data-[0-9a-f]+[^>]*>\\r?\\n");
     private static final Logger log = LoggerFactory.getLogger(PlaudMcpAccounts.class);
 
@@ -56,9 +56,8 @@ public class PlaudMcpAccounts implements PlaudAccounts {
     private final PlaudAccountStore store;
     private final Clock clock;
     private final int maxTextCharacters;
+    private final PlaudTokenSlots slots;
     private final JsonMapper json = JsonMapper.builder().build();
-    /** One refresh at a time per source: Plaud rotates refresh tokens, so two at once would sign the person out. */
-    private final Map<UUID, Object> refreshLocks = new ConcurrentHashMap<>();
 
     /** {@code mcpUrl} is Plaud's MCP endpoint; its authorization server is found from it. */
     public static PlaudMcpAccounts create(RestClient http, URI mcpUrl, URI redirectUri, Clock clock, JdbcClient jdbc,
@@ -74,6 +73,7 @@ public class PlaudMcpAccounts implements PlaudAccounts {
         this.store = store;
         this.clock = clock;
         this.maxTextCharacters = maxTextCharacters;
+        this.slots = new PlaudTokenSlots(oauth, mcp, store, clock, SIGNED_IN_TIME);
     }
 
     @Override
@@ -129,17 +129,51 @@ public class PlaudMcpAccounts implements PlaudAccounts {
     @Override
     public void attach(UUID workspaceId, UUID signInId, UUID sourceId) {
         Instant now = clock.instant();
-        if (!store.attach(workspaceId, signInId, sourceId, now.minus(SIGNED_IN_TIME), now)) {
+        if (!slots.exclusively(signInId,
+                () -> store.attach(workspaceId, signInId, sourceId, now.minus(SIGNED_IN_TIME), now))) {
             throw new AccessDenied("sign-in not finished");
         }
     }
 
     @Override
-    public FilePage files(UUID sourceId, LocalDate from, int page) {
+    public FilePage files(UUID sourceId, LocalDate from, LocalDate to, int page) {
+        return listPage(slots.source(sourceId), from, to, page);
+    }
+
+    @Override
+    public RecentFiles recentFiles(UUID workspaceId, UUID signInId, DateRange dates) {
+        Slot slot = slots.signIn(workspaceId, signInId);
+        LocalDate from = dates.from();
+        LocalDate to = dates.to();
+        int max = MAX_RECENT_FILES;
+        List<AccountFile> files = new ArrayList<>();
+        int pages = (max + PAGE_SIZE - 1) / PAGE_SIZE;
+        for (int number = 1; number <= pages; number++) {
+            FilePage page = listPage(slot, from, to, number);
+            files.addAll(page.files());
+            if (!page.hasMore()) {
+                break;
+            }
+            if (number == pages) {
+                return new RecentFiles(List.copyOf(files.subList(0, Math.min(max, files.size()))), true);
+            }
+        }
+        return new RecentFiles(List.copyOf(files.subList(0, Math.min(max, files.size()))), files.size() > max);
+    }
+
+    private FilePage listPage(Slot slot, LocalDate from, LocalDate to, int page) {
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        if (from != null) {
+            arguments.put("date_from", from.toString());
+        }
+        if (to != null) {
+            arguments.put("date_to", to.toString());
+        }
+        arguments.put("page", page);
+        arguments.put("page_size", PAGE_SIZE);
         JsonNode answer;
         try {
-            answer = parse(call(sourceId, "list_files",
-                    Map.of("date_from", from.toString(), "page", page, "page_size", PAGE_SIZE)));
+            answer = parse(slots.call(slot, "list_files", arguments));
         } catch (McpClient.ToolFailed failed) {
             throw new Unavailable("list_files failed");
         }
@@ -150,7 +184,7 @@ public class PlaudMcpAccounts implements PlaudAccounts {
             if (!FILE_ID.matcher(id).matches()) {
                 continue;
             }
-            files.add(new AccountFile(id, file.path("name").asString(""), recordedAt(file)));
+            files.add(new AccountFile(id, file.path("name").asString(""), recordedAt(file), length(file)));
         }
         return new FilePage(files, data.size() >= PAGE_SIZE);
     }
@@ -166,7 +200,7 @@ public class PlaudMcpAccounts implements PlaudAccounts {
                     : Map.of("file_id", fileId, "limit", TRANSCRIPT_PAGE_SIZE, "cursor", cursor);
             String text;
             try {
-                text = call(sourceId, "get_transcript", arguments);
+                text = slots.call(slots.source(sourceId), "get_transcript", arguments);
             } catch (McpClient.ToolFailed failed) {
                 return Optional.empty();
             }
@@ -195,7 +229,7 @@ public class PlaudMcpAccounts implements PlaudAccounts {
     public List<String> notes(UUID sourceId, String fileId) {
         String text;
         try {
-            text = call(sourceId, "get_note", Map.of("file_id", fileId));
+            text = slots.call(slots.source(sourceId), "get_note", Map.of("file_id", fileId));
         } catch (McpClient.ToolFailed failed) {
             return List.of();
         }
@@ -230,49 +264,6 @@ public class PlaudMcpAccounts implements PlaudAccounts {
     private record Account(String label, String key) {
     }
 
-    /** One tool call with the source's tokens: refreshed before expiry, and once more if Plaud refuses them. */
-    private String call(UUID sourceId, String tool, Map<String, Object> arguments) {
-        Tokens tokens = store.tokens(sourceId).orElseThrow(() -> new AccessDenied("no tokens"));
-        try {
-            if (tokens.expiresAt().isBefore(clock.instant().plus(REFRESH_MARGIN))) {
-                tokens = refresh(sourceId, tokens);
-            }
-            try {
-                return mcp.callTool(tokens.accessToken(), tool, arguments);
-            } catch (McpClient.TokenRefused refused) {
-                mcp.forget(tokens.accessToken());
-                Tokens fresh = refresh(sourceId, tokens);
-                try {
-                    return mcp.callTool(fresh.accessToken(), tool, arguments);
-                } catch (McpClient.TokenRefused again) {
-                    throw new AccessDenied("token refused after refresh");
-                }
-            }
-        } catch (PlaudOAuth.SignedOut signedOut) {
-            throw new AccessDenied(signedOut.getMessage());
-        } catch (PlaudOAuth.Unreachable | McpClient.SessionGone unreachable) {
-            throw new Unavailable(unreachable.getClass().getSimpleName());
-        }
-    }
-
-    /**
-     * Swaps {@code used} for new tokens, one refresh per source at a time. If another sync already refreshed them,
-     * the stored tokens are newer than {@code used} and are taken as they are.
-     */
-    private Tokens refresh(UUID sourceId, Tokens used) {
-        synchronized (refreshLocks.computeIfAbsent(sourceId, id -> new Object())) {
-            Tokens stored = store.tokens(sourceId).orElseThrow(() -> new AccessDenied("no tokens"));
-            if (!stored.accessToken().equals(used.accessToken())) {
-                return stored;
-            }
-            Tokens fresh = oauth.refresh(used);
-            store.replaceTokens(sourceId, fresh, clock.instant());
-            mcp.forget(used.accessToken());
-            log.info("Refreshed the Plaud sign-in of source {}", sourceId);
-            return fresh;
-        }
-    }
-
     private JsonNode parse(String text) {
         try {
             return json.readTree(unwrap(text));
@@ -302,6 +293,12 @@ public class PlaudMcpAccounts implements PlaudAccounts {
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }
+    }
+
+    /** Plaud gives the length in milliseconds; anything else is left out rather than guessed. */
+    private static Duration length(JsonNode file) {
+        JsonNode value = file.path("duration");
+        return value.isNumber() && value.asLong() > 0 ? Duration.ofMillis(value.asLong()) : null;
     }
 
     /** Plaud gives the start as a local date-time without a zone; it is read as UTC. */

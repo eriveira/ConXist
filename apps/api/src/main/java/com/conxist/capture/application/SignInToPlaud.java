@@ -1,12 +1,15 @@
 package com.conxist.capture.application;
 
+import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import com.conxist.capture.application.RecordingPicks.Pick;
 import com.conxist.capture.application.PlaudAccounts.SignIn;
 import com.conxist.capture.application.PlaudAccounts.SignInStart;
 import com.conxist.capture.application.PlaudAccounts.SignInStatus;
 import com.conxist.capture.domain.PlaudAccountConnection;
-import com.conxist.capture.domain.StartFrom;
-import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
 import com.conxist.sources.Provider;
 import com.conxist.sources.SourceCatalog;
@@ -22,14 +25,18 @@ public final class SignInToPlaud {
     private final PlaudAccounts plaud;
     private final PlaudAccountConnections connections;
     private final PlaudTeamConnections teams;
+    private final ListPlaudRecordings recordings;
+    private final RecordingPicks picks;
     private final CaptureContext context;
 
     public SignInToPlaud(SourceCatalog catalog, PlaudAccounts plaud, PlaudAccountConnections connections,
-            PlaudTeamConnections teams, CaptureContext context) {
+            PlaudTeamConnections teams, ListPlaudRecordings recordings, RecordingPicks picks, CaptureContext context) {
         this.sources = new CaptureSources(catalog);
         this.plaud = plaud;
         this.connections = connections;
         this.teams = teams;
+        this.recordings = recordings;
+        this.picks = picks;
         this.context = context;
     }
 
@@ -48,26 +55,43 @@ public final class SignInToPlaud {
 
     public SignIn status(UUID signInId) {
         return plaud.signIn(context.workspace().id(), signInId)
-                .orElseThrow(() -> new NotFound("plaud.sign-in-not-found", "This sign-in expired. Press Sign in again."));
+                .orElseThrow(RecorderProblems::signInExpired);
     }
 
-    public ConnectionView connect(UUID sourceId, UUID signInId, StartFrom startFrom, boolean includeSummaries) {
+    /**
+     * Links the signed-in account to the source, with the recordings the person picked; a sync imports them, a few at
+     * a time.
+     */
+    public ConnectionView connect(UUID sourceId, AccountChoice choice) {
         sources.require(sourceId, Provider.PLAUD);
+        UUID signInId = choice.signInId();
+        boolean importNew = choice.importNew();
+        Set<String> fileIds = new LinkedHashSet<>(choice.recordingIds());
+        if (fileIds.size() > PlaudAccounts.MAX_RECENT_FILES) {
+            throw RecorderProblems.tooManyPicks(PlaudAccounts.MAX_RECENT_FILES);
+        }
+        if (fileIds.isEmpty() && !importNew) {
+            throw RecorderProblems.nothingPicked();
+        }
         UUID workspaceId = context.workspace().id();
         if (connections.find(workspaceId, sourceId).isPresent() || teams.find(workspaceId, sourceId).isPresent()) {
             throw alreadyConnected();
         }
         SignIn signIn = signedIn(signInId);
+        List<Pick> picks = fileIds.isEmpty() ? List.of() : recordings.resolve(workspaceId, signInId, fileIds);
+        Instant now = context.clock().instant();
         PlaudAccountConnection connection = PlaudAccountConnection.connect(sourceId, workspaceId,
-                signIn.accountLabel(), signIn.accountKey(), startFrom, includeSummaries, context.clock().instant());
+                signIn.accountLabel(), signIn.accountKey(), importNew, choice.includeSummaries(), now);
         context.unitOfWork().inTransaction(() -> {
             // Added before the tokens move, so two connects racing for one source cannot both win.
             if (!connections.add(connection)) {
                 throw alreadyConnected();
             }
             plaud.attach(workspaceId, signInId, sourceId);
+            this.picks.add(workspaceId, sourceId, picks, now);
             return null;
         });
+        recordings.forget(signInId);
         return ConnectionView.of(connection);
     }
 
@@ -100,5 +124,16 @@ public final class SignInToPlaud {
             throw RecorderProblems.signInNotFinished();
         }
         return signIn;
+    }
+
+    /**
+     * What the person chose while connecting: {@code recordingIds} from {@link ListPlaudRecordings} to import now (may
+     * be empty), and whether recordings made from now on come in as well.
+     */
+    public record AccountChoice(UUID signInId, List<String> recordingIds, boolean importNew, boolean includeSummaries) {
+
+        public AccountChoice {
+            recordingIds = List.copyOf(recordingIds);
+        }
     }
 }

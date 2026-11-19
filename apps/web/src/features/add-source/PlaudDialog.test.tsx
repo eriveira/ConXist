@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
 import { stubApi } from '../../testing';
@@ -8,14 +8,22 @@ describe('PlaudDialog', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const START = { signInId: 'si-1', authorizationUrl: 'https://plaud.test/authorize?state=abc' };
+  /** 30 recordings, three a day at noon UTC from 2026-10-01 back, so there are two pages of 25. */
+  const RECORDINGS = Array.from({ length: 30 }, (_, index) => ({
+    id: `of_${index + 1}`,
+    title: `Meeting ${String(index + 1).padStart(2, '0')}`,
+    recordedAt: new Date(Date.UTC(2026, 9, 1 - Math.floor(index / 3), 12 - (index % 3))).toISOString(),
+    lengthSeconds: 1800,
+  }));
 
   function signInRoutes(status: string, overrides: Record<string, Parameters<typeof stubApi>[0][string]> = {}) {
     return stubApi({
       'POST /api/recorders/plaud/sign-ins': () => ({ status: 201, body: START }),
       'GET /api/recorders/plaud/sign-ins/si-1': () => ({ body: { id: 'si-1', status, accountLabel: status === 'SIGNED_IN' ? 'alex@acme.test' : null } }),
+      'GET /api/recorders/plaud/sign-ins/si-1/recordings': () => ({ body: { recordings: RECORDINGS, capped: false, max: 500 } }),
       'POST /api/sources': () => ({ status: 201, body: { id: 'rec-1' } }),
       'POST /api/sources/rec-1/plaud-account': () => ({ status: 201, body: {} }),
-      'POST /api/sources/rec-1/sync': () => ({ body: { imported: 3, alreadyImported: 0, waitingForTranscript: 0 } }),
+      'POST /api/sources/rec-1/sync': () => ({ body: { imported: 3, alreadyImported: 0, waitingForTranscript: 0, queued: 0 } }),
       ...overrides,
     });
   }
@@ -42,15 +50,19 @@ describe('PlaudDialog', () => {
     expect(await screen.findByText('alex@acme.test', {}, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.getByText('Signed in')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Meeting 02/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByLabelText('Source name')).toHaveValue('My meetings');
+    expect(screen.getByText('1 recording')).toBeInTheDocument();
+    expect(screen.getByText('Imported automatically')).toBeInTheDocument();
     expect(screen.getByText('Plaud account')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('3 meetings are waiting for review');
+    expect(screen.getByText('New recordings will arrive on their own.')).toBeInTheDocument();
     const body = (key: string) => JSON.parse(String(calls.find((call) => call.key === key)?.init?.body));
     expect(body('POST /api/sources')).toEqual({ provider: 'PLAUD', name: 'My meetings', accountLabel: 'alex@acme.test' });
-    expect(body('POST /api/sources/rec-1/plaud-account')).toEqual({ signInId: 'si-1', startFrom: 'LAST_30_DAYS', includeSummaries: true });
+    expect(body('POST /api/sources/rec-1/plaud-account')).toEqual({ signInId: 'si-1', recordingIds: ['of_2'], importNew: true, includeSummaries: true });
   });
 
   it('says so when the person cancels on Plaud, and lets them try again', async () => {
@@ -109,7 +121,7 @@ describe('PlaudDialog', () => {
     const calls = signInRoutes('SIGNED_IN', {
       'POST /api/sources/rec-1/sync': () => (++syncs === 1
         ? { status: 503, body: { code: 'plaud.unavailable' } }
-        : { body: { imported: 2, alreadyImported: 0, waitingForTranscript: 0 } }),
+        : { body: { imported: 2, alreadyImported: 0, waitingForTranscript: 0, queued: 0 } }),
     });
     stubPopup();
     render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
@@ -122,5 +134,111 @@ describe('PlaudDialog', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('2 meetings are waiting for review');
     expect(calls.filter((call) => call.key === 'POST /api/sources')).toHaveLength(1);
     expect(calls.filter((call) => call.key === 'POST /api/sources/rec-1/plaud-account')).toHaveLength(1);
+  });
+
+  async function toRecordings() {
+    signInRoutes('SIGNED_IN');
+    stubPopup();
+    render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await screen.findByText('alex@acme.test', {}, { timeout: 4000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('checkbox', { name: /Meeting 01/ });
+  }
+
+  it('shows the newest 25 recordings grouped by day, with a second page', async () => {
+    await toRecordings();
+
+    expect(screen.getAllByRole('checkbox', { name: /^Meeting/ })).toHaveLength(25);
+    expect(screen.getAllByText('3 recordings')).not.toHaveLength(0);
+    expect(screen.getByText('1–25 of 30')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(screen.getAllByRole('checkbox', { name: /^Meeting/ })).toHaveLength(5);
+    expect(screen.getByRole('checkbox', { name: /Meeting 30/ })).toBeInTheDocument();
+    expect(await accessibilityViolations(document.body)).toEqual([]);
+  });
+
+  it('selects every matching recording, on every page, with Select all', async () => {
+    await toRecordings();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all 30' }));
+    expect(screen.getByText('30 selected')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(screen.getByRole('checkbox', { name: /Meeting 30/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.getByText('None selected')).toBeInTheDocument();
+  });
+
+  it("selects a whole day with the day's checkbox", async () => {
+    await toRecordings();
+
+    const days = screen.getAllByRole('checkbox', { name: /^Select all 3: / });
+    await userEvent.click(days[0]);
+    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    for (const name of [/Meeting 01/, /Meeting 02/, /Meeting 03/]) expect(screen.getByRole('checkbox', { name })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Meeting 04/ })).not.toBeChecked();
+  });
+
+  it('searches by name and sorts A to Z without day groups, keeping picks', async () => {
+    await toRecordings();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /Meeting 01/ }));
+    await userEvent.type(screen.getByLabelText('Search'), 'meeting 1');
+    // Every word must match: Meeting 01, 10 to 19 and 21.
+    expect(screen.getAllByRole('checkbox', { name: /^Meeting/ })).toHaveLength(12);
+    await userEvent.selectOptions(screen.getByLabelText('Sort'), 'NAME_ZA');
+    const list = screen.getByRole('list', { name: '1–12 of 12' });
+    expect(within(list).getAllByRole('checkbox')[0]).toHaveAccessibleName(/Meeting 21/);
+    expect(within(list).queryByRole('checkbox', { name: /^Select all 3: / })).not.toBeInTheDocument();
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByLabelText('Search'));
+    await userEvent.type(screen.getByLabelText('Search'), 'standup');
+    expect(screen.getByText('No recordings match')).toBeInTheDocument();
+  });
+
+  it('needs a pick or new recordings before Next', async () => {
+    await toRecordings();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /Also import new recordings/ }));
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveAccessibleDescription('Pick a recording, or turn on new recordings.');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Meeting 05/ }));
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  });
+
+  it('says when the From date is after the To date, without asking Plaud', async () => {
+    await toRecordings();
+
+    await userEvent.type(screen.getByLabelText('From'), '2026-10-02');
+    await userEvent.type(screen.getByLabelText('To'), '2026-10-01');
+    expect(screen.getByRole('alert')).toHaveTextContent('The From date is after the To date.');
+    expect(screen.getByLabelText('To')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('moves focus to the list when the page changes', async () => {
+    await toRecordings();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(screen.getByRole('list', { name: '26–30 of 30' })).toHaveFocus();
+  });
+
+  it('says so and offers Retry when Plaud does not answer', async () => {
+    let lists = 0;
+    signInRoutes('SIGNED_IN', {
+      'GET /api/recorders/plaud/sign-ins/si-1/recordings': () => (++lists === 1
+        ? { status: 503, body: { code: 'plaud.unavailable' } }
+        : { body: { recordings: RECORDINGS, capped: true, max: 500 } }),
+    });
+    stubPopup();
+    render(<PlaudDialog onClose={vi.fn()} onCaptured={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await screen.findByText('alex@acme.test', {}, { timeout: 4000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Plaud is not answering right now.');
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText(/Showing your newest 500 recordings/)).toBeInTheDocument();
   });
 });

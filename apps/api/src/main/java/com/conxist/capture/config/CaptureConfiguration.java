@@ -17,6 +17,8 @@ import com.conxist.capture.application.ConnectPlaudTeam;
 import com.conxist.capture.application.ListRecorderConnections;
 import com.conxist.capture.application.PlaudTeam;
 import com.conxist.capture.application.SignInToPlaud;
+import com.conxist.capture.application.ListPlaudRecordings;
+import com.conxist.capture.application.RecordingPicks;
 import com.conxist.capture.application.PlaudAccountConnections;
 import com.conxist.capture.application.PlaudAccounts;
 import com.conxist.capture.adapter.plaudaccount.PlaudMcpAccounts;
@@ -87,9 +89,14 @@ class CaptureConfiguration {
     }
 
     @Bean
+    ListPlaudRecordings listPlaudRecordings(PlaudAccounts plaud, CaptureContext context) {
+        return new ListPlaudRecordings(plaud, context);
+    }
+
+    @Bean
     SignInToPlaud signInToPlaud(SourceCatalog catalog, PlaudAccounts plaud, PlaudAccountConnections accounts,
-            PlaudTeamConnections teams, CaptureContext context) {
-        return new SignInToPlaud(catalog, plaud, accounts, teams, context);
+            PlaudTeamConnections teams, ListPlaudRecordings recordings, RecordingPicks picks, CaptureContext context) {
+        return new SignInToPlaud(catalog, plaud, accounts, teams, recordings, picks, context);
     }
 
     /** Plaud's APIs: timeouts, and no redirects, so a token is never sent to another host. */
@@ -110,9 +117,9 @@ class CaptureConfiguration {
 
     @Bean
     SyncRecorder syncRecorder(SourceCatalog catalog, PlaudTeam plaud, PlaudTeamConnections connections,
-            PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, CapturedDocumentRepository documents,
-            CaptureContext context, CaptureProperties capture) {
-        return new SyncRecorder(catalog, plaud, connections, plaudAccounts, accounts, documents, context,
+            PlaudAccounts plaudAccounts, PlaudAccountConnections accounts, RecordingPicks picks,
+            CapturedDocumentRepository documents, CaptureContext context, CaptureProperties capture) {
+        return new SyncRecorder(catalog, plaud, connections, plaudAccounts, accounts, picks, documents, context,
                 capture.maxTextCharacters());
     }
 
