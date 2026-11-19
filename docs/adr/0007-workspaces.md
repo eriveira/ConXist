@@ -1,6 +1,6 @@
-# 0006. Several workspaces, named in each request
+# 0007. Several workspaces, named in each request
 
-- Status: **Proposed** (needs the owner's go before migration V6 is applied anywhere shared)
+- Status: **Proposed** (needs the owner's go before migration V8 is applied anywhere shared)
 - Date: 2026-11-19
 - Decided by: Eugenio Riviera (workspace setup mock approved, "build it", project thread, 2026-11-19)
 
@@ -23,7 +23,7 @@ person can keep several workspaces, switching between them from the header. Ther
 - Work outside a request (the scheduled recorder check) is told the workspace id and runs for every workspace.
 - The switcher's source counts come from `workspace_sources`, a read model fed by `SourceAdded`, with no foreign key
   into the sources module (like the hub's, ADR 0002). Writes are idempotent, so a re-delivered event counts once.
-- Migration V6 gives data made before workspaces existed a row named "My workspace" (then "My workspace 2" and so
+- Migration V8 gives data made before workspaces existed a row named "My workspace" (then "My workspace 2" and so
   on), so it stays reachable. A database with no sources gets no row, and the app shows the first-run page.
 - The web app keeps the last workspace used in the browser and opens it next time, or the oldest one.
 

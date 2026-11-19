@@ -1,4 +1,4 @@
--- A person can keep several workspaces (ADR 0006). Every request names the one it acts for.
+-- A person can keep several workspaces (ADR 0007). Every request names the one it acts for.
 
 create table workspaces (
     id          uuid        primary key,
