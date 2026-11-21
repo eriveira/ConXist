@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import { setRequestLanguage } from './api/client';
 import { Icon } from './components/Icon';
 import { AgentPage } from './features/agents/AgentPage';
 import { AgentsPage } from './features/agents/AgentsPage';
+import { SkillPage } from './features/skills/SkillPage';
+import { SkillsPage } from './features/skills/SkillsPage';
 import type { Workspace } from './domain/workspaces';
 import { AppHeader } from './features/shell/AppHeader';
 import { AskConxist } from './features/shell/AskConxist';
@@ -16,7 +19,7 @@ import { NewWorkspaceDialog } from './features/workspaces/NewWorkspaceDialog';
 import { useWorkspaces } from './features/workspaces/useWorkspaces';
 import { I18nProvider, translator } from './i18n/i18n';
 import { LANGUAGES, type Language } from './i18n/messages';
-import { useAgentRoute, useRoute as useSourceRoute } from './navigation';
+import { type AgentsRoute, useAgentsRoute, useRoute as useSourceRoute } from './navigation';
 import { readPreference, savePreference } from './preferences';
 
 /** How long "Acme is ready" stays after creating a workspace. */
@@ -25,6 +28,8 @@ const CREATED_NOTICE_MS = 8_000;
 export function App() {
   const [language, setLanguage] = useState<Language>(() => readPreference('language', LANGUAGES, 'en'));
   const [theme, setTheme] = useState<Theme>(() => readPreference('theme', THEMES, 'system'));
+  // Set while rendering, so the requests the pages below make on their first render already carry it.
+  setRequestLanguage(language);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -57,7 +62,7 @@ function Workspaces(settings: SettingsProps) {
   const { state, retry, switchTo, created, refresh } = useWorkspaces();
   const [page, go] = useRoute();
   const sourceRoute = useSourceRoute();
-  const agentId = useAgentRoute();
+  const agentsRoute = useAgentsRoute();
   const [newOpen, setNewOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -102,11 +107,21 @@ function Workspaces(settings: SettingsProps) {
         {page === 'sources' && (sourceRoute.page === 'source'
           ? <SourcePage key={sourceRoute.sourceId} sourceId={sourceRoute.sourceId} />
           : <SourcesPage />)}
-        {page === 'agents' && (agentId ? <AgentPage key={agentId} agentId={agentId} /> : <AgentsPage />)}
+        {page === 'agents' && <AgentsArea route={agentsRoute} />}
         {(page === 'flow' || page === 'knowledge') && <ComingSoonPage page={page} />}
       </main>
       <AskConxist />
       {newOpen && <NewWorkspaceDialog onClose={() => setNewOpen(false)} onCreated={onCreated} />}
     </div>
   );
+}
+
+/** Agents and the skills they follow, which live under Agents in the menu. */
+function AgentsArea({ route }: { route: AgentsRoute }) {
+  switch (route.view) {
+    case 'agent': return <AgentPage key={route.id} agentId={route.id} />;
+    case 'skill': return <SkillPage key={route.id} skillId={route.id} />;
+    case 'skills': return <SkillsPage creating={route.creating} />;
+    default: return <AgentsPage />;
+  }
 }

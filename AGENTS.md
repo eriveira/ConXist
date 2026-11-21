@@ -38,10 +38,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
   is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`) with `domain`,
   `application`, `adapter` and `config` inside. Modules talk through their root
   package (API) and events. See `docs/adr/0002-stack.md` (accepted).
-- `apps/web/`: the web app (the Sources and Agents pages and their dialogs). `domain` and `api` stay
+- `apps/web/`: the web app (the Sources, Agents and Skills pages and their dialogs). `domain` and `api` stay
   free of React; screens live in `features`.
 
-## Current state (2026-11-20)
+## Current state (2026-11-21)
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
@@ -55,10 +55,13 @@ Sources page does not show it for now, owner decision 2026-11-17).
   `mvn spring-boot:test-run` runs a fake Plaud that signs in as `alex@acme.test`.
 - Workspaces (ADR 0007): a person keeps several; first run asks for one (name, optional description up to 500
   characters). Every workspace request sends `X-Workspace-Id`; the app keeps the last one used. The header menu is
-  Home (empty for now), Flow, Agents, Sources, Knowledge; Flow, Knowledge and Ask ConXist show "coming soon".
+  Home (empty for now), Flow, Agents (with Skills), Sources, Knowledge; Flow, Knowledge and Ask ConXist show "coming soon".
 - Agents (ADR 0010, step 1 of 4 the owner set: Agents, Skills, Test run, Schedules): an `agents` module and the
   Agents pages. Create from a template, edit a draft that saves itself (revision check), publish numbered versions,
-  History and Restore, Archive. Nothing runs agents yet; Test and Skills show "coming soon".
+  History and Restore, Archive. Nothing runs agents yet; Test shows "coming soon".
+- Skills (ADR 0011, step 2): in the `agents` module, under an Agents | Skills tab. Write, import a SKILL.md, or copy a
+  built-in skill; publish numbered versions with a note. An agent pins a skill version and gets "vN available" when a
+  newer one is published. Reference files and GitHub import show "coming soon".
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

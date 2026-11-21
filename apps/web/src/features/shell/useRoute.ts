@@ -7,8 +7,9 @@ export type Page = (typeof PAGES)[number];
 export const START_PAGE: Page = 'sources';
 
 export function pageOf(hash: string): Page {
-  // #/sources/{id} is one source's page, under Sources.
+  // #/sources/{id} is one source's page, under Sources. Skills live under Agents.
   const name = hash.replace(/^#\/?/, '').split('/')[0];
+  if (name === 'skills') return 'agents';
   return PAGES.find((page) => page === name) ?? START_PAGE;
 }
 

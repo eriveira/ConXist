@@ -1,0 +1,90 @@
+/* Skills: the Agents and Skills tabs, the list, one skill's page, and the Skills section of an agent. Tokens only. */
+.page-h-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--cx-border); margin: -8px 0 18px; overflow-x: auto; }
+.subtabs a {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-weight: 700; white-space: nowrap;
+  color: var(--cx-fg-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.subtabs a[aria-current="page"] { color: var(--cx-fg); border-bottom-color: var(--cx-action); }
+.subtabs a:hover { color: var(--cx-fg); }
+.subtabs a:focus-visible { outline-offset: -2px; }
+
+.list-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 12px; }
+.list-tools .show-archived { margin-bottom: 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button {
+  min-height: 40px; padding: 0 14px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-pill);
+  background: var(--cx-surface); color: var(--cx-fg); font: inherit; font-size: 14px; cursor: pointer;
+}
+.filters button[aria-pressed="true"] { border-color: var(--cx-accent); background: var(--cx-accent-soft); color: var(--cx-accent-text); font-weight: 700; }
+
+/* an agent's Skills section */
+.skill-rows { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.skill-row {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 10px 12px 14px; border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius-sm); background: var(--cx-surface);
+}
+.skill-row .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.skill-row small { font-size: 13px; color: var(--cx-fg-muted); overflow-wrap: anywhere; }
+.skill-row-top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.skill-row-top b { overflow-wrap: anywhere; }
+.skill-row-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; color: var(--cx-fg-muted); }
+.skill-row-links a, .skill-row-links .link { min-height: 32px; display: inline-flex; align-items: center; }
+.skill-warn { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; color: var(--cx-warn-fg); }
+.skill-warn svg { flex: none; }
+.nico.sm { width: 32px; height: 32px; flex: none; }
+.icon-btn {
+  flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: var(--cx-radius-sm);
+  background: transparent; color: var(--cx-fg-muted); cursor: pointer;
+}
+.icon-btn:hover { background: var(--cx-bg-alt); color: var(--cx-fg); }
+.skill-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 4px; }
+.skill-menu { max-height: min(420px, 70vh); overflow-y: auto; }
+.skill-menu a.mitem { color: inherit; text-decoration: none; }
+.mname.accent { color: var(--cx-accent-text); }
+.menu-empty { padding: 4px 10px 8px; margin: 0; font-size: 13.5px; }
+.notice.inline { min-height: 0; margin: 4px 0 8px; font-size: 13.5px; }
+.notice.inline:empty { margin: 0; }
+.needed-by { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--cx-accent-text); }
+.needed-by.off { color: var(--cx-warn-fg); }
+
+/* one skill's page */
+.skill-needs { margin-bottom: 8px; }
+.grp-title { margin: 6px 0 8px; font-size: 14px; font-weight: 800; }
+.need-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.need-list li {
+  display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius-sm); background: var(--cx-surface);
+}
+.need-list .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.need-list small { font-size: 12.5px; color: var(--cx-fg-muted); }
+.need-list code, .skill-md { font-family: var(--cx-font-mono); }
+.inline-field { max-width: 320px; }
+.skill-page textarea.instructions { font-family: var(--cx-font-mono); font-size: 13.5px; min-height: 280px; }
+.side-card.side-tabs-card, .skill-page .side-card { border-style: solid; padding: 0; overflow: hidden; }
+.side-tabs { display: flex; border-bottom: 1px solid var(--cx-border); }
+.side-tabs button {
+  flex: 1; min-height: 44px; border: 0; background: none; font: inherit; font-weight: 700; color: var(--cx-fg-muted); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.side-tabs button[aria-selected="true"] { color: var(--cx-fg); border-bottom-color: var(--cx-action); }
+.side-tabs button:focus-visible { outline-offset: -2px; }
+.side-panel { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.side-panel .hint { font-size: 13px; color: var(--cx-fg-muted); margin: 0; }
+.skill-md {
+  margin: 0; padding: 10px 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-size: 12.5px; line-height: 1.5; background: var(--cx-surface); border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm);
+}
+.used-by { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.used-by li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 14px; }
+.used-by .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.version-note { display: block; margin-top: 2px; font-size: 13px; color: var(--cx-fg-muted); overflow-wrap: anywhere; }
+.plain-list { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.soon-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--cx-border); border-radius: var(--cx-radius-sm); }
+.soon-row .grow { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.soon-row small { color: var(--cx-fg-muted); font-size: 13px; }
+
+@media (max-width: 560px) {
+  .page-h-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+a.btn { text-decoration: none; }

@@ -3,6 +3,7 @@ import { shellEn, shellEs } from './shellMessages';
 import { sourceEn, sourceEs } from './sourceMessages';
 import { editEn, editEs } from './editMessages';
 import { agentEn, agentEs } from './agentMessages';
+import { skillEn, skillEs } from './skillMessages';
 
 const en = {
   ...pickerEn,
@@ -10,6 +11,7 @@ const en = {
   ...editEn,
   ...shellEn,
   ...agentEn,
+  ...skillEn,
   'app.theme': 'Theme',
   'app.theme.system': 'System',
   'app.theme.light': 'Light',
@@ -204,6 +206,7 @@ const es: Messages = {
   ...editEs,
   ...shellEs,
   ...agentEs,
+  ...skillEs,
   'app.theme': 'Tema',
   'app.theme.system': 'Sistema',
   'app.theme.light': 'Claro',

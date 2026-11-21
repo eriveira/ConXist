@@ -5,6 +5,7 @@ import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
 import type { Agent, AgentDefinition, AgentSummary, AgentTemplate, AgentToolInfo, AgentVersion } from '../domain/agents';
+import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
 export class ApiError extends Error {
@@ -22,9 +23,17 @@ export function setRequestWorkspace(workspaceId: string | null): void {
   currentWorkspace = workspaceId;
 }
 
+/** The person's language, for what ConXist writes itself, such as built-in skills. */
+let currentLanguage: string | null = null;
+
+export function setRequestLanguage(language: string | null): void {
+  currentLanguage = language;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (currentWorkspace) headers.set(WORKSPACE_HEADER, currentWorkspace);
+  if (currentLanguage) headers.set('Accept-Language', currentLanguage);
   const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     const problem = await problemOf(response);
@@ -96,6 +105,7 @@ export interface NewAgent {
 }
 
 const agentPath = (agentId: string) => `/api/agents/${encodeURIComponent(agentId)}`;
+const skillPath = (skillId: string) => `/api/skills/${encodeURIComponent(skillId)}`;
 
 export const api = {
   workspaces: () => request<Workspace[]>('/api/workspaces'),
@@ -151,6 +161,22 @@ export const api = {
     postJson<Agent>(`${agentPath(agentId)}/versions/${number}/restore`, { revision }),
   archiveAgent: (agentId: string, revision: number) => postJson<Agent>(`${agentPath(agentId)}/archive`, { revision }),
   unarchiveAgent: (agentId: string, revision: number) => postJson<Agent>(`${agentPath(agentId)}/unarchive`, { revision }),
+  skills: () => request<SkillSummary[]>('/api/skills'),
+  createSkill: (name: string) => postJson<Skill>('/api/skills', { name }),
+  /** Reads a SKILL.md into a new draft to check before publishing. */
+  importSkill: (markdown: string) => postJson<Skill>('/api/skills/import', { markdown }),
+  /** Copies a built-in skill into one the team can change. */
+  copySkill: (skillId: string) => request<Skill>(`${skillPath(skillId)}/copy`, { method: 'POST' }),
+  skill: (skillId: string) => request<Skill>(skillPath(skillId)),
+  saveSkillDraft: (skillId: string, revision: number, draft: SkillDefinition) =>
+    putJson<Skill>(`${skillPath(skillId)}/draft`, { revision, draft }),
+  publishSkill: (skillId: string, revision: number, note: string) =>
+    postJson<Skill>(`${skillPath(skillId)}/publish`, { revision, note }),
+  skillVersion: (skillId: string, number: number) => request<SkillVersion>(`${skillPath(skillId)}/versions/${number}`),
+  restoreSkillVersion: (skillId: string, number: number, revision: number) =>
+    postJson<Skill>(`${skillPath(skillId)}/versions/${number}/restore`, { revision }),
+  archiveSkill: (skillId: string, revision: number) => postJson<Skill>(`${skillPath(skillId)}/archive`, { revision }),
+  unarchiveSkill: (skillId: string, revision: number) => postJson<Skill>(`${skillPath(skillId)}/unarchive`, { revision }),
   sync: (sourceId: string) => request<SyncResult>(`/api/sources/${sourceId}/sync`, { method: 'POST' }),
 };
 

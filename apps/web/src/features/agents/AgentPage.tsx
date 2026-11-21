@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
-import { type AgentToolInfo, localProblems } from '../../domain/agents';
+import { type AgentDefinition, type AgentToolInfo, localProblems } from '../../domain/agents';
+import { type PinnedSkill, type SkillSummary, skillRowProblems, skillRows } from '../../domain/skills';
 import type { Source } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { AGENTS_HREF } from '../../navigation';
 import { AgentSections } from './AgentSections';
 import { AgentStatePill } from './AgentStatePill';
-import { HistoryDialog } from './HistoryDialog';
+import { AgentVersionSummary, HistoryDialog } from './HistoryDialog';
 import { SaveStatus } from './SaveStatus';
 import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
 
-/** What the agent's fields need from the rest of the workspace: its sources, and the tools agents may use. */
+/** What the agent's fields need from the rest of the workspace: its sources, its skills and the tools agents may use. */
 export type Choices =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[] };
+  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[] };
 
 type Busy = 'publish' | 'archive' | null;
 
@@ -38,8 +39,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
 
   const loadChoices = useCallback(() => {
     setChoices({ status: 'loading' });
-    Promise.all([api.sources(), api.agentTools()])
-      .then(([sources, tools]) => setChoices({ status: 'ready', sources, tools }))
+    Promise.all([api.sources(), api.agentTools(), api.skills()])
+      .then(([sources, tools, skills]) => setChoices({ status: 'ready', sources, tools, skills }))
       .catch(() => setChoices({ status: 'error' }));
   }, []);
 
@@ -66,9 +67,9 @@ export function AgentPage({ agentId }: { agentId: string }) {
     );
   }
 
-  const { agent, draft, save, problem } = state;
+  const { item: agent, draft, save, problem } = state;
   const archived = agent.status === 'ARCHIVED';
-  const problems = Array.from(new Set([...localProblems(draft), ...agent.problems]));
+  const problems = Array.from(new Set([...localProblems(draft), ...currentProblems(agent.problems, draft, agent.skills, choices)]));
   const blocked = blockedBy(draft);
   const stuck = blocked !== null || save === 'conflict';
   const canPublish = !archived && problems.length === 0 && !stuck && save !== 'failed'
@@ -139,23 +140,34 @@ export function AgentPage({ agentId }: { agentId: string }) {
         </div>
       )}
       <div className="agent-layout">
-        <AgentSections draft={draft} onChange={editor.edit} disabled={archived || save === 'conflict'}
+        <AgentSections draft={draft} pinned={agent.skills} onChange={editor.edit} disabled={archived || save === 'conflict'}
           choices={choices} onRetryChoices={loadChoices} />
         <aside className="agent-side">
           <div className="side-card">
             <h2><Icon name="chat" size={18} /> {t('agent.test.title')}</h2>
             <p>{t('agent.test.soon')}</p>
           </div>
-          <div className="side-card">
-            <h2><Icon name="file" size={18} /> {t('agent.skills.title')}</h2>
-            <p>{t('agent.skills.soon')}</p>
-          </div>
         </aside>
       </div>
       {historyOpen && (
-        <HistoryDialog agent={agent} hasUnpublished={!agent.draftPublished || save !== 'saved'}
+        <HistoryDialog name={agent.draft.name} versions={agent.versions} publishedVersion={agent.publishedVersion}
+          loadVersion={(number) => api.agentVersion(agent.id, number)}
+          renderVersion={(version) => <AgentVersionSummary version={version} />}
+          archivedNote={t('agent.history.archived')} hasUnpublished={!agent.draftPublished || save !== 'saved'}
           archived={archived} blocked={stuck} onRestore={restore} onClose={() => setHistoryOpen(false)} />
       )}
     </section>
   );
+}
+
+const SKILL_PROBLEMS = ['skill-missing', 'skill-needs-tool'];
+
+/**
+ * The server's problems describe the saved draft. Once the skills list is in, the skill problems are worked out from
+ * what is on screen instead, so adding a tool or removing a skill clears them at once.
+ */
+function currentProblems(saved: string[], draft: AgentDefinition, pinned: PinnedSkill[], choices: Choices): string[] {
+  if (choices.status !== 'ready') return saved;
+  return [...saved.filter((code) => !SKILL_PROBLEMS.includes(code)),
+    ...skillRowProblems(skillRows(draft.skills, pinned, choices.skills), draft.tools)];
 }

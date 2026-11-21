@@ -17,26 +17,47 @@ export function sourceHref(sourceId: string): string {
 export const SOURCES_HREF = '#/sources';
 export const AGENTS_HREF = '#/agents';
 
-const AGENT = /^#\/agents\/([0-9a-fA-F-]{36})$/;
+export const SKILLS_HREF = '#/skills';
+/** Opens the Skills page with the New skill dialog. */
+export const NEW_SKILL_HREF = '#/skills/new';
 
-/** The agent whose page the address shows (#/agents/{id}), or null for the list of agents. */
-export function agentIdOf(hash: string): string | null {
-  return AGENT.exec(hash)?.[1] ?? null;
+/** Where in Agents the address points: the list of agents or skills, one agent, one skill, or a new skill. */
+export type AgentsRoute =
+  | { view: 'agents' }
+  | { view: 'agent'; id: string }
+  | { view: 'skills'; creating: boolean }
+  | { view: 'skill'; id: string };
+
+const AGENT = /^#\/agents\/([0-9a-fA-F-]{36})$/;
+const SKILL = /^#\/skills\/([0-9a-fA-F-]{36})$/;
+
+export function agentsRouteOf(hash: string): AgentsRoute {
+  const agent = AGENT.exec(hash);
+  if (agent) return { view: 'agent', id: agent[1] };
+  const skill = SKILL.exec(hash);
+  if (skill) return { view: 'skill', id: skill[1] };
+  if (hash === NEW_SKILL_HREF) return { view: 'skills', creating: true };
+  if (hash.startsWith(SKILLS_HREF)) return { view: 'skills', creating: false };
+  return { view: 'agents' };
 }
 
 export function agentHref(agentId: string): string {
   return `#/agents/${agentId}`;
 }
 
-/** The agent in the address, following the back button and links. */
-export function useAgentRoute(): string | null {
-  const [agentId, setAgentId] = useState(() => agentIdOf(window.location.hash));
+export function skillHref(skillId: string): string {
+  return `#/skills/${skillId}`;
+}
+
+/** The part of Agents in the address, following the back button and links. */
+export function useAgentsRoute(): AgentsRoute {
+  const [route, setRoute] = useState(() => agentsRouteOf(window.location.hash));
   useEffect(() => {
-    const onChange = () => setAgentId(agentIdOf(window.location.hash));
+    const onChange = () => setRoute(agentsRouteOf(window.location.hash));
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
-  return agentId;
+  return route;
 }
 
 export function useRoute(): Route {
