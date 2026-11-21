@@ -6,6 +6,7 @@ import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
 import type { Agent, AgentDefinition, AgentSummary, AgentTemplate, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
+import type { TestRunResult, TestRunStatus } from '../domain/testRuns';
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
 export class ApiError extends Error {
@@ -177,6 +178,10 @@ export const api = {
     postJson<Skill>(`${skillPath(skillId)}/versions/${number}/restore`, { revision }),
   archiveSkill: (skillId: string, revision: number) => postJson<Skill>(`${skillPath(skillId)}/archive`, { revision }),
   unarchiveSkill: (skillId: string, revision: number) => postJson<Skill>(`${skillPath(skillId)}/unarchive`, { revision }),
+  testRunStatus: () => request<TestRunStatus>('/api/test-runs/status'),
+  /** Runs the agent's saved draft once on one meeting; answers when the run is done. Nothing is kept. */
+  startTestRun: (agentId: string, sourceId: string, meetingId: string) =>
+    postJson<TestRunResult>(`${agentPath(agentId)}/test-runs`, { sourceId, meetingId }),
   sync: (sourceId: string) => request<SyncResult>(`/api/sources/${sourceId}/sync`, { method: 'POST' }),
 };
 

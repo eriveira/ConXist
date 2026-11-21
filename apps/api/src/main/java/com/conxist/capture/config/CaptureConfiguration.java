@@ -14,6 +14,8 @@ import com.conxist.capture.application.EditMeeting;
 import com.conxist.capture.application.ListDocuments;
 import com.conxist.capture.application.ListSyncHistory;
 import com.conxist.capture.application.ReadDocument;
+import com.conxist.capture.application.ReadMeetingLibrary;
+import com.conxist.capture.MeetingLibrary;
 import com.conxist.capture.application.SyncHistory;
 import com.conxist.capture.adapter.plaud.JdbcRecorderKeys;
 import com.conxist.capture.adapter.plaud.PlaudTeamClient;
@@ -162,5 +164,11 @@ class CaptureConfiguration {
     @Bean
     ListDocuments listDocuments(CapturedDocumentRepository documents, CurrentWorkspace workspace) {
         return new ListDocuments(documents, workspace);
+    }
+
+    @Bean
+    MeetingLibrary meetingLibrary(SourceCatalog catalog, CapturedDocumentRepository documents,
+            CurrentWorkspace workspace) {
+        return new ReadMeetingLibrary(catalog, documents, workspace);
     }
 }

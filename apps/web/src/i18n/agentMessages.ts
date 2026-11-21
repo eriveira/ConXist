@@ -142,7 +142,6 @@ export const agentEn = {
   'agent.limit.range': 'From {min} to {max}',
 
   'agent.test.title': 'Test',
-  'agent.test.soon': 'Coming soon: run this agent on one of your meetings and check what it gives back before you publish.',
 
   'agent.history.title': 'History',
   'agent.history.subtitle': 'Every published version. Published versions never change.',
@@ -317,7 +316,6 @@ export const agentEs: Record<keyof typeof agentEn, string> = {
   'agent.limit.range': 'De {min} a {max}',
 
   'agent.test.title': 'Probar',
-  'agent.test.soon': 'Próximamente: ejecuta este agente con una de tus reuniones y revisa lo que entrega antes de publicar.',
 
   'agent.history.title': 'Historial',
   'agent.history.subtitle': 'Cada versión publicada. Las versiones publicadas nunca cambian.',
