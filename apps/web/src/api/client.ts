@@ -4,7 +4,7 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
-import type { Agent, AgentDefinition, AgentSummary, AgentTemplate, AgentToolInfo, AgentVersion } from '../domain/agents';
+import type { Agent, AgentDefinition, AgentSummary, AgentUse, AgentTemplate, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
 import type { TestRunResult, TestRunStatus } from '../domain/testRuns';
 
@@ -162,6 +162,11 @@ export const api = {
     postJson<Agent>(`${agentPath(agentId)}/versions/${number}/restore`, { revision }),
   archiveAgent: (agentId: string, revision: number) => postJson<Agent>(`${agentPath(agentId)}/archive`, { revision }),
   unarchiveAgent: (agentId: string, revision: number) => postJson<Agent>(`${agentPath(agentId)}/unarchive`, { revision }),
+  /** What uses the agent; while anything does, the API refuses to delete it. */
+  agentUses: (agentId: string) => request<AgentUse[]>(`${agentPath(agentId)}/uses`),
+  /** Deletes the agent and all its versions for good, if it is still at `revision` and nothing uses it. */
+  deleteAgent: (agentId: string, revision: number) =>
+    request<void>(`${agentPath(agentId)}?revision=${revision}`, { method: 'DELETE' }),
   skills: () => request<SkillSummary[]>('/api/skills'),
   createSkill: (name: string) => postJson<Skill>('/api/skills', { name }),
   /** Reads a SKILL.md into a new draft to check before publishing. */
@@ -178,6 +183,11 @@ export const api = {
     postJson<Skill>(`${skillPath(skillId)}/versions/${number}/restore`, { revision }),
   archiveSkill: (skillId: string, revision: number) => postJson<Skill>(`${skillPath(skillId)}/archive`, { revision }),
   unarchiveSkill: (skillId: string, revision: number) => postJson<Skill>(`${skillPath(skillId)}/unarchive`, { revision }),
+  /** The agents that follow the skill in their draft or live version. */
+  skillUses: (skillId: string) => request<AgentUse[]>(`${skillPath(skillId)}/uses`),
+  /** Deletes the skill and all its versions for good, if it is still at `revision` and no agent follows it. */
+  deleteSkill: (skillId: string, revision: number) =>
+    request<void>(`${skillPath(skillId)}?revision=${revision}`, { method: 'DELETE' }),
   testRunStatus: () => request<TestRunStatus>('/api/test-runs/status'),
   /** Runs the agent's saved draft once on one meeting; answers when the run is done. Nothing is kept. */
   startTestRun: (agentId: string, sourceId: string, meetingId: string) =>

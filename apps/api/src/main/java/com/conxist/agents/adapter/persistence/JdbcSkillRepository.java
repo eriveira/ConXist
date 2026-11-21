@@ -76,6 +76,23 @@ class JdbcSkillRepository implements SkillRepository {
     }
 
     @Override
+    public boolean delete(UUID workspaceId, UUID skillId, long expectedRevision) {
+        jdbc.sql("""
+                delete from skill_versions where skill_id = :id and exists (
+                    select 1 from skills where id = :id and workspace_id = :workspaceId and revision = :revision)
+                """)
+                .param("id", skillId)
+                .param("workspaceId", workspaceId)
+                .param("revision", expectedRevision)
+                .update();
+        return jdbc.sql("delete from skills where id = :id and workspace_id = :workspaceId and revision = :revision")
+                .param("id", skillId)
+                .param("workspaceId", workspaceId)
+                .param("revision", expectedRevision)
+                .update() == 1;
+    }
+
+    @Override
     public Optional<Skill> find(UUID workspaceId, UUID skillId) {
         return jdbc.sql("select " + COLUMNS + " from skills where id = :id and workspace_id = :workspaceId")
                 .param("id", skillId)

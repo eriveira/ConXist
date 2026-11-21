@@ -29,6 +29,12 @@ public interface SkillRepository {
         return nameTaken(workspaceId, name, null);
     }
 
+    /**
+     * Deletes the workspace's skill and all its versions, only if it is still at {@code expectedRevision};
+     * false when it changed first or is not there.
+     */
+    boolean delete(UUID workspaceId, UUID skillId, long expectedRevision);
+
     void addVersion(SkillVersion version);
 
     /** Number, note and date of every version of the workspace's skill, the newest first. */

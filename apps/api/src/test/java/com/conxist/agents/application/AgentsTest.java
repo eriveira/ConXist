@@ -54,6 +54,9 @@ class AgentsTest {
     private final PublishAgent publish = new PublishAgent(book);
     private final RestoreAgentVersion restore = new RestoreAgentVersion(book);
     private final ArchiveAgent archive = new ArchiveAgent(book);
+    private final List<AgentUse> agentUses = new ArrayList<>();
+    private final DeleteAgent deleteAgent = new DeleteAgent(book, (workspaceId, agentId) -> List.copyOf(agentUses));
+    private final DeleteSkill deleteSkill = new DeleteSkill(skills, book);
 
     @Test
     void an_agent_starts_from_a_template_as_a_ready_draft() {
@@ -213,6 +216,61 @@ class AgentsTest {
     }
 
     @Test
+    void an_agent_is_deleted_with_its_versions_unless_something_uses_it_or_it_changed() {
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView published = publish.publish(created.id(), created.revision());
+
+        assertCode(() -> deleteAgent.delete(published.id(), created.revision()), "agent.changed");
+        agentUses.add(new AgentUse("FLOW", UUID.randomUUID(), "Triage", "LIVE", false));
+        assertThat(deleteAgent.uses(published.id())).hasSize(1);
+        assertCode(() -> deleteAgent.delete(published.id(), published.revision()), "agent.in-use");
+        agentUses.clear();
+
+        deleteAgent.delete(published.id(), published.revision());
+
+        assertThat(list.list()).isEmpty();
+        assertThatThrownBy(() -> read.get(published.id())).isInstanceOf(NotFound.class);
+        assertThat(repository.versions).isEmpty();
+    }
+
+    @Test
+    void a_skill_an_agent_follows_in_its_draft_or_live_version_is_not_deleted() {
+        SkillView skill = addSkill.create("Acme style");
+        SkillView drafted = saveSkill.save(skill.id(), skill.revision(), new SkillDefinition("Acme style",
+                "When writing for customers.", "Say customer, never user.", List.of()));
+        SkillView v1 = publishSkill.publish(drafted.id(), drafted.revision(), "");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView following = save.save(created.id(), created.revision(),
+                withSkills(created.draft(), List.of(new SkillPin(skill.id(), 1))));
+        AgentView live = publish.publish(following.id(), following.revision());
+
+        assertThat(deleteSkill.uses(skill.id())).singleElement().satisfies(use -> {
+            assertThat(use.name()).isEqualTo("Summarizer");
+            assertThat(use.where()).isEqualTo("BOTH");
+        });
+        assertCode(() -> deleteSkill.delete(skill.id(), v1.revision()), "skill.in-use");
+
+        // Out of the draft but still in the live version: still in use, and an archived agent still counts.
+        AgentView dropped = save.save(live.id(), live.revision(), withSkills(live.draft(), List.of()));
+        AgentView archived = archive.archive(dropped.id(), dropped.revision());
+        assertThat(deleteSkill.uses(skill.id())).singleElement().satisfies(use -> {
+            assertThat(use.where()).isEqualTo("LIVE");
+            assertThat(use.archived()).isTrue();
+        });
+
+        AgentView back = archive.unarchive(archived.id(), archived.revision());
+        publish.publish(back.id(), back.revision());
+        assertThat(deleteSkill.uses(skill.id())).isEmpty();
+        deleteSkill.delete(skill.id(), v1.revision());
+        assertThatThrownBy(() -> deleteSkill.uses(skill.id())).isInstanceOf(NotFound.class);
+    }
+
+    @Test
+    void a_built_in_skill_is_not_deleted() {
+        assertCode(() -> deleteSkill.delete(BuiltInSkill.PLAIN_WRITING.id(), 1), "skill.built-in");
+    }
+
+    @Test
     void another_workspaces_agent_is_not_found() {
         AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         workspace = new FixedWorkspace(UUID.randomUUID());
@@ -262,6 +320,17 @@ class AgentsTest {
                 return false;
             }
             agents.put(agent.id(), agent);
+            return true;
+        }
+
+        @Override
+        public boolean delete(UUID workspaceId, UUID agentId, long expectedRevision) {
+            Agent current = agents.get(agentId);
+            if (current == null || !current.workspaceId().equals(workspaceId) || current.revision() != expectedRevision) {
+                return false;
+            }
+            agents.remove(agentId);
+            versions.removeIf(version -> version.agentId().equals(agentId));
             return true;
         }
 

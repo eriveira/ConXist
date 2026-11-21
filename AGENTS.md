@@ -59,10 +59,14 @@ Sources page does not show it for now, owner decision 2026-11-17).
   Memories and Ask ConXist show "coming soon".
 - Agents (ADR 0010, step 1 of 4 the owner set: Agents, Skills, Test run, Schedules): an `agents` module and the
   Agents pages. Create from a template, edit a draft that saves itself (revision check), publish numbered versions,
-  History and Restore, Archive.
+  History and Restore, Archive, Delete.
 - Skills (ADR 0011, step 2): in the `agents` module, with its own menu item. Write, import a SKILL.md, or copy a
   built-in skill; publish numbered versions with a note. An agent pins a skill version and gets "vN available" when a
   newer one is published. Reference files and GitHub import show "coming soon".
+- Delete (ADR 0013, owner 2026-11-21): an agent or a skill is deleted for good with all its versions, after a check of what
+  uses it. A skill any agent (archived too) follows in its draft or live version is not deleted; the dialog names
+  and links those agents. Built-in skills can't be deleted. Nothing uses an agent yet; flows and schedules will plug
+  into the `AgentUses` port.
 - Test run (ADR 0012, step 3): a `runs` module and the Test panel on an agent's page. It runs the saved draft once on
   a picked meeting with Claude (Anthropic Java SDK), with the draft's read tools, sources and limits, and shows the
   answer, its shape check and each step. Nothing of a run is kept. Local only until sign-in (owner, 2026-11-21): the

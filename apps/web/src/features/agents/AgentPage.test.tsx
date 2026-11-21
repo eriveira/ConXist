@@ -299,4 +299,26 @@ describe('AgentPage', () => {
     expect(await screen.findByRole('heading', { name: 'This agent no longer exists.' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Agents' })).toHaveAttribute('href', '#/agents');
   });
+
+  it('shows what started using the agent when the server refuses the delete, and deletes nothing', async () => {
+    let checks = 0;
+    const calls = api(AGENT, {
+      [`GET /api/agents/${ID}/uses`]: () => {
+        checks += 1;
+        return { body: checks === 1 ? [] : [{ kind: 'AGENT', id: ID, name: 'Weekly flow', where: 'DRAFT', archived: false }] };
+      },
+      [`DELETE /api/agents/${ID}?revision=1`]: () => ({ status: 409, body: { code: 'agent.in-use' } }),
+    });
+    render(<AgentPage agentId={ID} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    const confirm = await screen.findByRole('dialog', { name: `Delete ${DRAFT.name}?` });
+    expect(within(confirm).getByText('Its draft is deleted for good.')).toBeInTheDocument();
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+
+    const blocked = await screen.findByRole('dialog', { name: `Can’t delete ${DRAFT.name} yet` });
+    expect(within(blocked).getByText('1 thing uses this agent.')).toBeInTheDocument();
+    expect(within(blocked).getByRole('button', { name: 'Archive instead' })).toBeInTheDocument();
+    expect(calls.filter((call) => call.key.startsWith('DELETE'))).toHaveLength(1);
+  });
 });

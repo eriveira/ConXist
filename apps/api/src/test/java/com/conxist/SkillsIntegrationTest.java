@@ -1,5 +1,6 @@
 package com.conxist;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -179,6 +180,67 @@ class SkillsIntegrationTest {
         mvc.perform(get("/api/skills/{id}", id).header(HEADER, owner))
                 .andExpect(jsonPath("$.revision").value(2))
                 .andExpect(jsonPath("$.draft.name").value("Release notes"));
+    }
+
+    @Test
+    void a_skill_an_agent_follows_is_kept_until_the_agent_is_gone_then_both_are_deleted_with_their_versions()
+            throws Exception {
+        String workspace = workspace("Deleting");
+        String other = workspace("Not the owner");
+        String skillId = JsonPath.read(mvc.perform(post("/api/skills/import").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(json("markdown", SKILL_MD)))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        mvc.perform(post("/api/skills/{id}/publish", skillId).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":1}"))
+                .andExpect(jsonPath("$.revision").value(2));
+        String agentId = JsonPath.read(mvc.perform(post("/api/agents").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"template\":\"BLANK\",\"name\":\"Notes\",\"language\":\"EN\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        mvc.perform(put("/api/agents/{id}/draft", agentId).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(agentDraft(1, "[{\"skillId\":\"" + skillId + "\",\"version\":1}]",
+                                "[\"GET_TRANSCRIPT\"]")))
+                .andExpect(jsonPath("$.revision").value(2));
+        mvc.perform(post("/api/agents/{id}/publish", agentId).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":2}"))
+                .andExpect(jsonPath("$.revision").value(3));
+
+        mvc.perform(get("/api/skills/{id}/uses", skillId).header(HEADER, workspace))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].kind").value("AGENT"))
+                .andExpect(jsonPath("$[0].id").value(agentId))
+                .andExpect(jsonPath("$[0].where").value("BOTH"));
+        mvc.perform(delete("/api/skills/{id}", skillId).param("revision", "2").header(HEADER, workspace))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("skill.in-use"));
+        mvc.perform(delete("/api/skills/{id}", BuiltInSkill.MEETING_SUMMARY.id()).param("revision", "0")
+                        .header(HEADER, workspace))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("skill.built-in"));
+
+        mvc.perform(delete("/api/agents/{id}", agentId).param("revision", "3").header(HEADER, other))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/agents/{id}", agentId).param("revision", "2").header(HEADER, workspace))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("agent.changed"));
+        mvc.perform(get("/api/agents/{id}/uses", agentId).header(HEADER, workspace))
+                .andExpect(jsonPath("$").isEmpty());
+        mvc.perform(delete("/api/agents/{id}", agentId).param("revision", "3").header(HEADER, workspace))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/agents/{id}", agentId).header(HEADER, workspace))
+                .andExpect(status().isNotFound());
+
+        mvc.perform(get("/api/skills/{id}/uses", skillId).header(HEADER, workspace))
+                .andExpect(jsonPath("$").isEmpty());
+        mvc.perform(delete("/api/skills/{id}", skillId).param("revision", "2").header(HEADER, other))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/skills/{id}", skillId).param("revision", "2").header(HEADER, workspace))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/skills/{id}", skillId).header(HEADER, workspace))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/skills").header(HEADER, workspace))
+                .andExpect(jsonPath("$.length()").value(BuiltInSkill.values().length));
     }
 
     private static String agentDraft(int revision, String skills, String tools) {

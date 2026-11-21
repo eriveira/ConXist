@@ -23,6 +23,12 @@ public interface AgentRepository {
     /** Whether another agent of the workspace than {@code except} has the name, ignoring case. */
     boolean nameTaken(UUID workspaceId, String name, UUID except);
 
+    /**
+     * Deletes the workspace's agent and all its versions, only if it is still at {@code expectedRevision};
+     * false when it changed first or is not there.
+     */
+    boolean delete(UUID workspaceId, UUID agentId, long expectedRevision);
+
     void addVersion(AgentVersion version);
 
     /** Number and date of every version of the workspace's agent, the newest first; definitions are not read. */

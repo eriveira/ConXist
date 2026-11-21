@@ -130,3 +130,12 @@
 @media (min-width: 1001px) {
   .agent-side { max-height: calc(100vh - 112px); overflow: auto; padding-bottom: 88px; }
 }
+
+/* Delete: what still uses an agent or a skill */
+.delete-uses { list-style: none; margin: 8px 0 12px; padding: 0; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); }
+.delete-uses li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; padding: 8px 12px; min-height: 44px; border-top: 1px solid var(--cx-border); }
+.delete-uses li:first-child { border-top: 0; }
+.delete-uses a { color: var(--cx-accent-text); font-weight: 700; overflow-wrap: anywhere; flex: 1 1 10ch; min-width: 0; }
+.delete-uses .pill { white-space: normal; }
+.delete-body p { margin: 0 0 10px; }
+.delete-body [role="status"] { display: flex; align-items: center; gap: 8px; }

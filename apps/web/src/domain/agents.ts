@@ -57,6 +57,19 @@ export interface Agent {
   updatedAt: string;
 }
 
+/**
+ * Something that uses an agent or a skill; while anything does, it can't be deleted. For now only agents use things
+ * (a skill they follow); flows and schedules will use agents. `where` says which of the agent's draft and live
+ * version follow it.
+ */
+export interface AgentUse {
+  kind: 'AGENT';
+  id: string;
+  name: string;
+  where: 'DRAFT' | 'LIVE' | 'BOTH';
+  archived: boolean;
+}
+
 export interface AgentSummary {
   id: string;
   name: string;

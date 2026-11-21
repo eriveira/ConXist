@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.UUID;
 import com.conxist.agents.application.AgentSummary;
 import com.conxist.agents.application.AgentView;
+import com.conxist.agents.application.AgentUse;
 import com.conxist.agents.application.ArchiveAgent;
 import com.conxist.agents.application.CreateAgent;
+import com.conxist.agents.application.DeleteAgent;
 import com.conxist.agents.application.ListAgents;
 import com.conxist.agents.application.PublishAgent;
 import com.conxist.agents.application.ReadAgent;
@@ -27,16 +29,18 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Agents of the workspace the request names: list, create, edit the draft, publish, restore and archive. */
+/** Agents of the workspace the request names: list, create, edit the draft, publish, restore, archive, delete. */
 @RestController
 @RequestMapping("/api/agents")
 class AgentsController {
@@ -53,9 +57,11 @@ class AgentsController {
     private final PublishAgent publishAgent;
     private final RestoreAgentVersion restoreVersion;
     private final ArchiveAgent archiveAgent;
+    private final DeleteAgent deleteAgent;
 
     AgentsController(CreateAgent createAgent, ListAgents listAgents, ReadAgent readAgent, SaveAgentDraft saveDraft,
-            PublishAgent publishAgent, RestoreAgentVersion restoreVersion, ArchiveAgent archiveAgent) {
+            PublishAgent publishAgent, RestoreAgentVersion restoreVersion, ArchiveAgent archiveAgent,
+            DeleteAgent deleteAgent) {
         this.createAgent = createAgent;
         this.listAgents = listAgents;
         this.readAgent = readAgent;
@@ -63,6 +69,7 @@ class AgentsController {
         this.publishAgent = publishAgent;
         this.restoreVersion = restoreVersion;
         this.archiveAgent = archiveAgent;
+        this.deleteAgent = deleteAgent;
     }
 
     @GetMapping
@@ -118,6 +125,19 @@ class AgentsController {
     @PostMapping("/{agentId}/unarchive")
     AgentView unarchive(@PathVariable UUID agentId, @Valid @RequestBody RevisionRequest request) {
         return archiveAgent.unarchive(agentId, request.revision());
+    }
+
+    /** What uses the agent; while anything does, it can't be deleted. */
+    @GetMapping("/{agentId}/uses")
+    List<AgentUse> uses(@PathVariable UUID agentId) {
+        return deleteAgent.uses(agentId);
+    }
+
+    /** Deletes the agent and its versions for good, if it is still at {@code revision} and nothing uses it. */
+    @DeleteMapping("/{agentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(@PathVariable UUID agentId, @RequestParam long revision) {
+        deleteAgent.delete(agentId, revision);
     }
 
     record ToolInfo(String id, String toolName, boolean readOnly) {

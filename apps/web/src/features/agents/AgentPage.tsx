@@ -6,10 +6,11 @@ import { type PinnedSkill, SKILL_PROBLEMS, type SkillSummary, skillRowProblems, 
 import type { Source } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
-import { AGENTS_HREF } from '../../navigation';
+import { AGENTS_HREF, goWithNotice } from '../../navigation';
 import { AgentSections } from './AgentSections';
 import { AgentStatePill } from './AgentStatePill';
 import { AgentTestPanel, type RunBlock } from './AgentTestPanel';
+import { DeleteDialog } from './DeleteDialog';
 import { AgentVersionSummary, HistoryDialog } from './HistoryDialog';
 import { SaveStatus } from './SaveStatus';
 import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
@@ -32,6 +33,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
   const { state } = editor;
   const [choices, setChoices] = useState<Choices>({ status: 'loading' });
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionProblem, setActionProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
@@ -46,6 +48,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
   }, []);
 
   useEffect(loadChoices, [loadChoices]);
+  const loadAgentUses = useCallback(() => api.agentUses(agentId), [agentId]);
 
   useEffect(() => {
     if (ready) headingRef.current?.focus();
@@ -94,6 +97,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
   const restore = async (number: number) => {
     if (await run(null, () => editor.restore(number), t('agent.restored', { version: number }))) setHistoryOpen(false);
   };
+  // A change on its way to the server would change the revision under the delete, so it waits for it.
+  const canDelete = busy === null && save !== 'conflict' && save !== 'saving' && (save !== 'waiting' || blocked !== null);
 
   return (
     <section className="page agent-page" aria-labelledby="agent-title">
@@ -108,6 +113,9 @@ export function AgentPage({ agentId }: { agentId: string }) {
           </div>
         </div>
         <div className="agent-actions">
+          <button type="button" className="btn ghost danger-text" disabled={!canDelete} onClick={() => setDeleting(true)}>
+            <Icon name="trash" size={16} /> {t('delete.button')}
+          </button>
           {archived ? (
             <button type="button" className="btn" disabled={busy !== null}
               onClick={() => void run('archive', editor.unarchive, t('agent.unarchived'))}>
@@ -156,6 +164,13 @@ export function AgentPage({ agentId }: { agentId: string }) {
           renderVersion={(version) => <AgentVersionSummary version={version} />}
           archivedNote={t('agent.history.archived')} hasUnpublished={!agent.draftPublished || save !== 'saved'}
           archived={archived} blocked={stuck} onRestore={restore} onClose={() => setHistoryOpen(false)} />
+      )}
+      {deleting && (
+        <DeleteDialog what="agent" name={agent.draft.name} versions={agent.versions.length} archived={archived}
+          loadUses={loadAgentUses} remove={() => api.deleteAgent(agent.id, agent.revision)}
+          onArchive={() => { setDeleting(false); void run('archive', editor.archive, t('agent.archivedNotice')); }}
+          onDeleted={() => goWithNotice(AGENTS_HREF, t('delete.done', { name: agent.draft.name }))}
+          onClose={() => setDeleting(false)} />
       )}
     </section>
   );
