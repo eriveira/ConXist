@@ -107,8 +107,8 @@ function Workspaces(settings: SettingsProps) {
         {page === 'sources' && (sourceRoute.page === 'source'
           ? <SourcePage key={sourceRoute.sourceId} sourceId={sourceRoute.sourceId} />
           : <SourcesPage />)}
-        {page === 'agents' && <AgentsArea route={agentsRoute} />}
-        {(page === 'flow' || page === 'knowledge') && <ComingSoonPage page={page} />}
+        {(page === 'agents' || page === 'skills') && <AgentsArea route={agentsRoute} />}
+        {(page === 'flow' || page === 'knowledge' || page === 'memories') && <ComingSoonPage page={page} />}
       </main>
       <AskConxist />
       {newOpen && <NewWorkspaceDialog onClose={() => setNewOpen(false)} onCreated={onCreated} />}
@@ -116,7 +116,7 @@ function Workspaces(settings: SettingsProps) {
   );
 }
 
-/** Agents and the skills they follow, which live under Agents in the menu. */
+/** Agents and the skills they follow: Agents and Skills in the menu, with a tab between them on their pages. */
 function AgentsArea({ route }: { route: AgentsRoute }) {
   switch (route.view) {
     case 'agent': return <AgentPage key={route.id} agentId={route.id} />;

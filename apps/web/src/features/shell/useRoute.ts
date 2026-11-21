@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 
-export const PAGES = ['home', 'flow', 'agents', 'sources', 'knowledge'] as const;
+export const PAGES = ['home', 'flow', 'agents', 'skills', 'sources', 'knowledge', 'memories'] as const;
 export type Page = (typeof PAGES)[number];
 
 /** Home is empty for now, so the app opens on Sources until Home shows something. */
 export const START_PAGE: Page = 'sources';
 
 export function pageOf(hash: string): Page {
-  // #/sources/{id} is one source's page, under Sources. Skills live under Agents.
+  // #/sources/{id} is one source's page, under Sources; #/skills/{id} one skill's, under Skills.
   const name = hash.replace(/^#\/?/, '').split('/')[0];
-  if (name === 'skills') return 'agents';
   return PAGES.find((page) => page === name) ?? START_PAGE;
 }
 

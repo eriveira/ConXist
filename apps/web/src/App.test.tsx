@@ -47,7 +47,7 @@ describe('App', () => {
     await screen.findByRole('heading', { name: 'Sources', level: 1 });
 
     const menu = screen.getByRole('navigation', { name: 'Main' });
-    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Flow', 'Agents', 'Sources', 'Knowledge']);
+    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Flow', 'Agents', 'Skills', 'Sources', 'Knowledge', 'Memories']);
     expect(within(menu).getByRole('link', { name: 'Sources' })).toHaveAttribute('aria-current', 'page');
 
     await userEvent.click(within(menu).getByRole('link', { name: 'Flow' }));
@@ -55,6 +55,21 @@ describe('App', () => {
     await userEvent.click(within(menu).getByRole('link', { name: 'Home' }));
     expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
     expect(await accessibilityViolations(container)).toEqual([]);
+  });
+
+  it('opens Skills and Memories from the menu, and keeps Skills marked on its page', async () => {
+    api([ACME], { 'GET /api/skills': () => ({ body: [] }) });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Sources', level: 1 });
+    const menu = screen.getByRole('navigation', { name: 'Main' });
+
+    await userEvent.click(within(menu).getByRole('link', { name: 'Memories' }));
+    expect(await screen.findByRole('heading', { name: 'Memories is coming soon' })).toBeInTheDocument();
+
+    await userEvent.click(within(menu).getByRole('link', { name: 'Skills' }));
+    expect(await screen.findByRole('heading', { name: 'Skills', level: 1 })).toBeInTheDocument();
+    expect(within(menu).getByRole('link', { name: 'Skills' })).toHaveAttribute('aria-current', 'page');
+    expect(within(menu).getByRole('link', { name: 'Agents' })).not.toHaveAttribute('aria-current');
   });
 
   it('switches workspaces from the header, and every request then names the new one', async () => {
