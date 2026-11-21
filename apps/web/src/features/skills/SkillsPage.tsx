@@ -7,7 +7,6 @@ import { SKILL_FILTERS, type SkillFilter, type SkillSummary, sortSkills, usersOf
 import { useLanguage, toolLabel, useT } from '../../i18n/i18n';
 import { NEW_SKILL_HREF, SKILLS_HREF, skillHref } from '../../navigation';
 import { AgentStatePill } from '../agents/AgentStatePill';
-import { AgentsTabs } from './AgentsTabs';
 import { ImportSkillDialog } from './ImportSkillDialog';
 import { NewSkillDialog } from './NewSkillDialog';
 
@@ -55,7 +54,6 @@ export function SkillsPage({ creating }: { creating: boolean }) {
         </div>
         <p>{t('skills.lead')}</p>
       </div>
-      <AgentsTabs current="skills" />
       {state.status === 'loading' && <div className="page-state" role="status"><Icon name="sync" /> {t('skills.loading')}</div>}
       {state.status === 'error' && (
         <div className="page-state" role="alert">
