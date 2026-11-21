@@ -1,3 +1,5 @@
+import type { PinnedSkill, SkillPin } from './skills';
+
 /** What an agent accepts and gives back; a flow connects agents whose shapes match. */
 export const INPUT_KINDS = ['TRANSCRIPT', 'DOCUMENT', 'TOPIC', 'REQUIREMENT'] as const;
 export type InputKind = (typeof INPUT_KINDS)[number];
@@ -23,6 +25,8 @@ export interface AgentDefinition {
   purpose: string;
   instructions: string;
   knowledgeSources: string[];
+  /** The skills it follows, each at a fixed version. */
+  skills: SkillPin[];
   tools: string[];
   model: ModelPolicy;
   style: Style;
@@ -46,6 +50,8 @@ export interface Agent {
   draftPublished: boolean;
   /** Stable codes of what stops the draft from being published; empty when it is ready. */
   problems: string[];
+  /** The skills the saved draft follows that this workspace can use; a pin missing here is gone. */
+  skills: PinnedSkill[];
   versions: VersionInfo[];
   createdAt: string;
   updatedAt: string;
@@ -59,6 +65,8 @@ export interface AgentSummary {
   publishedVersion: number;
   draftPublished: boolean;
   givesBack: OutputKind;
+  /** The skills its draft follows, so a skill can show who uses it. */
+  skills: SkillPin[];
   updatedAt: string;
 }
 

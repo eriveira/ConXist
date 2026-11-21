@@ -1,15 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
-import { api } from '../../api/client';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
-import type { Agent, AgentVersion } from '../../domain/agents';
+import type { AgentVersion, VersionInfo } from '../../domain/agents';
 import { dateTime } from '../../domain/time';
 import { useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 
-interface HistoryDialogProps {
-  agent: Agent;
+interface HistoryDialogProps<V> {
+  /** The agent's or skill's name, for the heading. */
+  name: string;
+  /** Every published version, newest first; a note says what changed, when there is one. */
+  versions: (VersionInfo & { note?: string })[];
+  publishedVersion: number;
+  loadVersion: (number: number) => Promise<V>;
+  renderVersion: (version: V) => ReactNode;
+  /** Shown when archived: why nothing can be restored. */
+  archivedNote: string;
   /** The draft differs from the newest version, so restoring would replace those changes. */
   hasUnpublished: boolean;
   /** An archived agent's versions can be looked at, not restored. */
@@ -20,13 +27,16 @@ interface HistoryDialogProps {
   onClose: () => void;
 }
 
-type Opened = { number: number; version: AgentVersion | null; problem: string | null };
+type Opened<V> = { number: number; version: V | null; problem: string | null };
 
 /** Every published version, newest first. Look at one, and put it back in the draft to publish it again. */
-export function HistoryDialog({ agent, hasUnpublished, archived, blocked, onRestore, onClose }: HistoryDialogProps) {
+export function HistoryDialog<V>({
+  name, versions, publishedVersion, loadVersion, renderVersion, archivedNote, hasUnpublished, archived, blocked, onRestore,
+  onClose,
+}: HistoryDialogProps<V>) {
   const t = useT();
   const language = useLanguage();
-  const [opened, setOpened] = useState<Opened | null>(null);
+  const [opened, setOpened] = useState<Opened<V> | null>(null);
   const [confirming, setConfirming] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const confirmButton = useRef<HTMLButtonElement>(null);
@@ -43,7 +53,7 @@ export function HistoryDialog({ agent, hasUnpublished, archived, blocked, onRest
     }
     setOpened({ number, version: null, problem: null });
     try {
-      const version = await api.agentVersion(agent.id, number);
+      const version = await loadVersion(number);
       setOpened((now) => now?.number === number ? { ...now, version } : now);
     } catch (error) {
       setOpened((now) => now?.number === number ? { ...now, problem: problemMessage(error, t) } : now);
@@ -64,13 +74,13 @@ export function HistoryDialog({ agent, hasUnpublished, archived, blocked, onRest
       closeLabel={t('ask.close')} onClose={onClose} step="history" closable={!busy}
       footer={<><span className="grow" /><button type="button" className="btn" onClick={onClose} disabled={busy}>{t('ask.close')}</button></>}>
       <div className="m-body">
-        <h3>{t('agent.history.heading', { name: agent.draft.name })}</h3>
-        {archived && <p className="alert info"><Icon name="info" /> {t('agent.history.archived')}</p>}
+        <h3>{t('agent.history.heading', { name })}</h3>
+        {archived && <p className="alert info"><Icon name="info" /> {archivedNote}</p>}
         {!archived && blocked && <p className="alert info"><Icon name="info" /> {t('agent.history.blocked')}</p>}
         <ol className="versions">
-          {agent.versions.map((info) => {
+          {versions.map((info) => {
             const isOpen = opened?.number === info.number;
-            const newest = info.number === agent.publishedVersion;
+            const newest = info.number === publishedVersion;
             const label = newest ? t('agent.history.discard') : t('agent.history.restore');
             return (
               <li key={info.number} className="version">
@@ -79,6 +89,7 @@ export function HistoryDialog({ agent, hasUnpublished, archived, blocked, onRest
                   <span className="grow">
                     {t('agent.history.published', { when: dateTime(info.publishedAt, language) })}
                     {newest && <> <Pill tone="live">{t('agent.history.newest')}</Pill></>}
+                    {info.note && <span className="version-note">{info.note}</span>}
                   </span>
                   <button type="button" className="btn sm ghost" aria-expanded={isOpen} onClick={() => void open(info.number)}
                     aria-label={t(isOpen ? 'agent.history.hideVersion' : 'agent.history.viewVersion', { version: info.number })}>
@@ -103,7 +114,7 @@ export function HistoryDialog({ agent, hasUnpublished, archived, blocked, onRest
                     </button>
                   </div>
                 )}
-                {isOpen && <VersionSummary opened={opened} />}
+                {isOpen && opened && <VersionBody opened={opened} render={renderVersion} />}
               </li>
             );
           })}
@@ -113,11 +124,17 @@ export function HistoryDialog({ agent, hasUnpublished, archived, blocked, onRest
   );
 }
 
-function VersionSummary({ opened }: { opened: Opened }) {
+function VersionBody<V>({ opened, render }: { opened: Opened<V>; render: (version: V) => ReactNode }) {
   const t = useT();
   if (opened.problem) return <p className="alert error"><Icon name="alert" /> {opened.problem}</p>;
   if (!opened.version) return <p className="muted" role="status">{t('agent.loading')}</p>;
-  const { definition } = opened.version;
+  return <>{render(opened.version)}</>;
+}
+
+/** What a published agent was: enough to recognize it. */
+export function AgentVersionSummary({ version }: { version: AgentVersion }) {
+  const t = useT();
+  const { definition } = version;
   return (
     <dl className="summary version-summary">
       <div><dt>{t('agent.name')}</dt><dd>{definition.name}</dd></div>

@@ -51,6 +51,7 @@ button { cursor: pointer; }
   font-weight: 700; white-space: nowrap;
 }
 .btn:hover { border-color: var(--cx-accent); }
+a.btn { text-decoration: none; }
 .btn.primary { background: var(--cx-action); border-color: var(--cx-action); color: var(--cx-on-action); }
 .btn.primary:hover { filter: brightness(1.08); }
 /* A step that removes something: tinted, with a stronger label, so it never reads as just another button. */

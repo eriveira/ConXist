@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
 import { routeOf } from '../../navigation';
@@ -58,7 +58,9 @@ describe('SourcePage', () => {
     workspace();
     render(<SourcePage sourceId="p1" />);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Team meetings' })).toHaveFocus();
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Team meetings' });
+    // The page moves focus once it has loaded; under a busy test run that can land a moment after the heading shows.
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText('alex@acme.test')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Meetings/ })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByRole('heading', { level: 2, name: 'Today' })).toBeInTheDocument();

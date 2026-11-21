@@ -37,7 +37,7 @@ export const agentEn = {
   'agent.unarchiving': 'Bringing back…',
   'agent.archivedNotice': 'Archived. Its versions are kept.',
   'agent.unarchived': 'Brought back. You can change and publish it again.',
-  'agent.choices.error': 'We could not load your sources and tools. Nothing was changed.',
+  'agent.choices.error': 'We could not load your sources, skills and tools. Nothing was changed.',
   'agent.knowledge.removeMissing': 'Remove the removed source',
   'agent.history.discard': 'Discard changes',
   'agent.history.confirm.discard': 'Put v{version} back in your draft? Your unpublished changes will be lost.',
@@ -143,8 +143,6 @@ export const agentEn = {
 
   'agent.test.title': 'Test',
   'agent.test.soon': 'Coming soon: run this agent on one of your meetings and check what it gives back before you publish.',
-  'agent.skills.title': 'Skills',
-  'agent.skills.soon': 'Coming soon: add reusable ways of working, such as your team’s ticket format.',
 
   'agent.history.title': 'History',
   'agent.history.subtitle': 'Every published version. Published versions never change.',
@@ -214,7 +212,7 @@ export const agentEs: Record<keyof typeof agentEn, string> = {
   'agent.unarchiving': 'Recuperando…',
   'agent.archivedNotice': 'Archivado. Sus versiones se conservan.',
   'agent.unarchived': 'Recuperado. Puedes cambiarlo y publicarlo de nuevo.',
-  'agent.choices.error': 'No pudimos cargar tus fuentes y herramientas. No se cambió nada.',
+  'agent.choices.error': 'No pudimos cargar tus fuentes, habilidades y herramientas. No se cambió nada.',
   'agent.knowledge.removeMissing': 'Quitar la fuente eliminada',
   'agent.history.discard': 'Descartar cambios',
   'agent.history.confirm.discard': '¿Volver a poner la v{version} en tu borrador? Se perderán tus cambios sin publicar.',
@@ -320,8 +318,6 @@ export const agentEs: Record<keyof typeof agentEn, string> = {
 
   'agent.test.title': 'Probar',
   'agent.test.soon': 'Próximamente: ejecuta este agente con una de tus reuniones y revisa lo que entrega antes de publicar.',
-  'agent.skills.title': 'Habilidades',
-  'agent.skills.soon': 'Próximamente: agrega formas de trabajar reutilizables, como el formato de tickets de tu equipo.',
 
   'agent.history.title': 'Historial',
   'agent.history.subtitle': 'Cada versión publicada. Las versiones publicadas nunca cambian.',

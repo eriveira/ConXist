@@ -7,14 +7,19 @@ import {
   STYLES, toggled,
 } from '../../domain/agents';
 import type { Source } from '../../domain/model';
+import { type PinnedSkill, skillRows } from '../../domain/skills';
 import { characterCount } from '../../domain/workspaces';
-import { type Translate, useT } from '../../i18n/i18n';
+import { type Translate, toolDescription, toolLabel, useT } from '../../i18n/i18n';
 import { MESSAGES, type MessageKey } from '../../i18n/messages';
 import { SOURCES_HREF } from '../../navigation';
 import type { Choices } from './AgentPage';
+import { AgentSkills } from './AgentSkills';
+import { Counter, FieldError, Section } from './FormParts';
 
 interface AgentSectionsProps {
   draft: AgentDefinition;
+  /** What the server said about the skills of the saved draft. */
+  pinned: PinnedSkill[];
   onChange: (change: Partial<AgentDefinition>) => void;
   disabled: boolean;
   choices: Choices;
@@ -24,7 +29,7 @@ interface AgentSectionsProps {
 const LIMIT_KEYS = Object.keys(LIMIT_RANGES) as (keyof Limits)[];
 
 /** The parts of an agent, grouped the way a person thinks about them: what it is, what it uses, how it works. */
-export function AgentSections({ draft, onChange, disabled, choices, onRetryChoices }: AgentSectionsProps) {
+export function AgentSections({ draft, pinned, onChange, disabled, choices, onRetryChoices }: AgentSectionsProps) {
   const t = useT();
   const ids = {
     name: useId(), purpose: useId(), instructions: useId(), givesBack: useId(), hint: useId(),
@@ -101,28 +106,47 @@ export function AgentSections({ draft, onChange, disabled, choices, onRetryChoic
         </ChoicesState>
       </Section>
 
-      <Section number={5} title={t('agent.section.tools')} lead={t('agent.section.tools.lead')}>
+      <Section number={5} title={t('agent.section.skills')} lead={t('agent.section.skills.lead')}>
         <ChoicesState choices={choices} onRetry={onRetryChoices}>
-          {({ tools }) => (
+          {({ skills, tools }) => <AgentSkills draft={draft} pinned={pinned} skills={skills} tools={tools} onChange={onChange} />}
+        </ChoicesState>
+      </Section>
+
+      <Section number={6} title={t('agent.section.tools')} lead={t('agent.section.tools.lead')}>
+        <ChoicesState choices={choices} onRetry={onRetryChoices}>
+          {({ tools, skills }) => {
+            const rows = skillRows(draft.skills, pinned, skills);
+            return (
           <div className="choice">
-            {tools.map((tool) => (
+            {tools.map((tool) => {
+              const on = draft.tools.includes(tool.id);
+              const neededBy = rows.flatMap((row) => row.skill?.needs.includes(tool.id) ? [row.skill.name] : []);
+              return (
               <label key={tool.id}>
-                <input type="checkbox" checked={draft.tools.includes(tool.id)}
+                <input type="checkbox" checked={on}
                   onChange={() => onChange({ tools: toggled(draft.tools, tool.id, tools.map((each) => each.id)) })} />
                 <span className="grow">
-                  <b>{t(`agent.tool.${tool.id}` as 'agent.tool.GET_TRANSCRIPT')}</b>
-                  <small>{t(`agent.tool.${tool.id}.desc` as 'agent.tool.GET_TRANSCRIPT.desc')}</small>
+                  <b>{toolLabel(t, tool.id)}</b>
+                  <small>{toolDescription(t, tool.id)}</small>
+                  {neededBy.length > 0 && (
+                    <small className={on ? 'needed-by' : 'needed-by off'}>
+                      <Icon name={on ? 'skill' : 'alert'} size={14} />
+                      {' '}{t(on ? 'agent.tool.neededBy' : 'agent.tool.offNeededBy', { names: neededBy.join(', '), count: neededBy.length })}
+                    </small>
+                  )}
                 </span>
                 {tool.readOnly && <Pill tone="live">{t('agent.tool.readOnly')}</Pill>}
               </label>
-            ))}
+              );
+            })}
           </div>
-          )}
+            );
+          }}
         </ChoicesState>
         <p className="note"><Icon name="info" size={14} /> {t('agent.tools.changeNote')}</p>
       </Section>
 
-      <Section number={6} title={t('agent.section.model')} lead={t('agent.section.model.lead')}>
+      <Section number={7} title={t('agent.section.model')} lead={t('agent.section.model.lead')}>
         <fieldset className="choice segmented">
           <legend>{t('agent.model')}</legend>
           {MODEL_POLICIES.map((policy) => (
@@ -143,7 +167,7 @@ export function AgentSections({ draft, onChange, disabled, choices, onRetryChoic
         </fieldset>
       </Section>
 
-      <Section number={7} title={t('agent.section.limits')} lead={t('agent.section.limits.lead')}>
+      <Section number={8} title={t('agent.section.limits')} lead={t('agent.section.limits.lead')}>
         <div className="limits">
           {LIMIT_KEYS.map((key) => <LimitField key={key} name={key} value={draft.limits[key]}
             onChange={(value) => onChange({ limits: { ...draft.limits, [key]: value } })} />)}
@@ -153,34 +177,8 @@ export function AgentSections({ draft, onChange, disabled, choices, onRetryChoic
   );
 }
 
-function Section({ number, title, lead, children }: { number: number; title: string; lead: string; children: ReactNode }) {
-  const id = useId();
-  return (
-    <section className="agent-section" aria-labelledby={id}>
-      <h2 id={id}><span className="step-no" aria-hidden="true">{number}</span> {title}</h2>
-      <p className="lead">{lead}</p>
-      {children}
-    </section>
-  );
-}
-
 function nameLength(draft: AgentDefinition): number {
   return characterCount(draft.name.trim());
-}
-
-function FieldError({ id, children }: { id: string; children: ReactNode }) {
-  return <span id={id} className="hint error-text"><Icon name="alert" size={14} /> {children}</span>;
-}
-
-/** "20 / 60" on screen; "20 of 60 characters" for a screen reader, read with the field. */
-function Counter({ id, count, max }: { id: string; count: number; max: number }) {
-  const t = useT();
-  return (
-    <span id={id} className={count > max ? 'counter over' : 'counter'}>
-      <span aria-hidden="true">{t('workspace.count', { count, max })}</span>
-      <span className="sr-only">{t('workspace.count.label', { count, max })}</span>
-    </span>
-  );
 }
 
 /** Sources and tools load with the page; until they do, or if they cannot, nothing is shown as missing. */

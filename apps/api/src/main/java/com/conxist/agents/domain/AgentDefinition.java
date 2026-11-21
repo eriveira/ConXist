@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * What an agent is: its purpose, its brief, what it may read and use, how it thinks, what it takes in and gives back,
+ * What an agent is: its purpose, its brief, what it may read, the skills it follows and the tools it may use, how it thinks, what it takes in and gives back,
  * and where it stops. A draft may be unfinished; {@link #problems()} says what must be done before it is published.
  */
 public record AgentDefinition(
@@ -16,6 +16,7 @@ public record AgentDefinition(
         String purpose,
         String instructions,
         List<UUID> knowledgeSources,
+        List<SkillPin> skills,
         List<AgentTool> tools,
         ModelPolicy model,
         Style style,
@@ -27,6 +28,7 @@ public record AgentDefinition(
     public static final int MAX_PURPOSE_LENGTH = 200;
     public static final int MAX_INSTRUCTIONS_LENGTH = 8_000;
     public static final int MAX_KNOWLEDGE_SOURCES = 20;
+    public static final int MAX_SKILLS = 10;
 
     /** Checks the lengths and sizes every draft must keep, and trims and de-duplicates what the person typed. */
     public AgentDefinition {
@@ -40,6 +42,13 @@ public record AgentDefinition(
         if (knowledgeSources.size() > MAX_KNOWLEDGE_SOURCES) {
             throw new InvalidAgent("too-many-sources",
                     "An agent can read up to " + MAX_KNOWLEDGE_SOURCES + " sources.");
+        }
+        skills = distinct(skills);
+        if (skills.size() > MAX_SKILLS) {
+            throw new InvalidAgent("too-many-skills", "An agent can follow up to " + MAX_SKILLS + " skills.");
+        }
+        if (skills.stream().map(SkillPin::skillId).distinct().count() < skills.size()) {
+            throw new InvalidAgent("skill-twice", "An agent follows one version of each skill.");
         }
         tools = distinct(tools);
         accepts = distinct(accepts);
