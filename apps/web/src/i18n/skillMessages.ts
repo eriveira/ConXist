@@ -1,6 +1,5 @@
 /** The words of the Skills pages and of an agent's Skills section, kept apart so messages.ts stays short. */
 export const skillEn = {
-  'skills.tabs': 'Agents and skills',
   'skills.title': 'Skills',
   'skills.lead': 'A skill is a way of working written once: steps, rules, examples. Any agent can follow it. Skills only add instructions and can’t turn on tools by themselves: adding one to an agent turns on the read-only tools it needs, and shows you which.',
   'skills.import': 'Import',
@@ -155,7 +154,6 @@ export const skillEn = {
 };
 
 export const skillEs: Record<keyof typeof skillEn, string> = {
-  'skills.tabs': 'Agentes y habilidades',
   'skills.title': 'Habilidades',
   'skills.lead': 'Una habilidad es una forma de trabajar escrita una vez: pasos, reglas, ejemplos. Cualquier agente puede seguirla. Las habilidades solo añaden instrucciones y no activan herramientas por sí solas: al añadir una a un agente se activan las herramientas de solo lectura que necesita, y ves cuáles.',
   'skills.import': 'Importar',

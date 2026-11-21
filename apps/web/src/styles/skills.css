@@ -1,13 +1,5 @@
-/* Skills: the Agents and Skills tabs, the list, one skill's page, and the Skills section of an agent. Tokens only. */
+/* Skills: the list, one skill's page, and the Skills section of an agent. Tokens only. */
 .page-h-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--cx-border); margin: -8px 0 18px; overflow-x: auto; }
-.subtabs a {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-weight: 700; white-space: nowrap;
-  color: var(--cx-fg-muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
-}
-.subtabs a[aria-current="page"] { color: var(--cx-fg); border-bottom-color: var(--cx-action); }
-.subtabs a:hover { color: var(--cx-fg); }
-.subtabs a:focus-visible { outline-offset: -2px; }
 
 .list-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 12px; }
 .list-tools .show-archived { margin-bottom: 0; }

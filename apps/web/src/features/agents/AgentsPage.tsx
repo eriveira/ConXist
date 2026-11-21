@@ -4,7 +4,6 @@ import { Icon } from '../../components/Icon';
 import { type AgentSummary, sortAgents } from '../../domain/agents';
 import { useT } from '../../i18n/i18n';
 import { agentHref } from '../../navigation';
-import { AgentsTabs } from '../skills/AgentsTabs';
 import { AgentStatePill } from './AgentStatePill';
 import { NewAgentDialog } from './NewAgentDialog';
 
@@ -42,7 +41,6 @@ export function AgentsPage() {
         </button>
         <p>{t('agents.lead')}</p>
       </div>
-      <AgentsTabs current="agents" />
       {state.status === 'loading' && <div className="page-state" role="status"><Icon name="sync" /> {t('agents.loading')}</div>}
       {state.status === 'error' && (
         <div className="page-state" role="alert">

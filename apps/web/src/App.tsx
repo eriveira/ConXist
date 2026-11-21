@@ -116,7 +116,7 @@ function Workspaces(settings: SettingsProps) {
   );
 }
 
-/** Agents and the skills they follow: Agents and Skills in the menu, with a tab between them on their pages. */
+/** Agents and the skills they follow, each with its own item in the menu. */
 function AgentsArea({ route }: { route: AgentsRoute }) {
   switch (route.view) {
     case 'agent': return <AgentPage key={route.id} agentId={route.id} />;

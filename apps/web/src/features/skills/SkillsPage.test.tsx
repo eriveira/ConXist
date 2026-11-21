@@ -46,7 +46,6 @@ describe('SkillsPage', () => {
     expect(cards[1]).toHaveTextContent('v3 live · edited');
     expect(cards[1]).toHaveTextContent('Used by 1 agent');
     expect(screen.queryByText('Release notes')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Skills/, current: 'page' })).toBeInTheDocument();
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
