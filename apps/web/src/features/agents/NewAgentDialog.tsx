@@ -7,6 +7,9 @@ import { characterCount } from '../../domain/workspaces';
 import { useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 
+/** Room to paste a longer name and shorten it; the 60-character rule is what counts. */
+const NAME_INPUT_LIMIT = MAX_NAME_LENGTH * 2;
+
 interface NewAgentDialogProps {
   onClose: () => void;
   onCreated: (agentId: string) => void;
@@ -22,6 +25,7 @@ export function NewAgentDialog({ onClose, onCreated }: NewAgentDialogProps) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const nameId = useId();
+  const errorId = useId();
   const tooLong = characterCount(name.trim()) > MAX_NAME_LENGTH;
 
   function choose(next: AgentTemplate) {
@@ -34,7 +38,7 @@ export function NewAgentDialog({ onClose, onCreated }: NewAgentDialogProps) {
     setBusy(true);
     setProblem(null);
     try {
-      const agent = await api.createAgent({ template, name: name.trim(), language });
+      const agent = await api.createAgent({ template, name: name.trim(), language: language === 'es' ? 'ES' : 'EN' });
       onCreated(agent.id);
     } catch (error) {
       setProblem(problemMessage(error, t));
@@ -71,10 +75,11 @@ export function NewAgentDialog({ onClose, onCreated }: NewAgentDialogProps) {
         </fieldset>
         <div className="field">
           <label htmlFor={nameId}>{t('agent.name')}</label>
-          <input id={nameId} type="text" value={name} maxLength={MAX_NAME_LENGTH * 2}
-            aria-invalid={tooLong || undefined}
+          {/* Typing may run past the limit so a pasted name can be trimmed; the counted limit is checked below. */}
+          <input id={nameId} type="text" value={name} maxLength={NAME_INPUT_LIMIT}
+            aria-invalid={tooLong || undefined} aria-describedby={tooLong ? errorId : undefined}
             onChange={(event) => { setNamed(true); setName(event.target.value); }} />
-          {tooLong && <span className="hint error-text">{t('api.agent.name-too-long')}</span>}
+          {tooLong && <span id={errorId} className="hint error-text">{t('api.agent.name-too-long')}</span>}
         </div>
       </form>
     </Dialog>

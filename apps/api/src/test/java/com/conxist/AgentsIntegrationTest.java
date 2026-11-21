@@ -3,6 +3,7 @@ package com.conxist;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -44,7 +46,7 @@ class AgentsIntegrationTest {
         String workspace = workspace("Agents");
         String created = mvc.perform(post("/api/agents").header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"REQUIREMENTS_ANALYST\",\"name\":\"Analista\",\"language\":\"es\"}"))
+                        .content("{\"template\":\"REQUIREMENTS_ANALYST\",\"name\":\"Analista\",\"language\":\"ES\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.draft.givesBack").value("REQUIREMENTS"))
                 .andExpect(jsonPath("$.draft.tools[0]").value("GET_TRANSCRIPT"))
@@ -86,7 +88,7 @@ class AgentsIntegrationTest {
         String workspace = workspace("Rules");
         String created = mvc.perform(post("/api/agents").header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"BLANK\",\"name\":\"Mine\",\"language\":\"en\"}"))
+                        .content("{\"template\":\"BLANK\",\"name\":\"Mine\",\"language\":\"EN\"}"))
                 .andExpect(jsonPath("$.problems[0]").value("instructions-required"))
                 .andReturn().getResponse().getContentAsString();
         String id = JsonPath.read(created, "$.id");
@@ -100,7 +102,7 @@ class AgentsIntegrationTest {
                         .content(draft(1, "Mine").replace("\"maxSteps\":6", "\"maxSteps\":99")))
                 .andExpect(jsonPath("$.code").value("agent.limits-steps"));
         mvc.perform(post("/api/agents").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"BLANK\",\"name\":\"MINE\",\"language\":\"en\"}"))
+                        .content("{\"template\":\"BLANK\",\"name\":\"MINE\",\"language\":\"EN\"}"))
                 .andExpect(jsonPath("$.code").value("agent.name-taken"));
     }
 
@@ -110,7 +112,7 @@ class AgentsIntegrationTest {
         String other = workspace("Someone else");
         String created = mvc.perform(post("/api/agents").header(HEADER, owner)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"MEETING_SUMMARIZER\",\"name\":\"Summary\",\"language\":\"en\"}"))
+                        .content("{\"template\":\"MEETING_SUMMARIZER\",\"name\":\"Summary\",\"language\":\"EN\"}"))
                 .andReturn().getResponse().getContentAsString();
         String id = JsonPath.read(created, "$.id");
 
@@ -121,6 +123,52 @@ class AgentsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":1}"))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/agents").header(HEADER, other)).andExpect(jsonPath("$").isEmpty());
+        mvc.perform(post("/api/agents/{id}/publish", id).header(HEADER, owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":1}"))
+                .andExpect(jsonPath("$.publishedVersion").value(1));
+
+        String[][] attempts = {
+                {"PUT", "/api/agents/{id}/draft", draft(2, "Taken over")},
+                {"POST", "/api/agents/{id}/publish", "{\"revision\":2}"},
+                {"GET", "/api/agents/{id}/versions/1", null},
+                {"POST", "/api/agents/{id}/versions/1/restore", "{\"revision\":2}"},
+                {"POST", "/api/agents/{id}/archive", "{\"revision\":2}"},
+                {"POST", "/api/agents/{id}/unarchive", "{\"revision\":2}"}};
+        for (String[] attempt : attempts) {
+            var request = request(HttpMethod.valueOf(attempt[0]), attempt[1], id).header(HEADER, other);
+            if (attempt[2] != null) {
+                request.contentType(MediaType.APPLICATION_JSON).content(attempt[2]);
+            }
+            mvc.perform(request)
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("agent.not-found"));
+        }
+        mvc.perform(get("/api/agents/{id}", id).header(HEADER, owner))
+                .andExpect(jsonPath("$.revision").value(2))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.draft.name").value("Summary"));
+    }
+
+    @Test
+    void an_agent_cannot_publish_reading_another_workspaces_source() throws Exception {
+        String owner = workspace("Reader");
+        String other = workspace("Holder of the source");
+        String source = JsonPath.read(mvc.perform(post("/api/sources").header(HEADER, other)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"UPLOAD\",\"name\":\"Theirs\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        String id = JsonPath.read(mvc.perform(post("/api/agents").header(HEADER, owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"template\":\"MEETING_SUMMARIZER\",\"name\":\"Reader\",\"language\":\"EN\"}"))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        mvc.perform(put("/api/agents/{id}/draft", id).header(HEADER, owner).contentType(MediaType.APPLICATION_JSON)
+                        .content(draft(1, "Reader").replace("\"knowledgeSources\":[]",
+                                "\"knowledgeSources\":[\"" + source + "\"]")))
+                .andExpect(jsonPath("$.problems[0]").value("source-missing"));
+        mvc.perform(post("/api/agents/{id}/publish", id).header(HEADER, owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":2}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("agent.source-missing"));
     }
 
     private static String draft(int revision, String name) {

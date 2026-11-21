@@ -55,6 +55,9 @@ public record Agent(
             throw new IllegalArgumentException("The version belongs to another agent");
         }
         boolean isNewest = version.number() == publishedVersion;
+        if (version.definition().equals(draft) && isNewest == draftPublished) {
+            return this;
+        }
         return new Agent(id, workspaceId, version.definition(), revision + 1, status, publishedVersion, isNewest,
                 createdAt, now);
     }

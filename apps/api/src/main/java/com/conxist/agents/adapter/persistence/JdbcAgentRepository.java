@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.agents.application.AgentRepository;
+import com.conxist.agents.application.AgentView.VersionInfo;
 import com.conxist.agents.domain.Agent;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentVersion;
@@ -115,22 +116,26 @@ class JdbcAgentRepository implements AgentRepository {
     }
 
     @Override
-    public List<AgentVersion> versions(UUID agentId) {
+    public List<VersionInfo> versionInfos(UUID workspaceId, UUID agentId) {
         return jdbc.sql("""
-                select agent_id, number, definition::text as definition, published_at from agent_versions
-                where agent_id = :agentId order by number desc
+                select v.number, v.published_at from agent_versions v join agents a on a.id = v.agent_id
+                where a.workspace_id = :workspaceId and v.agent_id = :agentId order by v.number desc
                 """)
+                .param("workspaceId", workspaceId)
                 .param("agentId", agentId)
-                .query((row, rowNumber) -> version(row))
+                .query((row, rowNumber) -> new VersionInfo(row.getInt("number"),
+                        row.getTimestamp("published_at").toInstant()))
                 .list();
     }
 
     @Override
-    public Optional<AgentVersion> version(UUID agentId, int number) {
+    public Optional<AgentVersion> version(UUID workspaceId, UUID agentId, int number) {
         return jdbc.sql("""
-                select agent_id, number, definition::text as definition, published_at from agent_versions
-                where agent_id = :agentId and number = :number
+                select v.agent_id, v.number, v.definition::text as definition, v.published_at
+                from agent_versions v join agents a on a.id = v.agent_id
+                where a.workspace_id = :workspaceId and v.agent_id = :agentId and v.number = :number
                 """)
+                .param("workspaceId", workspaceId)
                 .param("agentId", agentId)
                 .param("number", number)
                 .query((row, rowNumber) -> version(row))

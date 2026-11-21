@@ -17,6 +17,7 @@ import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTemplate;
 import com.conxist.agents.domain.AgentVersion;
+import com.conxist.agents.domain.Language;
 import com.conxist.platform.Conflict;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
@@ -46,7 +47,7 @@ class AgentsTest {
 
     @Test
     void an_agent_starts_from_a_template_as_a_ready_draft() {
-        AgentView created = create.create(AgentTemplate.REQUIREMENTS_ANALYST, " Requirements analyst ", "en");
+        AgentView created = create.create(AgentTemplate.REQUIREMENTS_ANALYST, " Requirements analyst ", Language.EN);
 
         assertThat(created.draft().name()).isEqualTo("Requirements analyst");
         assertThat(created.problems()).isEmpty();
@@ -59,19 +60,19 @@ class AgentsTest {
 
     @Test
     void names_are_unique_in_a_workspace_ignoring_case() {
-        AgentView first = create.create(AgentTemplate.BLANK, "Triage", "en");
-        AgentView second = create.create(AgentTemplate.BLANK, "Other", "en");
+        AgentView first = create.create(AgentTemplate.BLANK, "Triage", Language.EN);
+        AgentView second = create.create(AgentTemplate.BLANK, "Other", Language.EN);
 
-        assertCode(() -> create.create(AgentTemplate.BLANK, "TRIAGE", "en"), "agent.name-taken");
+        assertCode(() -> create.create(AgentTemplate.BLANK, "TRIAGE", Language.EN), "agent.name-taken");
         assertCode(() -> save.save(second.id(), second.revision(), renamed(second.draft(), "triage")),
                 "agent.name-taken");
         workspace = new FixedWorkspace(UUID.randomUUID());
-        assertThat(create.create(AgentTemplate.BLANK, "Triage", "en").id()).isNotEqualTo(first.id());
+        assertThat(create.create(AgentTemplate.BLANK, "Triage", Language.EN).id()).isNotEqualTo(first.id());
     }
 
     @Test
     void edits_go_to_the_draft_and_publishing_makes_numbered_versions() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", "en");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         AgentView v1 = publish.publish(created.id(), created.revision());
         clock.advance(Duration.ofMinutes(1));
         AgentView edited = save.save(v1.id(), v1.revision(), renamed(v1.draft(), "Weekly summary"));
@@ -89,7 +90,7 @@ class AgentsTest {
 
     @Test
     void a_stale_editor_cannot_overwrite_a_newer_draft() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", "en");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         save.save(created.id(), created.revision(), renamed(created.draft(), "From tab one"));
 
         assertThatThrownBy(() -> save.save(created.id(), created.revision(), renamed(created.draft(), "Tab two")))
@@ -99,7 +100,7 @@ class AgentsTest {
 
     @Test
     void saving_an_unchanged_draft_keeps_its_revision() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", "en");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
 
         assertThat(save.save(created.id(), created.revision(), created.draft()).revision())
                 .isEqualTo(created.revision());
@@ -107,7 +108,7 @@ class AgentsTest {
 
     @Test
     void restoring_copies_a_version_into_the_draft() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", "en");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         AgentView v1 = publish.publish(created.id(), created.revision());
         AgentView edited = save.save(v1.id(), v1.revision(), renamed(v1.draft(), "Changed"));
         AgentView v2 = publish.publish(edited.id(), edited.revision());
@@ -126,7 +127,7 @@ class AgentsTest {
         sources.put(kept, new SourceSummary(kept, SourceCategory.CAPTURE, Provider.UPLOAD, "Specs", null,
                 Instant.EPOCH));
         UUID removed = UUID.randomUUID();
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", "en");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         AgentView reading = save.save(created.id(), created.revision(),
                 withSources(created.draft(), List.of(kept, removed)));
 
@@ -139,7 +140,7 @@ class AgentsTest {
 
     @Test
     void archived_agents_stay_listed_and_can_come_back() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", "en");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         AgentView archived = archive.archive(created.id(), created.revision());
 
         assertThat(list.list()).singleElement().extracting(AgentSummary::status).isEqualTo(AgentStatus.ARCHIVED);
@@ -149,7 +150,7 @@ class AgentsTest {
 
     @Test
     void another_workspaces_agent_is_not_found() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", "en");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         workspace = new FixedWorkspace(UUID.randomUUID());
 
         assertThatThrownBy(() -> read.get(created.id())).isInstanceOf(NotFound.class);
@@ -218,14 +219,16 @@ class AgentsTest {
         }
 
         @Override
-        public List<AgentVersion> versions(UUID agentId) {
-            return versions.stream().filter(v -> v.agentId().equals(agentId))
-                    .sorted(Comparator.comparingInt(AgentVersion::number).reversed()).toList();
+        public List<AgentView.VersionInfo> versionInfos(UUID workspaceId, UUID agentId) {
+            return versions.stream().filter(v -> v.agentId().equals(agentId) && find(workspaceId, agentId).isPresent())
+                    .sorted(Comparator.comparingInt(AgentVersion::number).reversed())
+                    .map(v -> new AgentView.VersionInfo(v.number(), v.publishedAt())).toList();
         }
 
         @Override
-        public Optional<AgentVersion> version(UUID agentId, int number) {
-            return versions.stream().filter(v -> v.agentId().equals(agentId) && v.number() == number).findFirst();
+        public Optional<AgentVersion> version(UUID workspaceId, UUID agentId, int number) {
+            return versions.stream().filter(v -> v.agentId().equals(agentId) && v.number() == number
+                    && find(workspaceId, agentId).isPresent()).findFirst();
         }
     }
 }

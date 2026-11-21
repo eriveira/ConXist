@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
-import type { AgentToolInfo } from '../../domain/agents';
-import { localProblems } from '../../domain/agents';
+import { type AgentToolInfo, localProblems } from '../../domain/agents';
 import type { Source } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
@@ -11,13 +10,15 @@ import { AgentSections } from './AgentSections';
 import { AgentStatePill } from './AgentStatePill';
 import { HistoryDialog } from './HistoryDialog';
 import { SaveStatus } from './SaveStatus';
-import { blockedBy, useAgentEditor } from './useAgentEditor';
+import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
 
 /** What the agent's fields need from the rest of the workspace: its sources, and the tools agents may use. */
-interface Choices {
-  sources: Source[];
-  tools: AgentToolInfo[];
-}
+export type Choices =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[] };
+
+type Busy = 'publish' | 'archive' | null;
 
 /**
  * One agent on one page: what it is, what it uses and how it works. Changes save as a draft on their own; Publish
@@ -27,18 +28,22 @@ export function AgentPage({ agentId }: { agentId: string }) {
   const t = useT();
   const editor = useAgentEditor(agentId);
   const { state } = editor;
-  const [choices, setChoices] = useState<Choices | null>(null);
+  const [choices, setChoices] = useState<Choices>({ status: 'loading' });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [publishing, setPublishing] = useState(false);
+  const [actionProblem, setActionProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Busy>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const ready = state.status === 'ready';
 
-  useEffect(() => {
+  const loadChoices = useCallback(() => {
+    setChoices({ status: 'loading' });
     Promise.all([api.sources(), api.agentTools()])
-      .then(([sources, tools]) => setChoices({ sources, tools }))
-      .catch(() => setChoices({ sources: [], tools: [] }));
+      .then(([sources, tools]) => setChoices({ status: 'ready', sources, tools }))
+      .catch(() => setChoices({ status: 'error' }));
   }, []);
+
+  useEffect(loadChoices, [loadChoices]);
 
   useEffect(() => {
     if (ready) headingRef.current?.focus();
@@ -65,23 +70,26 @@ export function AgentPage({ agentId }: { agentId: string }) {
   const archived = agent.status === 'ARCHIVED';
   const problems = Array.from(new Set([...localProblems(draft), ...agent.problems]));
   const blocked = blockedBy(draft);
-  const canPublish = !archived && problems.length === 0 && !blocked && save !== 'conflict'
+  const stuck = blocked !== null || save === 'conflict';
+  const canPublish = !archived && problems.length === 0 && !stuck && save !== 'failed'
     && !(agent.draftPublished && save === 'saved');
 
-  async function publish() {
-    setPublishing(true);
+  /** Runs an action and says what happened; a refused action leaves everything as it was. */
+  async function run(kind: Busy, action: () => Promise<ActResult>, done: string): Promise<boolean> {
+    setBusy(kind);
     setNotice(null);
-    const next = agent.publishedVersion + 1;
-    if (await editor.publish()) setNotice(t('agent.published', { version: next }));
-    setPublishing(false);
+    setActionProblem(null);
+    const result = await action();
+    setBusy(null);
+    if (result === 'ok') setNotice(done);
+    else if (result === 'blocked') setActionProblem(t('agent.action.blocked'));
+    return result === 'ok';
   }
 
-  async function restore(number: number) {
-    if (await editor.restore(number)) {
-      setHistoryOpen(false);
-      setNotice(t('agent.restored', { version: number }));
-    }
-  }
+  const publish = () => run('publish', editor.publish, t('agent.published', { version: agent.publishedVersion + 1 }));
+  const restore = async (number: number) => {
+    if (await run(null, () => editor.restore(number), t('agent.restored', { version: number }))) setHistoryOpen(false);
+  };
 
   return (
     <section className="page agent-page" aria-labelledby="agent-title">
@@ -91,26 +99,35 @@ export function AgentPage({ agentId }: { agentId: string }) {
           <h1 id="agent-title" ref={headingRef} tabIndex={-1}>{draft.name.trim() || agent.draft.name}</h1>
           <div className="agent-head-meta">
             <AgentStatePill agent={agent} />
-            <SaveStatus save={save} blocked={blocked !== null} onRetry={editor.retry} onReload={() => void editor.reload()} />
+            <SaveStatus save={save} problem={problem} blocked={blocked !== null} onRetry={editor.retry}
+              onReload={() => void editor.reload()} />
           </div>
         </div>
         <div className="agent-actions">
-          {archived
-            ? <button type="button" className="btn" onClick={() => void editor.unarchive()}>{t('agent.unarchive')}</button>
-            : <button type="button" className="btn ghost" onClick={() => void editor.archive()}>{t('agent.archive')}</button>}
+          {archived ? (
+            <button type="button" className="btn" disabled={busy !== null}
+              onClick={() => void run('archive', editor.unarchive, t('agent.unarchived'))}>
+              {busy === 'archive' ? <><span className="spin" aria-hidden="true" /> {t('agent.unarchiving')}</> : t('agent.unarchive')}
+            </button>
+          ) : (
+            <button type="button" className="btn ghost" disabled={busy !== null || stuck}
+              onClick={() => void run('archive', editor.archive, t('agent.archivedNotice'))}>
+              {busy === 'archive' ? <><span className="spin" aria-hidden="true" /> {t('agent.archiving')}</> : t('agent.archive')}
+            </button>
+          )}
           <button type="button" className="btn" onClick={() => setHistoryOpen(true)} disabled={agent.versions.length === 0}>
             {t('agent.history')}{agent.versions.length > 0 && ` (${agent.versions.length})`}
           </button>
-          <button type="button" className="btn primary" onClick={() => void publish()} disabled={!canPublish || publishing}
+          <button type="button" className="btn primary" onClick={() => void publish()} disabled={!canPublish || busy !== null}
             aria-describedby={problems.length ? 'agent-problems' : undefined}>
-            {publishing ? <><span className="spin" aria-hidden="true" /> {t('agent.publishing')}</> : t('agent.publish')}
+            {busy === 'publish' ? <><span className="spin" aria-hidden="true" /> {t('agent.publishing')}</> : t('agent.publish')}
           </button>
         </div>
       </div>
       <p className="notice" role="status">{notice && <><Icon name="check" size={16} /> {notice}</>}</p>
       {archived && <p className="alert info"><Icon name="info" /> {t('agent.archived.note')}</p>}
-      {problem !== null && save !== 'conflict' && save !== 'failed' && (
-        <p className="alert error" role="alert"><Icon name="alert" /> {problemMessage(problem, t)}</p>
+      {(actionProblem ?? (problem !== null && save !== 'conflict' && save !== 'failed')) && (
+        <p className="alert error" role="alert"><Icon name="alert" /> {actionProblem ?? problemMessage(problem, t)}</p>
       )}
       {problems.length > 0 && !archived && (
         <div id="agent-problems" className="alert info agent-problems">
@@ -123,7 +140,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
       )}
       <div className="agent-layout">
         <AgentSections draft={draft} onChange={editor.edit} disabled={archived || save === 'conflict'}
-          sources={choices?.sources ?? null} tools={choices?.tools ?? null} />
+          choices={choices} onRetryChoices={loadChoices} />
         <aside className="agent-side">
           <div className="side-card">
             <h2><Icon name="chat" size={18} /> {t('agent.test.title')}</h2>
@@ -137,7 +154,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
       </div>
       {historyOpen && (
         <HistoryDialog agent={agent} hasUnpublished={!agent.draftPublished || save !== 'saved'}
-          onRestore={restore} onClose={() => setHistoryOpen(false)} />
+          archived={archived} blocked={stuck} onRestore={restore} onClose={() => setHistoryOpen(false)} />
       )}
     </section>
   );

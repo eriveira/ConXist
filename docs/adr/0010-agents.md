@@ -54,7 +54,14 @@ flows that stay on a version until a person moves them, and Skills under Agents.
 - Knowledge offers the workspace's sources only. Knowledge categories come when Knowledge exists.
 - Tools are the three read tools above, not the grouped picker with source and customer MCP tools; those come with
   the runtime (step 3) and connected sources.
-- Skills and Test show as coming soon (steps 2 and 3). "Uses" (which flows use an agent) comes with flows.
+- Skills and Test show as coming soon (steps 2 and 3), so the page has seven sections, not eight. "Uses" (which flows
+  use an agent) comes with flows.
+- Publish and Archive act at once, without the mock's confirmation: nothing is lost, because every version is kept
+  and can be restored, and an archived agent can be brought back. A publish note and who published come with
+  sign-in.
+- "Discard changes" is the History action on the newest version when the draft has unpublished changes, not a
+  separate button.
+- Takes in is a row of checkboxes (an agent can take in more than one kind); Gives back is a list to pick one from.
 
 ## Data
 
@@ -69,3 +76,13 @@ applied to any shared database.
 - No read tool for agents is added yet, because the shared tool set and MCP server do not exist yet. When they do,
   `list_agents` and `get_agent` are the first agent tools (plan, Tool calling).
 - Until sign-in exists (ADR 0002), anyone who can reach the API on this machine can change any workspace's agents.
+- Rules for the runtime (step 3), from the security review:
+  - A run is told its workspace id and looks up every knowledge source again, in that workspace only. Stored source
+    ids are never trusted, because a source can be removed after publishing.
+  - The tools given to the model are exactly the version's `tools`, matched against the server's own registry; never
+    text from instructions, transcripts or tool results. Tool results go into the prompt marked as data.
+  - Limits are enforced by the runtime, not asked for in the prompt. Step 3 adds prompt-injection cases to the evals.
+  - A tool that changes something gets `readOnly = false` and cannot run without a person's approval; a test fails
+    today if any tool is not read-only.
+- Stored versions are read back through the same rules as new drafts, so a limit may only be loosened; tightening one
+  needs a migration of the stored definitions first.

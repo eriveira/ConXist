@@ -2,7 +2,7 @@ import { useId, type ReactNode } from 'react';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import {
-  type AgentDefinition, type AgentToolInfo, INPUT_KINDS, LIMIT_RANGES, limitInRange, type Limits,
+  type AgentDefinition, INPUT_KINDS, LIMIT_RANGES, limitInRange, type Limits,
   MAX_INSTRUCTIONS_LENGTH, MAX_KNOWLEDGE_SOURCES, MAX_NAME_LENGTH, MAX_PURPOSE_LENGTH, MODEL_POLICIES, OUTPUT_KINDS,
   STYLES, toggled,
 } from '../../domain/agents';
@@ -11,25 +11,30 @@ import { characterCount } from '../../domain/workspaces';
 import { type Translate, useT } from '../../i18n/i18n';
 import { MESSAGES, type MessageKey } from '../../i18n/messages';
 import { SOURCES_HREF } from '../../navigation';
+import type { Choices } from './AgentPage';
 
 interface AgentSectionsProps {
   draft: AgentDefinition;
   onChange: (change: Partial<AgentDefinition>) => void;
   disabled: boolean;
-  /** Null while loading. */
-  sources: Source[] | null;
-  tools: AgentToolInfo[] | null;
+  choices: Choices;
+  onRetryChoices: () => void;
 }
 
 const LIMIT_KEYS = Object.keys(LIMIT_RANGES) as (keyof Limits)[];
 
 /** The parts of an agent, grouped the way a person thinks about them: what it is, what it uses, how it works. */
-export function AgentSections({ draft, onChange, disabled, sources, tools }: AgentSectionsProps) {
+export function AgentSections({ draft, onChange, disabled, choices, onRetryChoices }: AgentSectionsProps) {
   const t = useT();
-  const ids = { name: useId(), purpose: useId(), instructions: useId(), givesBack: useId(), hint: useId() };
-  const nameLength = characterCount(draft.name.trim());
+  const ids = {
+    name: useId(), purpose: useId(), instructions: useId(), givesBack: useId(), hint: useId(),
+    nameError: useId(), nameCount: useId(), purposeError: useId(), purposeCount: useId(),
+    instructionsError: useId(), instructionsCount: useId(),
+  };
+  const nameError = !draft.name.trim() ? t('agent.problem.name-required')
+    : nameLength(draft) > MAX_NAME_LENGTH ? t('api.agent.name-too-long') : null;
   const purposeLength = characterCount(draft.purpose.trim());
-  const instructionsLength = characterCount(draft.instructions);
+  const instructionsLength = characterCount(draft.instructions.trimEnd());
 
   return (
     <fieldset className="agent-sections" disabled={disabled}>
@@ -38,15 +43,19 @@ export function AgentSections({ draft, onChange, disabled, sources, tools }: Age
         <div className="field">
           <label htmlFor={ids.name}>{t('agent.name')}</label>
           <input id={ids.name} type="text" value={draft.name} onChange={(event) => onChange({ name: event.target.value })}
-            aria-invalid={!draft.name.trim() || nameLength > MAX_NAME_LENGTH || undefined} />
-          <Counter count={nameLength} max={MAX_NAME_LENGTH} />
+            aria-invalid={nameError !== null || undefined}
+            aria-describedby={`${nameError ? ids.nameError : ''} ${ids.nameCount}`.trim()} />
+          {nameError && <FieldError id={ids.nameError}>{nameError}</FieldError>}
+          <Counter id={ids.nameCount} count={nameLength(draft)} max={MAX_NAME_LENGTH} />
         </div>
         <div className="field">
           <label htmlFor={ids.purpose}>{t('agent.purpose')}</label>
           <textarea id={ids.purpose} rows={2} value={draft.purpose} placeholder={t('agent.purpose.placeholder')}
             onChange={(event) => onChange({ purpose: event.target.value })}
-            aria-invalid={purposeLength > MAX_PURPOSE_LENGTH || undefined} />
-          <Counter count={purposeLength} max={MAX_PURPOSE_LENGTH} />
+            aria-invalid={purposeLength > MAX_PURPOSE_LENGTH || undefined}
+            aria-describedby={`${purposeLength > MAX_PURPOSE_LENGTH ? ids.purposeError : ''} ${ids.purposeCount}`.trim()} />
+          {purposeLength > MAX_PURPOSE_LENGTH && <FieldError id={ids.purposeError}>{t('api.agent.purpose-too-long')}</FieldError>}
+          <Counter id={ids.purposeCount} count={purposeLength} max={MAX_PURPOSE_LENGTH} />
         </div>
       </Section>
 
@@ -54,11 +63,14 @@ export function AgentSections({ draft, onChange, disabled, sources, tools }: Age
         <div className="field">
           <label htmlFor={ids.instructions} className="sr-only">{t('agent.section.instructions')}</label>
           <textarea id={ids.instructions} className="instructions" rows={9} value={draft.instructions}
-            placeholder={t('agent.instructions.placeholder')} aria-describedby={ids.hint}
+            placeholder={t('agent.instructions.placeholder')}
+            aria-describedby={`${instructionsLength > MAX_INSTRUCTIONS_LENGTH ? ids.instructionsError : ''} ${ids.hint} ${ids.instructionsCount}`.trim()}
             onChange={(event) => onChange({ instructions: event.target.value })}
             aria-invalid={instructionsLength > MAX_INSTRUCTIONS_LENGTH || undefined} />
+          {instructionsLength > MAX_INSTRUCTIONS_LENGTH
+            && <FieldError id={ids.instructionsError}>{t('api.agent.instructions-too-long')}</FieldError>}
           <span id={ids.hint} className="hint"><Icon name="lock" size={14} /> {t('agent.instructions.safety')}</span>
-          <Counter count={instructionsLength} max={MAX_INSTRUCTIONS_LENGTH} />
+          <Counter id={ids.instructionsCount} count={instructionsLength} max={MAX_INSTRUCTIONS_LENGTH} />
         </div>
       </Section>
 
@@ -84,11 +96,14 @@ export function AgentSections({ draft, onChange, disabled, sources, tools }: Age
       </Section>
 
       <Section number={4} title={t('agent.section.knowledge')} lead={t('agent.section.knowledge.lead')}>
-        <Knowledge draft={draft} sources={sources} onChange={onChange} />
+        <ChoicesState choices={choices} onRetry={onRetryChoices}>
+          {(ready) => <Knowledge draft={draft} sources={ready.sources} onChange={onChange} />}
+        </ChoicesState>
       </Section>
 
       <Section number={5} title={t('agent.section.tools')} lead={t('agent.section.tools.lead')}>
-        {tools === null ? <p className="muted">{t('agent.loadingChoices')}</p> : (
+        <ChoicesState choices={choices} onRetry={onRetryChoices}>
+          {({ tools }) => (
           <div className="choice">
             {tools.map((tool) => (
               <label key={tool.id}>
@@ -97,13 +112,13 @@ export function AgentSections({ draft, onChange, disabled, sources, tools }: Age
                 <span className="grow">
                   <b>{t(`agent.tool.${tool.id}` as 'agent.tool.GET_TRANSCRIPT')}</b>
                   <small>{t(`agent.tool.${tool.id}.desc` as 'agent.tool.GET_TRANSCRIPT.desc')}</small>
-                  <code className="tool-name">{tool.toolName}</code>
                 </span>
                 {tool.readOnly && <Pill tone="live">{t('agent.tool.readOnly')}</Pill>}
               </label>
             ))}
           </div>
-        )}
+          )}
+        </ChoicesState>
         <p className="note"><Icon name="info" size={14} /> {t('agent.tools.changeNote')}</p>
       </Section>
 
@@ -149,13 +164,42 @@ function Section({ number, title, lead, children }: { number: number; title: str
   );
 }
 
-function Counter({ count, max }: { count: number; max: number }) {
+function nameLength(draft: AgentDefinition): number {
+  return characterCount(draft.name.trim());
+}
+
+function FieldError({ id, children }: { id: string; children: ReactNode }) {
+  return <span id={id} className="hint error-text"><Icon name="alert" size={14} /> {children}</span>;
+}
+
+/** "20 / 60" on screen; "20 of 60 characters" for a screen reader, read with the field. */
+function Counter({ id, count, max }: { id: string; count: number; max: number }) {
   const t = useT();
   return (
-    <span className={count > max ? 'counter over' : 'counter'} aria-label={t('workspace.count.label', { count, max })}>
-      {t('workspace.count', { count, max })}
+    <span id={id} className={count > max ? 'counter over' : 'counter'}>
+      <span aria-hidden="true">{t('workspace.count', { count, max })}</span>
+      <span className="sr-only">{t('workspace.count.label', { count, max })}</span>
     </span>
   );
+}
+
+/** Sources and tools load with the page; until they do, or if they cannot, nothing is shown as missing. */
+function ChoicesState({ choices, onRetry, children }: {
+  choices: Choices;
+  onRetry: () => void;
+  children: (ready: Extract<Choices, { status: 'ready' }>) => ReactNode;
+}) {
+  const t = useT();
+  if (choices.status === 'loading') return <p className="muted" role="status">{t('agent.loadingChoices')}</p>;
+  if (choices.status === 'error') {
+    return (
+      <p className="alert error" role="alert">
+        <Icon name="alert" /> <span className="grow">{t('agent.choices.error')}</span>
+        <button type="button" className="link" onClick={onRetry}>{t('sources.retry')}</button>
+      </p>
+    );
+  }
+  return <>{children(choices)}</>;
 }
 
 function LimitField({ name, value, onChange }: { name: keyof Limits; value: number; onChange: (value: number) => void }) {
@@ -177,9 +221,8 @@ function LimitField({ name, value, onChange }: { name: keyof Limits; value: numb
   );
 }
 
-function Knowledge({ draft, sources, onChange }: Pick<AgentSectionsProps, 'draft' | 'sources' | 'onChange'>) {
+function Knowledge({ draft, sources, onChange }: Pick<AgentSectionsProps, 'draft' | 'onChange'> & { sources: Source[] }) {
   const t = useT();
-  if (sources === null) return <p className="muted">{t('agent.loadingChoices')}</p>;
   const known = new Set(sources.map((source) => source.id));
   const missing = draft.knowledgeSources.filter((id) => !known.has(id));
   const order = [...sources.map((source) => source.id), ...missing];
@@ -206,7 +249,8 @@ function Knowledge({ draft, sources, onChange }: Pick<AgentSectionsProps, 'draft
       {missing.map((id) => (
         <p key={id} className="alert error">
           <Icon name="alert" /> {t('agent.knowledge.missing')}
-          <button type="button" className="link" onClick={() => toggle(id)}>{t('agent.knowledge.remove')}</button>
+          <button type="button" className="link" onClick={() => toggle(id)}
+            aria-label={t('agent.knowledge.removeMissing')}>{t('agent.knowledge.remove')}</button>
         </p>
       ))}
       <p className="note"><Icon name="lock" size={14} /> {t('agent.knowledge.readOnly')}</p>

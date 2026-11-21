@@ -22,7 +22,7 @@ describe('AgentsPage', () => {
 
     const card = await screen.findByRole('link', { name: /Requirements analyst/ });
     expect(card).toHaveAttribute('href', `#/agents/${LIVE.id}`);
-    expect(card).toHaveTextContent('v2 live · changes not published');
+    expect(card).toHaveTextContent('v2 live · edited');
     expect(card).toHaveTextContent('Gives back: Requirements');
     expect(screen.queryByRole('link', { name: /Old summarizer/ })).not.toBeInTheDocument();
 
@@ -42,10 +42,11 @@ describe('AgentsPage', () => {
     const dialog = screen.getByRole('dialog', { name: 'Nuevo agente' });
     await userEvent.click(within(dialog).getByRole('radio', { name: /Analista de requisitos/ }));
     expect(within(dialog).getByLabelText('Nombre')).toHaveValue('Analista de requisitos');
+    expect(await accessibilityViolations(dialog)).toEqual([]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Crear' }));
 
     const sent = calls.find((call) => call.key === 'POST /api/agents');
-    expect(JSON.parse(String(sent?.init?.body))).toEqual({ template: 'REQUIREMENTS_ANALYST', name: 'Analista de requisitos', language: 'es' });
+    expect(JSON.parse(String(sent?.init?.body))).toEqual({ template: 'REQUIREMENTS_ANALYST', name: 'Analista de requisitos', language: 'ES' });
     expect(window.location.hash).toBe(`#/agents/${LIVE.id}`);
   });
 

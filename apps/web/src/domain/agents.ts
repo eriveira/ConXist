@@ -118,5 +118,5 @@ export function toggled<T>(selected: readonly T[], item: T, all: readonly T[]): 
 /** Active agents first, each group most recently changed first. */
 export function sortAgents(agents: readonly AgentSummary[]): AgentSummary[] {
   return [...agents].sort((a, b) =>
-    Number(a.status === 'ARCHIVED') - Number(b.status === 'ARCHIVED') || b.updatedAt.localeCompare(a.updatedAt));
+    Number(a.status === 'ARCHIVED') - Number(b.status === 'ARCHIVED') || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }

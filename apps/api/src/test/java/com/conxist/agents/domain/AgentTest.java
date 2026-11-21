@@ -16,7 +16,7 @@ class AgentTest {
     private static final Instant LATER = NOW.plus(Duration.ofMinutes(5));
 
     private final Agent agent = Agent.create(UUID.randomUUID(), UUID.randomUUID(),
-            AgentTemplate.MEETING_SUMMARIZER.draft("Summarizer", "en"), NOW);
+            AgentTemplate.MEETING_SUMMARIZER.draft("Summarizer", Language.EN), NOW);
 
     @Test
     void a_new_agent_is_an_unpublished_draft() {
@@ -121,11 +121,19 @@ class AgentTest {
 
     @Test
     void templates_write_the_brief_in_the_persons_language() {
-        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analista", "es").instructions())
+        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analista", Language.ES).instructions())
                 .startsWith("Encuentra los requisitos");
-        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analyst", "en").givesBack())
+        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analyst", Language.EN).givesBack())
                 .isEqualTo(OutputKind.REQUIREMENTS);
-        assertThat(AgentTemplate.BLANK.draft("Mine", null).problems()).containsExactly("instructions-required");
+        assertThat(AgentTemplate.BLANK.draft("Mine", Language.EN).problems()).containsExactly("instructions-required");
+    }
+
+    @Test
+    void every_tool_only_reads_until_the_approval_runtime_exists() {
+        // A tool that changes something needs a person's approval when it runs (TOOL_CALLING_STANDARDS.md §3); that
+        // runtime does not exist yet, so adding one must fail here first.
+        assertThat(AgentTool.values()).allMatch(AgentTool::readOnly);
+        assertThat(AgentTool.values()).extracting(AgentTool::toolName).allMatch(name -> name.startsWith("conxist."));
     }
 
     private static AgentDefinition renamed(AgentDefinition definition, String name) {

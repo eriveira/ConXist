@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import com.conxist.agents.domain.Agent;
 import com.conxist.agents.domain.AgentDefinition;
+import com.conxist.agents.domain.AgentVersion;
 import com.conxist.agents.domain.InvalidAgent;
 import com.conxist.platform.Conflict;
 import com.conxist.platform.CurrentWorkspace;
@@ -89,11 +90,14 @@ public final class AgentBook {
     }
 
     AgentView view(Agent agent) {
-        List<AgentView.VersionInfo> versions = agents.versions(agent.id()).stream()
-                .map(version -> new AgentView.VersionInfo(version.number(), version.publishedAt()))
-                .toList();
+        List<AgentView.VersionInfo> versions = agents.versionInfos(agent.workspaceId(), agent.id());
         return new AgentView(agent.id(), agent.status(), agent.revision(), agent.draft(), agent.publishedVersion(),
                 agent.draftPublished(), problems(agent.draft()), versions, agent.createdAt(), agent.updatedAt());
+    }
+
+    AgentVersion version(Agent agent, int number) {
+        return agents.version(agent.workspaceId(), agent.id(), number)
+                .orElseThrow(() -> new NotFound("agent.version-not-found", "This version does not exist."));
     }
 
     static InvalidAgent nameTaken(String name) {

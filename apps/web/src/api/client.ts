@@ -92,7 +92,7 @@ export interface NewAgent {
   template: AgentTemplate;
   name: string;
   /** The language the template's brief is written in. */
-  language: 'en' | 'es';
+  language: 'EN' | 'ES';
 }
 
 const agentPath = (agentId: string) => `/api/agents/${encodeURIComponent(agentId)}`;

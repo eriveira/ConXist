@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.agents.domain.Agent;
+import com.conxist.agents.application.AgentView.VersionInfo;
 import com.conxist.agents.domain.AgentVersion;
 
 public interface AgentRepository {
@@ -24,8 +25,9 @@ public interface AgentRepository {
 
     void addVersion(AgentVersion version);
 
-    /** Every version of the agent, the newest first. */
-    List<AgentVersion> versions(UUID agentId);
+    /** Number and date of every version of the workspace's agent, the newest first; definitions are not read. */
+    List<VersionInfo> versionInfos(UUID workspaceId, UUID agentId);
 
-    Optional<AgentVersion> version(UUID agentId, int number);
+    /** A version of the workspace's agent; empty when the agent belongs to another workspace. */
+    Optional<AgentVersion> version(UUID workspaceId, UUID agentId, int number);
 }

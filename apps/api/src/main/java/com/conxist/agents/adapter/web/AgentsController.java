@@ -17,13 +17,13 @@ import com.conxist.agents.domain.AgentTemplate;
 import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.AgentVersion;
 import com.conxist.agents.domain.InputKind;
+import com.conxist.agents.domain.Language;
 import com.conxist.agents.domain.Limits;
 import com.conxist.agents.domain.ModelPolicy;
 import com.conxist.agents.domain.OutputKind;
 import com.conxist.agents.domain.Style;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -125,7 +125,7 @@ class AgentsController {
     record CreateRequest(
             @NotNull AgentTemplate template,
             @Size(max = MAX_LINE_INPUT) String name,
-            @Pattern(regexp = "en|es") String language) {
+            @NotNull Language language) {
     }
 
     record RevisionRequest(@NotNull Long revision) {

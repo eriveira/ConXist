@@ -92,6 +92,8 @@ describe('AgentPage', () => {
     await new Promise((resolve) => setTimeout(resolve, 900));
     expect(calls.some((call) => call.key === `PUT /api/agents/${ID}/draft`)).toBe(false);
     expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeDisabled();
+    expect(name).toHaveAccessibleDescription(/Give your agent a name\./);
 
     await userEvent.type(name, 'Summarizer');
     await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
@@ -138,10 +140,11 @@ describe('AgentPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'History (2)' }));
     const dialog = screen.getByRole('dialog', { name: 'History' });
     const first = within(dialog).getAllByRole('listitem')[1];
-    await userEvent.click(within(first).getByRole('button', { name: 'View' }));
+    await userEvent.click(within(first).getByRole('button', { name: 'View v1' }));
     expect(await within(first).findByText('First summarizer')).toBeInTheDocument();
-    await userEvent.click(within(first).getByRole('button', { name: 'Restore' }));
+    await userEvent.click(within(first).getByRole('button', { name: 'Restore v1' }));
     expect(within(first).getByText('Put v1 in your draft? Nothing changes until you publish.')).toBeInTheDocument();
+    expect(await accessibilityViolations(dialog)).toEqual([]);
     await userEvent.click(within(within(first).getByRole('group')).getByRole('button', { name: 'Restore' }));
 
     expect(await screen.findByText('v1 is in your draft. Publish to use it again.')).toBeInTheDocument();
@@ -151,16 +154,45 @@ describe('AgentPage', () => {
   });
 
   it('shows an archived agent read-only with a way to bring it back', async () => {
-    const calls = api({ ...AGENT, status: 'ARCHIVED' }, {
+    const calls = api({ ...AGENT, status: 'ARCHIVED', publishedVersion: 1, draftPublished: true, versions: [{ number: 1, publishedAt: '2026-11-20T11:00:00Z' }] }, {
       [`POST /api/agents/${ID}/unarchive`]: () => ({ body: { ...AGENT, revision: 3 } }),
     });
     render(<AgentPage agentId={ID} />);
 
     expect(await screen.findByLabelText('Name')).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'History (1)' }));
+    expect(screen.getByRole('dialog', { name: 'History' })).toHaveTextContent('This agent is archived. Bring it back to restore a version.');
+    expect(screen.queryByRole('button', { name: /Restore|Discard/ })).not.toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' })[0]);
     await userEvent.click(screen.getByRole('button', { name: 'Bring back' }));
 
     await waitFor(() => expect(screen.getByLabelText('Name')).toBeEnabled());
     expect(bodyOf(calls, `POST /api/agents/${ID}/unarchive`)).toEqual({ revision: 1 });
+  });
+
+  it('says when sources cannot load instead of calling them removed, and retries', async () => {
+    let fail = true;
+    api({ ...AGENT, draft: { ...DRAFT, knowledgeSources: [SOURCE.id] } }, {
+      'GET /api/sources': () => (fail ? { status: 500, body: {} } : { body: [SOURCE] }),
+    });
+    render(<AgentPage agentId={ID} />);
+
+    const alerts = await screen.findAllByText('We could not load your sources and tools. Nothing was changed.');
+    expect(alerts).toHaveLength(2);
+    expect(screen.queryByText('A source it reads was removed from the workspace.')).not.toBeInTheDocument();
+    fail = false;
+    await userEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0]);
+    expect(await screen.findByRole('checkbox', { name: /Specs/ })).toBeChecked();
+  });
+
+  it('says why a save was refused', async () => {
+    api(AGENT, { [`PUT /api/agents/${ID}/draft`]: () => ({ status: 422, body: { code: 'agent.name-taken' } }) });
+    render(<AgentPage agentId={ID} />);
+
+    await userEvent.type(await screen.findByLabelText('Name'), ' 2');
+
+    expect(await screen.findByText(/Not saved\. Another agent in this workspace has this name\./, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
   });
 
   it('says when the agent no longer exists', async () => {

@@ -93,10 +93,17 @@ public enum AgentTemplate {
         this.instructionsEs = instructionsEs;
     }
 
-    /** A first draft named as the person chose, with the brief in their language (English unless Spanish). */
-    public AgentDefinition draft(String name, String language) {
-        boolean spanish = "es".equals(language);
-        return new AgentDefinition(name, spanish ? purposeEs : purposeEn, spanish ? instructionsEs : instructionsEn,
-                List.of(), tools, model, Style.PRECISE, accepts, givesBack, Limits.DEFAULT);
+    /** A first draft named as the person chose, with the brief in their language. */
+    public AgentDefinition draft(String name, Language language) {
+        String purpose = switch (language) {
+            case EN -> purposeEn;
+            case ES -> purposeEs;
+        };
+        String instructions = switch (language) {
+            case EN -> instructionsEn;
+            case ES -> instructionsEs;
+        };
+        return new AgentDefinition(name, purpose, instructions, List.of(), tools, model, Style.PRECISE, accepts,
+                givesBack, Limits.DEFAULT);
     }
 }
