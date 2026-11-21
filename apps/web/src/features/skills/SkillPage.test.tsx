@@ -44,7 +44,9 @@ describe('SkillPage', () => {
     api(SKILL);
     const { container } = render(<SkillPage skillId={ID} />);
 
-    expect(await screen.findByRole('heading', { name: 'Acme style', level: 1 })).toHaveFocus();
+    const heading = await screen.findByRole('heading', { name: 'Acme style', level: 1 });
+    // The page moves focus once it has loaded; under a busy test run that can land a moment after the heading shows.
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText('v1 live · edited')).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Analyst' })).toBeInTheDocument();
     expect(screen.getByText('Reference files').closest('section')).toHaveTextContent('Coming soon');
@@ -61,9 +63,11 @@ describe('SkillPage', () => {
     const instructions = await screen.findByRole('textbox', { name: 'Instructions' });
 
     await userEvent.type(instructions, ' Read it with get_transcript.');
-    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
+    const mentioned = (await screen.findByText(/Your instructions name/)).closest('p') as HTMLElement;
+    await userEvent.click(within(mentioned).getByRole('button', { name: 'Add' }));
 
     expect(screen.getByText('Added Read a transcript.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Add a tool' })).toHaveFocus());
     await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
     const sent = bodyOf(calls, `PUT /api/skills/${ID}/draft`);
     expect(sent.revision).toBeGreaterThanOrEqual(4);
@@ -103,7 +107,8 @@ describe('SkillPage', () => {
     });
     render(<SkillPage skillId={ID} />);
 
-    expect(await screen.findByLabelText('Name')).toBeDisabled();
+    expect(await screen.findByLabelText('Name')).toHaveAttribute('readonly');
+    expect(screen.getByRole('textbox', { name: 'Instructions' })).not.toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
     expect(screen.getByText(/can’t be changed/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Copy' }));

@@ -13,9 +13,24 @@ export function translator(language: Language): Translate {
     const amount = PLURAL_VALUES.map((name) => values[name]).find((value) => typeof value === 'number');
     const singular = `${key}_one` as MessageKey;
     const chosen = typeof amount === 'number' && rules.select(amount) === 'one' && singular in messages ? singular : key;
-    return messages[chosen].replace(/\{(\w+)\}/g, (match, name: string) =>
+    // A key the app has no words for (a tool the server added since) shows as the key, never breaks the page.
+    return (messages[chosen] ?? key).replace(/\{(\w+)\}/g, (match, name: string) =>
       name in values ? String(values[name]) : match);
   };
+}
+
+/** A tool's name for people, or its id when this version of the app has no words for it yet. */
+export function toolLabel(t: Translate, id: string): string {
+  const key = `agent.tool.${id}` as MessageKey;
+  const label = t(key);
+  return label === key ? id : label;
+}
+
+/** What a tool does, or nothing when this version of the app has no words for it yet. */
+export function toolDescription(t: Translate, id: string): string {
+  const key = `agent.tool.${id}.desc` as MessageKey;
+  const text = t(key);
+  return text === key ? '' : text;
 }
 
 const I18nContext = createContext<Translate>(translator('en'));

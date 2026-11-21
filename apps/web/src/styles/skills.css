@@ -43,8 +43,10 @@
 .skill-menu a.mitem { color: inherit; text-decoration: none; }
 .mname.accent { color: var(--cx-accent-text); }
 .menu-empty { padding: 4px 10px 8px; margin: 0; font-size: 13.5px; }
-.notice.inline { min-height: 0; margin: 4px 0 8px; font-size: 13.5px; }
-.notice.inline:empty { margin: 0; }
+.inline-status { margin: 4px 0 8px; font-size: 13.5px; font-weight: 600; color: var(--cx-ok-fg); }
+.inline-status:empty { margin: 0; }
+.pick-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pick-row select { width: auto; flex: 0 1 300px; min-width: 0; }
 .needed-by { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--cx-accent-text); }
 .needed-by.off { color: var(--cx-warn-fg); }
 
@@ -59,7 +61,7 @@
 .need-list .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .need-list small { font-size: 12.5px; color: var(--cx-fg-muted); }
 .need-list code, .skill-md { font-family: var(--cx-font-mono); }
-.inline-field { max-width: 320px; }
+.inline-field { max-width: 420px; }
 .skill-page textarea.instructions { font-family: var(--cx-font-mono); font-size: 13.5px; min-height: 280px; }
 .side-card.side-tabs-card, .skill-page .side-card { border-style: solid; padding: 0; overflow: hidden; }
 .side-tabs { display: flex; border-bottom: 1px solid var(--cx-border); }
@@ -87,4 +89,3 @@
 @media (max-width: 560px) {
   .page-h-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
-a.btn { text-decoration: none; }

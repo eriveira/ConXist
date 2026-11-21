@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * A skill: a way of working written once (steps, rules, examples) that any agent can follow. It only adds
@@ -17,8 +18,20 @@ public record SkillDefinition(String name, String description, String instructio
     public static final int MAX_DESCRIPTION_LENGTH = 1_024;
     public static final int MAX_INSTRUCTIONS_LENGTH = 20_000;
 
+    /**
+     * Characters that do not show on screen but a model still reads: zero-width and byte-order marks, bidirectional
+     * controls and Unicode tag characters. A skill becomes prompt text, so what a person reviews must be all there is.
+     * The zero-width joiner stays, because emoji are built with it.
+     */
+    private static final Pattern HIDDEN =
+            Pattern.compile("[\\u200B\\u200C\\u200E\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF"
+                    + "\\x{E0000}-\\x{E007F}]");
+
     /** Checks the lengths every draft must keep, and trims and de-duplicates what the person typed. */
     public SkillDefinition {
+        name = visible(name);
+        description = visible(description);
+        instructions = visible(instructions);
         String trimmedName = stripped(name);
         if (trimmedName.isEmpty()) {
             throw new InvalidSkill("name-required", "Give your skill a name.");
@@ -43,6 +56,11 @@ public record SkillDefinition(String name, String description, String instructio
             problems.add("instructions-required");
         }
         return List.copyOf(problems);
+    }
+
+    /** The text without characters that would not show on screen. */
+    public static String visible(String value) {
+        return value == null ? null : HIDDEN.matcher(value).replaceAll("");
     }
 
     private static String limited(String value, int max, String code, String message) {

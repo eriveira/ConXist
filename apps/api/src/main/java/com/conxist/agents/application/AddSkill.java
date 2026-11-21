@@ -1,5 +1,6 @@
 package com.conxist.agents.application;
 
+import java.util.List;
 import java.util.UUID;
 import com.conxist.agents.domain.BuiltInSkill;
 import com.conxist.agents.domain.InvalidSkill;
@@ -20,7 +21,7 @@ public final class AddSkill {
     }
 
     public SkillView create(String name) {
-        return book.insert(newSkill(SkillSource.YOURS, new SkillDefinition(name, "", "", null)));
+        return book.insert(newSkill(SkillSource.YOURS, new SkillDefinition(name, "", "", List.of())));
     }
 
     /** Reads a SKILL.md into a draft for the person to check. Nothing in it is followed until they publish it. */
@@ -42,7 +43,7 @@ public final class AddSkill {
         for (int copy = 1; copy <= MAX_COPIES; copy++) {
             String suffix = copy == 1 ? " (copy)" : " (copy " + copy + ")";
             String name = shortened(original, SkillDefinition.MAX_NAME_LENGTH - suffix.length()) + suffix;
-            if (!book.skills().nameTaken(book.workspaceId(), name, null)) {
+            if (!book.skills().nameTaken(book.workspaceId(), name)) {
                 return name;
             }
         }

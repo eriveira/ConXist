@@ -1,11 +1,11 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Icon } from '../../components/Icon';
 import type { AgentToolInfo } from '../../domain/agents';
 import {
   MAX_DESCRIPTION_LENGTH, MAX_SKILL_INSTRUCTIONS_LENGTH, MAX_SKILL_NAME_LENGTH, mentionedTools, type SkillDefinition,
 } from '../../domain/skills';
 import { characterCount } from '../../domain/workspaces';
-import { useT } from '../../i18n/i18n';
+import { toolLabel, useT } from '../../i18n/i18n';
 import { Counter, FieldError, Section } from '../agents/FormParts';
 import type { SkillContext } from './SkillPage';
 
@@ -33,12 +33,12 @@ export function SkillSections({ draft, onChange, readOnly, disabled, context, on
   const instructionsLength = characterCount(draft.instructions.trimEnd());
 
   return (
-    <fieldset className="agent-sections" disabled={disabled || readOnly}>
+    <fieldset className="agent-sections" disabled={disabled}>
       <legend className="sr-only">{t('skill.sections')}</legend>
       <Section number={1} title={t('skill.section.about')} lead={t('skill.section.about.lead')}>
         <div className="field">
           <label htmlFor={ids.name}>{t('skill.name')}</label>
-          <input id={ids.name} type="text" value={draft.name} onChange={(event) => onChange({ name: event.target.value })}
+          <input id={ids.name} type="text" readOnly={readOnly} value={draft.name} onChange={(event) => onChange({ name: event.target.value })}
             aria-invalid={nameError !== null || undefined}
             aria-describedby={`${nameError ? ids.nameError : ''} ${ids.nameCount}`.trim()} />
           {nameError && <FieldError id={ids.nameError}>{nameError}</FieldError>}
@@ -46,7 +46,7 @@ export function SkillSections({ draft, onChange, readOnly, disabled, context, on
         </div>
         <div className="field">
           <label htmlFor={ids.description}>{t('skill.description')}</label>
-          <textarea id={ids.description} rows={2} value={draft.description} placeholder={t('skill.description.placeholder')}
+          <textarea id={ids.description} rows={2} readOnly={readOnly} value={draft.description} placeholder={t('skill.description.placeholder')}
             onChange={(event) => onChange({ description: event.target.value })}
             aria-invalid={descriptionLength > MAX_DESCRIPTION_LENGTH || undefined}
             aria-describedby={`${ids.descriptionHint} ${ids.descriptionCount}`} />
@@ -60,7 +60,7 @@ export function SkillSections({ draft, onChange, readOnly, disabled, context, on
       <Section number={2} title={t('skill.section.instructions')} lead={t('skill.section.instructions.lead')}>
         <div className="field">
           <label htmlFor={ids.instructions} className="sr-only">{t('skill.section.instructions')}</label>
-          <textarea id={ids.instructions} className="instructions" rows={14} value={draft.instructions}
+          <textarea id={ids.instructions} className="instructions" rows={14} readOnly={readOnly} value={draft.instructions}
             placeholder={t('skill.instructions.placeholder')}
             onChange={(event) => onChange({ instructions: event.target.value })}
             aria-invalid={instructionsLength > MAX_SKILL_INSTRUCTIONS_LENGTH || undefined}
@@ -102,7 +102,11 @@ function SkillNeeds({ draft, tools, onChange, readOnly }: SkillNeedsProps) {
   const t = useT();
   const pickId = useId();
   const [notice, setNotice] = useState<string | null>(null);
-  const name = (id: string) => t(`agent.tool.${id}` as 'agent.tool.GET_TRANSCRIPT');
+  const name = (id: string) => toolLabel(t, id);
+  const [picked, setPicked] = useState('');
+  const pickRef = useRef<HTMLSelectElement>(null);
+  /** The button pressed goes away, so focus moves to the tool picker, or the section when there is none. */
+  const keepFocus = () => requestAnimationFrame(() => pickRef.current?.focus());
   const order = tools.map((tool) => tool.id);
   const others = tools.filter((tool) => !draft.needs.includes(tool.id));
   const mentioned = mentionedTools(draft.instructions, tools).filter((id) => !draft.needs.includes(id));
@@ -121,7 +125,7 @@ function SkillNeeds({ draft, tools, onChange, readOnly }: SkillNeedsProps) {
                 <small><code>{tools.find((tool) => tool.id === id)?.toolName ?? id}</code> · {t('agent.tool.readOnly')}</small>
               </span>
               {!readOnly && (
-                <button type="button" className="icon-btn" onClick={() => set(draft.needs.filter((need) => need !== id))}
+                <button type="button" className="icon-btn" onClick={() => { keepFocus(); set(draft.needs.filter((need) => need !== id)); }}
                   aria-label={t('skill.needs.remove', { tool: name(id) })}>
                   <Icon name="close" size={18} />
                 </button>
@@ -135,25 +139,30 @@ function SkillNeeds({ draft, tools, onChange, readOnly }: SkillNeedsProps) {
           <Icon name="info" />
           <span className="grow">{t('skill.needs.mentioned', { tools: mentioned.map(name).join(', ') })}</span>
           <button type="button" className="btn sm" onClick={() => {
+            keepFocus();
             set([...draft.needs, ...mentioned]);
-            setNotice(t('skill.needs.added', { tools: mentioned.map(name).join(', ') }));
+            setNotice(t('skill.needs.added', { tools: mentioned.map(name).join(', '), count: mentioned.length }));
           }}>{t('skill.needs.addMentioned')}</button>
         </p>
       )}
       {!readOnly && others.length > 0 && (
         <div className="field inline-field">
           <label htmlFor={pickId}>{t('skill.needs.add')}</label>
-          <select id={pickId} value="" onChange={(event) => {
-            if (!event.target.value) return;
-            set([...draft.needs, event.target.value]);
-            setNotice(t('skill.needs.added', { tools: name(event.target.value) }));
-          }}>
-            <option value="">{t('skill.needs.pick')}</option>
-            {others.map((tool) => <option key={tool.id} value={tool.id}>{name(tool.id)}</option>)}
-          </select>
+          <span className="pick-row">
+            <select id={pickId} ref={pickRef} value={picked} onChange={(event) => setPicked(event.target.value)}>
+              <option value="">{t('skill.needs.pick')}</option>
+              {others.map((tool) => <option key={tool.id} value={tool.id}>{name(tool.id)}</option>)}
+            </select>
+            <button type="button" className="btn sm" disabled={!picked} onClick={() => {
+              set([...draft.needs, picked]);
+              setNotice(t('skill.needs.added', { tools: name(picked), count: 1 }));
+              setPicked('');
+              keepFocus();
+            }}>{t('skill.needs.addPicked')}</button>
+          </span>
         </div>
       )}
-      <p className="notice inline" role="status">{notice}</p>
+      <p className="inline-status" role="status">{notice}</p>
       <p className="note"><Icon name="info" size={14} /> {t('skill.needs.note')}</p>
     </div>
   );

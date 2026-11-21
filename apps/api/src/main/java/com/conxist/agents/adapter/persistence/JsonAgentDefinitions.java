@@ -38,7 +38,8 @@ final class JsonAgentDefinitions {
             throw new IllegalStateException("Unknown agent definition shape " + stored.v());
         }
         return new AgentDefinition(stored.name(), stored.purpose(), stored.instructions(),
-                stored.knowledgeSources(), pins(stored.skills()), stored.tools().stream().map(AgentTool::valueOf).toList(),
+                stored.knowledgeSources(), pins(stored.skills()),
+                stored.tools().stream().map(AgentTool::valueOf).toList(),
                 ModelPolicy.valueOf(stored.model()), Style.valueOf(stored.style()),
                 stored.accepts().stream().map(InputKind::valueOf).toList(), OutputKind.valueOf(stored.givesBack()),
                 new Limits(stored.limits().maxSteps(), stored.limits().timeoutSeconds(),

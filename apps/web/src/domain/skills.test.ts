@@ -20,6 +20,8 @@ describe('skills', () => {
   it('finds tools named in the instructions by their full or short name only', () => {
     expect(mentionedTools('Use conxist.get_transcript, then list_meetings.', TOOLS)).toEqual(['LIST_MEETINGS', 'GET_TRANSCRIPT']);
     expect(mentionedTools('my_list_meetings or get_transcript_v2', TOOLS)).toEqual([]);
+    expect(mentionedTools('a.b or a+b', [{ id: 'ODD', toolName: 'conxist.a+b' }])).toEqual(['ODD']);
+    expect(mentionedTools('aab', [{ id: 'ODD', toolName: 'conxist.a+b' }])).toEqual([]);
   });
 
   it('says what a draft still needs', () => {

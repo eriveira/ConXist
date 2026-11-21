@@ -114,7 +114,7 @@ export function SkillPage({ skillId }: { skillId: string }) {
 
   /** Whatever happens, the dialog closes, so the result or the reason shows on the page. */
   const publish = async (note: string) => {
-    await run(null, () => editor.publish(note), t('agent.published', { version: skill.publishedVersion + 1 }));
+    await run(null, () => editor.publish(note), t('skill.published', { version: skill.publishedVersion + 1 }));
     setPublishing(false);
   };
   const restore = async (number: number) => {
@@ -129,7 +129,7 @@ export function SkillPage({ skillId }: { skillId: string }) {
           <h1 id="skill-title" ref={headingRef} tabIndex={-1}>{draft.name.trim() || skill.draft.name}</h1>
           <div className="agent-head-meta">
             <Pill tone={builtIn ? 'soon' : 'info'}>{t(`skill.source.${skill.source}`)}</Pill>
-            {builtIn ? <Pill tone="live">v{skill.publishedVersion}</Pill> : <AgentStatePill agent={skill} />}
+            {builtIn ? <Pill tone="live">v{skill.publishedVersion}</Pill> : <AgentStatePill agent={skill} kind="skill" />}
             {!builtIn && (
               <SaveStatus save={save} problem={problem} blocked={blocked !== null} onRetry={editor.retry}
                 onReload={() => void editor.reload()} />

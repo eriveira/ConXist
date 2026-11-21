@@ -50,7 +50,9 @@ describe('AgentPage', () => {
     api(AGENT);
     const { container } = render(<AgentPage agentId={ID} />);
 
-    expect(await screen.findByRole('heading', { name: 'Summarizer', level: 1 })).toHaveFocus();
+    const heading = await screen.findByRole('heading', { name: 'Summarizer', level: 1 });
+    // The page moves focus once it has loaded; under a busy test run that can land a moment after the heading shows.
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText('Draft, not published')).toBeInTheDocument();
     for (const section of ['What it is', 'Instructions', 'Takes in and gives back', 'Knowledge', 'Skills', 'Tools', 'How it thinks', 'Limits']) {
       expect(screen.getByRole('region', { name: new RegExp(section) })).toBeInTheDocument();
@@ -216,6 +218,22 @@ describe('AgentPage', () => {
     const sent = bodyOf(calls, `PUT /api/agents/${ID}/draft`);
     expect(sent.draft.skills).toEqual([{ skillId: SUMMARY_ID, version: 1 }]);
     expect(sent.draft.tools).toEqual(['LIST_MEETINGS', 'GET_TRANSCRIPT']);
+  });
+
+  it('never turns on a tool that changes something when a skill is added', async () => {
+    api(AGENT, { 'GET /api/agents/tools': () => ({ body: TOOLS.map((tool) => ({ ...tool, readOnly: false })) }) });
+    render(<AgentPage agentId={ID} />);
+    const skills = await screen.findByRole('region', { name: /Skills/ });
+
+    await userEvent.click(await within(skills).findByRole('button', { name: 'Add' }));
+    await userEvent.click(within(skills).getByRole('button', { name: /Meeting summary/ }));
+
+    expect(within(skills).getByText('Added Meeting summary.')).toBeInTheDocument();
+    expect(within(skills).getByText('Needs List meetings, which is off.')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /List meetings/ })).not.toBeChecked();
+    await userEvent.click(within(skills).getByRole('button', { name: 'Turn on List meetings' }));
+    expect(screen.getByRole('checkbox', { name: /List meetings/ })).toBeChecked();
+    await waitFor(() => expect(within(skills).getByRole('button', { name: 'Add' })).toHaveFocus());
   });
 
   it('blocks publishing while a skill needs a tool that is off, and offers to turn it on', async () => {

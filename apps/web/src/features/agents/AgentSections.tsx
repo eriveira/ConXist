@@ -9,7 +9,7 @@ import {
 import type { Source } from '../../domain/model';
 import { type PinnedSkill, skillRows } from '../../domain/skills';
 import { characterCount } from '../../domain/workspaces';
-import { type Translate, useT } from '../../i18n/i18n';
+import { type Translate, toolDescription, toolLabel, useT } from '../../i18n/i18n';
 import { MESSAGES, type MessageKey } from '../../i18n/messages';
 import { SOURCES_HREF } from '../../navigation';
 import type { Choices } from './AgentPage';
@@ -126,12 +126,12 @@ export function AgentSections({ draft, pinned, onChange, disabled, choices, onRe
                 <input type="checkbox" checked={on}
                   onChange={() => onChange({ tools: toggled(draft.tools, tool.id, tools.map((each) => each.id)) })} />
                 <span className="grow">
-                  <b>{t(`agent.tool.${tool.id}` as 'agent.tool.GET_TRANSCRIPT')}</b>
-                  <small>{t(`agent.tool.${tool.id}.desc` as 'agent.tool.GET_TRANSCRIPT.desc')}</small>
+                  <b>{toolLabel(t, tool.id)}</b>
+                  <small>{toolDescription(t, tool.id)}</small>
                   {neededBy.length > 0 && (
                     <small className={on ? 'needed-by' : 'needed-by off'}>
                       <Icon name={on ? 'skill' : 'alert'} size={14} />
-                      {' '}{t(on ? 'agent.tool.neededBy' : 'agent.tool.offNeededBy', { names: neededBy.join(', ') })}
+                      {' '}{t(on ? 'agent.tool.neededBy' : 'agent.tool.offNeededBy', { names: neededBy.join(', '), count: neededBy.length })}
                     </small>
                   )}
                 </span>

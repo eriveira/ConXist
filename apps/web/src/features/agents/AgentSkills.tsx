@@ -4,7 +4,7 @@ import { Pill } from '../../components/Pill';
 import { usePopover } from '../../components/usePopover';
 import type { AgentDefinition, AgentToolInfo } from '../../domain/agents';
 import { MAX_SKILLS, type PinnedSkill, type SkillRow, skillRows, type SkillSummary } from '../../domain/skills';
-import { useT } from '../../i18n/i18n';
+import { toolLabel, useT } from '../../i18n/i18n';
 import { NEW_SKILL_HREF, SKILLS_HREF, skillHref } from '../../navigation';
 
 interface AgentSkillsProps {
@@ -25,7 +25,7 @@ export function AgentSkills({ draft, pinned, skills, tools, onChange }: AgentSki
   const popover = usePopover();
   const [notice, setNotice] = useState<string | null>(null);
   const rows = skillRows(draft.skills, pinned, skills);
-  const toolName = (id: string) => t(`agent.tool.${id}` as 'agent.tool.GET_TRANSCRIPT');
+  const toolName = (id: string) => toolLabel(t, id);
   const addable = skills.filter((skill) => skill.status === 'ACTIVE' && skill.publishedVersion > 0
     && !draft.skills.some((pin) => pin.skillId === skill.id));
   const full = draft.skills.length >= MAX_SKILLS;
@@ -33,17 +33,23 @@ export function AgentSkills({ draft, pinned, skills, tools, onChange }: AgentSki
   function add(skill: SkillSummary) {
     popover.setOpen(false);
     popover.button.current?.focus();
-    const turnedOn = skill.needs.filter((need) => !draft.tools.includes(need) && tools.some((tool) => tool.id === need));
+    // Only tools that read are turned on for the person; one that changes something stays off until they turn it on.
+    const turnedOn = skill.needs.filter((need) => !draft.tools.includes(need)
+      && tools.some((tool) => tool.id === need && tool.readOnly));
     onChange({
       skills: [...draft.skills, { skillId: skill.id, version: skill.publishedVersion }],
       tools: tools.map((tool) => tool.id).filter((id) => draft.tools.includes(id) || turnedOn.includes(id)),
     });
     setNotice(turnedOn.length
-      ? t('agent.skills.addedWithTools', { name: skill.name, tools: turnedOn.map(toolName).join(', ') })
+      ? t('agent.skills.addedWithTools', { name: skill.name, tools: turnedOn.map(toolName).join(', '), count: turnedOn.length })
       : t('agent.skills.added', { name: skill.name }));
   }
 
+  /** The button pressed goes away, so focus moves to Add, which stays. */
+  const keepFocus = () => requestAnimationFrame(() => popover.button.current?.focus());
+
   function remove(row: SkillRow) {
+    keepFocus();
     onChange({ skills: draft.skills.filter((pin) => pin.skillId !== row.pin.skillId) });
     setNotice(row.skill ? t('agent.skills.removed', { name: row.skill.name }) : null);
   }
@@ -51,11 +57,13 @@ export function AgentSkills({ draft, pinned, skills, tools, onChange }: AgentSki
   function update(row: SkillRow) {
     if (!row.skill) return;
     const newest = row.skill.newestVersion;
+    keepFocus();
     onChange({ skills: draft.skills.map((pin) => pin.skillId === row.pin.skillId ? { ...pin, version: newest } : pin) });
     setNotice(t('agent.skills.updated', { name: row.skill.name, version: newest }));
   }
 
   function turnOn(need: string) {
+    keepFocus();
     onChange({ tools: tools.map((tool) => tool.id).filter((id) => draft.tools.includes(id) || id === need) });
   }
 
@@ -140,7 +148,7 @@ export function AgentSkills({ draft, pinned, skills, tools, onChange }: AgentSki
           </div>
         )}
       </div>
-      <p className="notice inline" role="status">{notice}</p>
+      <p className="inline-status" role="status">{notice}</p>
       <p className="note"><Icon name="lock" size={14} /> {t('agent.skills.note')}</p>
     </>
   );

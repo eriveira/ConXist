@@ -21,7 +21,8 @@ export function SkillSide({ skill, draft, context }: { skill: Skill; draft: Skil
     link.href = url;
     link.download = `${slug(draft.name) || 'skill'}.SKILL.md`;
     link.click();
-    URL.revokeObjectURL(url);
+    // Some browsers start the download after this returns, so the file is let go on the next turn.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   const select = (next: Tab) => () => setTab(next);

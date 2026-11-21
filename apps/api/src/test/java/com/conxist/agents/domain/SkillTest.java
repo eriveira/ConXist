@@ -97,6 +97,39 @@ class SkillTest {
     }
 
     @Test
+    void a_skill_md_with_empty_front_matter_or_a_longer_rule_is_still_read() {
+        assertThat(SkillMarkdown.read("---\n---\n# Name\nDo it.").name()).isEqualTo("Name");
+        assertCode(() -> SkillMarkdown.read("---\nname: x\n----\n"), "skill.import-unreadable");
+        assertThat(SkillMarkdown.read("---\nname: x\n---\n").instructions()).isEmpty();
+    }
+
+    @Test
+    void a_quoted_description_is_read_back_as_it_was_exported() {
+        String exported = "---\nname: style\ndescription: \"Say \\\"done\\\" in C:\\\\work\"\n---\nBody";
+        assertThat(SkillMarkdown.read(exported).description()).isEqualTo("Say \"done\" in C:\\work");
+        assertThat(SkillMarkdown.read("---\nname: x\ndescription: 'It''s short'\n---\nBody").description())
+                .isEqualTo("It's short");
+    }
+
+    @Test
+    void a_file_over_64_kb_is_refused_counting_bytes_not_letters() {
+        assertCode(() -> SkillMarkdown.read("# N\n" + "é".repeat(SkillMarkdown.MAX_LENGTH / 2)),
+                "skill.import-too-large");
+    }
+
+    @Test
+    void characters_that_do_not_show_on_screen_are_removed() {
+        String hidden = "Be\u200B short.\u202E" + new String(Character.toChars(0xE0041)) + "\uFEFF";
+        SkillDefinition skill = new SkillDefinition("Meeting\u200B summary", "When\u2066 writing.", hidden, null);
+
+        assertThat(skill.name()).isEqualTo("Meeting summary");
+        assertThat(skill.description()).isEqualTo("When writing.");
+        assertThat(skill.instructions()).isEqualTo("Be short.");
+        assertThat(new SkillDefinition("Team 👩‍💻", "", "", null).name()).isEqualTo("Team 👩‍💻");
+        assertThat(BuiltInSkill.nameTaken(skill.name())).isTrue();
+    }
+
+    @Test
     void a_skill_md_that_cannot_be_read_is_refused_with_a_reason() {
         assertCode(() -> SkillMarkdown.read("---\nname: x\n"), "skill.import-unreadable");
         assertCode(() -> SkillMarkdown.read("No name here."), "skill.import-unreadable");

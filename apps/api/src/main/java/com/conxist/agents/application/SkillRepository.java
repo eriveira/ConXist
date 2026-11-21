@@ -24,6 +24,11 @@ public interface SkillRepository {
     /** Whether another skill of the workspace than {@code except} has the name, ignoring case. */
     boolean nameTaken(UUID workspaceId, String name, UUID except);
 
+    /** Whether any skill of the workspace has the name, ignoring case. */
+    default boolean nameTaken(UUID workspaceId, String name) {
+        return nameTaken(workspaceId, name, null);
+    }
+
     void addVersion(SkillVersion version);
 
     /** Number, note and date of every version of the workspace's skill, the newest first. */

@@ -4,7 +4,7 @@ import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import type { AgentSummary } from '../../domain/agents';
 import { SKILL_FILTERS, type SkillFilter, type SkillSummary, sortSkills, usersOf } from '../../domain/skills';
-import { useLanguage, useT } from '../../i18n/i18n';
+import { useLanguage, toolLabel, useT } from '../../i18n/i18n';
 import { NEW_SKILL_HREF, SKILLS_HREF, skillHref } from '../../navigation';
 import { AgentStatePill } from '../agents/AgentStatePill';
 import { AgentsTabs } from './AgentsTabs';
@@ -51,7 +51,7 @@ export function SkillsPage({ creating }: { creating: boolean }) {
           <button type="button" className="btn" onClick={() => setImporting(true)}>
             <Icon name="upload" /> {t('skills.import')}
           </button>
-          <a className="btn primary" href={NEW_SKILL_HREF}><Icon name="plus" /> {t('agents.new')}</a>
+          <a className="btn primary" href={NEW_SKILL_HREF}><Icon name="plus" /> {t('skills.new')}</a>
         </div>
         <p>{t('skills.lead')}</p>
       </div>
@@ -104,7 +104,7 @@ function SkillList({ skills, agents, filter, onFilter, showArchived, onShowArchi
         {archived > 0 && (
           <label className="show-archived">
             <input type="checkbox" checked={showArchived} onChange={(event) => onShowArchived(event.target.checked)} />
-            {t('agents.showArchived', { count: archived })}
+            {t('skills.showArchived', { count: archived })}
           </label>
         )}
       </div>
@@ -120,12 +120,12 @@ function SkillList({ skills, agents, filter, onFilter, showArchived, onShowArchi
                   <span className="agent-card-top">
                     <b>{skill.name}</b>
                     <Pill tone={skill.source === 'BUILT_IN' ? 'soon' : 'info'}>{t(`skill.source.${skill.source}`)}</Pill>
-                    {skill.source === 'BUILT_IN' ? <Pill tone="live">v{skill.publishedVersion}</Pill> : <AgentStatePill agent={skill} />}
+                    {skill.source === 'BUILT_IN' ? <Pill tone="live">v{skill.publishedVersion}</Pill> : <AgentStatePill agent={skill} kind="skill" />}
                   </span>
                   {skill.description && <span className="agent-card-purpose">{skill.description}</span>}
                   <span className="agent-card-meta">
                     {skill.needs.length > 0
-                      ? t('skills.needs', { tools: skill.needs.map((need) => t(`agent.tool.${need}` as 'agent.tool.GET_TRANSCRIPT')).join(', ') })
+                      ? t('skills.needs', { tools: skill.needs.map((need) => toolLabel(t, need)).join(', ') })
                       : t('skills.needsNothing')}
                     {' · '}
                     {users > 0 ? t('skills.usedBy', { count: users }) : t('skills.notUsed')}

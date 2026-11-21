@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { type AgentDefinition, type AgentToolInfo, localProblems } from '../../domain/agents';
-import { type PinnedSkill, type SkillSummary, skillRowProblems, skillRows } from '../../domain/skills';
+import { type PinnedSkill, SKILL_PROBLEMS, type SkillSummary, skillRowProblems, skillRows } from '../../domain/skills';
 import type { Source } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
@@ -159,8 +159,6 @@ export function AgentPage({ agentId }: { agentId: string }) {
     </section>
   );
 }
-
-const SKILL_PROBLEMS = ['skill-missing', 'skill-needs-tool'];
 
 /**
  * The server's problems describe the saved draft. Once the skills list is in, the skill problems are worked out from

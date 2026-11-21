@@ -157,6 +157,10 @@ class SkillsIntegrationTest {
                     .andExpect(jsonPath("$.code").value("skill.not-found"));
         }
 
+        mvc.perform(get("/api/skills").header(HEADER, other))
+                .andExpect(jsonPath("$.length()").value(BuiltInSkill.values().length))
+                .andExpect(jsonPath("$[?(@.id == '" + id + "')]").isEmpty());
+
         String agent = mvc.perform(post("/api/agents").header(HEADER, other)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"template\":\"BLANK\",\"name\":\"Borrower\",\"language\":\"EN\"}"))
@@ -171,6 +175,7 @@ class SkillsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":2}"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("agent.skill-missing"));
+        mvc.perform(get("/api/agents").header(HEADER, owner)).andExpect(jsonPath("$").isEmpty());
         mvc.perform(get("/api/skills/{id}", id).header(HEADER, owner))
                 .andExpect(jsonPath("$.revision").value(2))
                 .andExpect(jsonPath("$.draft.name").value("Release notes"));

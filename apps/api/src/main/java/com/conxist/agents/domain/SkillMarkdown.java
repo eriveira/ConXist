@@ -1,6 +1,8 @@
 package com.conxist.agents.domain;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -18,29 +20,33 @@ public final class SkillMarkdown {
 
     private static final Pattern SLUG = Pattern.compile("[a-z0-9]+(-[a-z0-9]+)*");
     private static final String FENCE = "---";
+    private static final String BYTE_ORDER_MARK = "\uFEFF";
 
     private SkillMarkdown() {
     }
 
     public static SkillDefinition read(String markdown) {
         String text = markdown == null ? "" : markdown.replace("\r\n", "\n").replace('\r', '\n');
-        if (text.length() > MAX_LENGTH) {
+        if (text.getBytes(StandardCharsets.UTF_8).length > MAX_LENGTH) {
             throw new InvalidSkill("import-too-large", "This file is too large for a skill. Keep it under 64 KB.");
         }
-        if (text.startsWith("﻿")) {
+        if (text.startsWith(BYTE_ORDER_MARK)) {
             text = text.substring(1);
         }
         Map<String, String> front = new LinkedHashMap<>();
         String body = text;
-        if (text.startsWith(FENCE + "\n")) {
-            int end = text.indexOf("\n" + FENCE, FENCE.length());
-            if (end < 0) {
+        List<String> lines = text.lines().toList();
+        if (!lines.isEmpty() && lines.get(0).strip().equals(FENCE)) {
+            int end = 1;
+            while (end < lines.size() && !lines.get(end).strip().equals(FENCE)) {
+                end++;
+            }
+            if (end == lines.size()) {
                 throw new InvalidSkill("import-unreadable",
                         "The file starts a settings block with --- but never closes it.");
             }
-            text.substring(FENCE.length() + 1, end).lines().forEach(line -> keyValue(line, front));
-            int bodyStart = text.indexOf('\n', end + 1);
-            body = bodyStart < 0 ? "" : text.substring(bodyStart + 1);
+            lines.subList(1, end).forEach(line -> keyValue(line, front));
+            body = String.join("\n", lines.subList(end + 1, lines.size()));
         }
         String instructions = body.strip();
         String name = front.getOrDefault("name", heading(instructions));
@@ -60,10 +66,15 @@ public final class SkillMarkdown {
         front.putIfAbsent(key, unquoted(line.substring(colon + 1).strip()));
     }
 
+    /** A quoted value loses its quotes; in double quotes, \" and \\ stand for " and \ as in YAML. */
     private static String unquoted(String value) {
-        boolean quoted = value.length() >= 2
-                && (value.startsWith("\"") && value.endsWith("\"") || value.startsWith("'") && value.endsWith("'"));
-        return quoted ? value.substring(1, value.length() - 1) : value;
+        if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
+            return value.substring(1, value.length() - 1).replace("''", "'");
+        }
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            return value.substring(1, value.length() - 1).replaceAll("\\\\([\"\\\\])", "$1");
+        }
+        return value;
     }
 
     private static String heading(String body) {

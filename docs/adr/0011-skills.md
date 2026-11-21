@@ -56,6 +56,11 @@ section where a skill stays at the version it was added at.
 - "New skill" from an agent's Add menu opens a new skill; it is not added to the agent on publish. The person adds it
   from the agent after publishing.
 - The publish dialog does not list what changed field by field; it names the agents that stay on their version.
+- Turning off a tool a skill needs is not confirmed in a dialog. The tool shows "Off, but needed by …" and publishing is
+  blocked until it is on again or the skill is removed, which is reversible and says why.
+- New asks for a name in a small dialog first, the same as a new agent, so the skill is saved from the first moment.
+- The Agents | Skills tabs show no counts; each page shows its own list.
+- Import uses a file picker, not a drop zone.
 
 ## Data
 
@@ -70,10 +75,23 @@ before it is applied to any shared database.
 - Skills can be written, imported, versioned and pinned now, but nothing follows them until agents run (step 3).
 - Skill text is configuration a team writes or imports, not captured customer content, so it is not sealed like
   transcripts (ADR 0004); logs name ids only. Imported text is shown to the person before any agent uses it.
-- Rules for the runtime (step 3), from this design:
+- Characters that do not show on screen (zero-width, bidirectional controls, Unicode tag characters) are removed from
+  a skill's name, "When to use it" and instructions when it is imported or saved, so what a person reviews is all a
+  model will read, and a name cannot pass for a built-in one.
+- The app turns on only read-only tools when a skill is added to an agent; a tool that changes something would stay
+  off with the "Needs … Turn on" note, because `needs` can come from imported text.
+- Rules for the runtime (step 3), from this design and the security review:
   - A run reads each pinned version again, in the run's workspace only; the stored pin is never trusted on its own.
-  - Skill instructions go into the system prompt as the team's instructions, below ConXist's own rules, which say
-    that meeting and document text is data. A skill cannot change the tools given to the model; those are exactly
-    the agent version's `tools`.
+    A pin to a missing or archived skill is refused, or the run records that it used one.
+  - Skill instructions go into the system prompt inside clearly marked delimiters with the skill's name, version and
+    source, below ConXist's own rules. Those rules say that meeting and document text is data, and that a skill
+    cannot change the tools, permissions, workspace or task.
+  - The tools given to the model are exactly the agent version's `tools`; a skill's `needs` is only ever a check.
+  - A built-in skill has English and Spanish text under one version. A test run uses the language of the person who
+    starts it; a scheduled run (step 4) uses the language saved with its schedule, so the same pin always reads the
+    same words in that schedule.
+  - The eval set gets prompt-injection cases for a hostile skill: one that asks for more tools, for another
+    workspace's data, or to ignore ConXist's rules (TOOL_CALLING_STANDARDS.md §6).
+  - Sign-in and owner checks come before agents run, because until then anyone on the machine can import a skill.
 - No read tool for skills is added yet, for the same reason as agents (ADR 0010); `list_skills` and `get_skill` come
   with the shared tool set.

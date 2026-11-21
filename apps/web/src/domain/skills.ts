@@ -90,10 +90,13 @@ export function localSkillProblems(draft: SkillDefinition): string[] {
   return problems;
 }
 
-/** The tools a text names by their full name (conxist.get_transcript) or the part after the dot. */
+/**
+ * The tools a text names by their full name (conxist.get_transcript) or the part after the dot. This only previews
+ * what the server works out with the same rule (AgentTool.mentionedIn); the server's answer is the one kept.
+ */
 export function mentionedTools(text: string, tools: readonly { id: string; toolName: string }[]): string[] {
   return tools.filter((tool) => {
-    const short = tool.toolName.slice(tool.toolName.indexOf('.') + 1);
+    const short = escapeRegExp(tool.toolName.slice(tool.toolName.indexOf('.') + 1));
     return new RegExp(`(?<![A-Za-z0-9_.])(conxist\\.)?${short}(?![A-Za-z0-9_])`).test(text);
   }).map((tool) => tool.id);
 }
@@ -109,7 +112,7 @@ export function skillMarkdown(draft: SkillDefinition): string {
 }
 
 export function slug(name: string): string {
-  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);
 }
 
@@ -153,10 +156,19 @@ export function skillRows(pins: readonly SkillPin[], saved: readonly PinnedSkill
   });
 }
 
+export const SKILL_MISSING = 'skill-missing';
+export const SKILL_NEEDS_TOOL = 'skill-needs-tool';
+/** The agent problems that come from its skills, which the agent page works out again from what is on screen. */
+export const SKILL_PROBLEMS: readonly string[] = [SKILL_MISSING, SKILL_NEEDS_TOOL];
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** What the skills an agent follows still need before it can be published. */
 export function skillRowProblems(rows: readonly SkillRow[], tools: readonly string[]): string[] {
   const problems: string[] = [];
-  if (rows.some((row) => row.skill === null)) problems.push('skill-missing');
-  if (rows.some((row) => row.skill?.needs.some((need) => !tools.includes(need)))) problems.push('skill-needs-tool');
+  if (rows.some((row) => row.skill === null)) problems.push(SKILL_MISSING);
+  if (rows.some((row) => row.skill?.needs.some((need) => !tools.includes(need)))) problems.push(SKILL_NEEDS_TOOL);
   return problems;
 }
