@@ -1,5 +1,6 @@
 package com.conxist.platform.adapter;
 
+import com.conxist.platform.Conflict;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
 import org.slf4j.Logger;
@@ -30,6 +31,11 @@ class ApiErrorHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(NotFound.class)
     ProblemDetail notFound(NotFound missing) {
         return problem(HttpStatus.NOT_FOUND, missing.code(), missing.getMessage());
+    }
+
+    @ExceptionHandler(Conflict.class)
+    ProblemDetail stale(Conflict conflict) {
+        return problem(HttpStatus.CONFLICT, conflict.code(), conflict.getMessage());
     }
 
     @ExceptionHandler(RuleViolation.class)

@@ -8,7 +8,6 @@ export const shellEn = {
   'nav.knowledge': 'Knowledge',
   'soon.title': '{page} is coming soon',
   'soon.flow': 'Follow work from a meeting to requirements to code, step by step.',
-  'soon.agents': 'Set up the agents that turn what ConXist captures into requirements and answers.',
   'soon.knowledge': 'Your team’s shared memory: decisions, requirements and context your coding agents can use.',
 
   'workspace.switch': 'Workspace: {name}. Switch workspace',
@@ -60,7 +59,6 @@ export const shellEs: Record<keyof typeof shellEn, string> = {
   'nav.knowledge': 'Conocimiento',
   'soon.title': '{page} llega pronto',
   'soon.flow': 'Sigue el trabajo de una reunión a los requisitos y al código, paso a paso.',
-  'soon.agents': 'Configura los agentes que convierten lo que ConXist captura en requisitos y respuestas.',
   'soon.knowledge': 'La memoria compartida de tu equipo: decisiones, requisitos y contexto que tus agentes de código pueden usar.',
 
   'workspace.switch': 'Espacio de trabajo: {name}. Cambiar de espacio',
