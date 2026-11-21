@@ -3,6 +3,7 @@ package com.conxist.agents.application;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import com.conxist.agents.domain.Agent;
@@ -20,18 +21,24 @@ public final class AgentBook {
 
     /** Reported when a source the agent reads was removed from the workspace. */
     static final String SOURCE_MISSING = "source-missing";
+    /** Reported when a skill version the agent follows is not one this workspace can use. */
+    static final String SKILL_MISSING = "skill-missing";
+    /** Reported when a skill the agent follows needs a tool the agent is not allowed. */
+    static final String SKILL_NEEDS_TOOL = "skill-needs-tool";
 
     private final AgentRepository agents;
     private final CurrentWorkspace workspace;
     private final SourceCatalog sources;
+    private final SkillBook skills;
     private final UnitOfWork unitOfWork;
     private final Clock clock;
 
     public AgentBook(AgentRepository agents, CurrentWorkspace workspace, SourceCatalog sources,
-            UnitOfWork unitOfWork, Clock clock) {
+            SkillBook skills, UnitOfWork unitOfWork, Clock clock) {
         this.agents = agents;
         this.workspace = workspace;
         this.sources = sources;
+        this.skills = skills;
         this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
@@ -80,19 +87,39 @@ public final class AgentBook {
         }
     }
 
-    /** What stops the draft from being published: the draft's own rules, then sources it reads that are gone. */
+    /**
+     * What stops the draft from being published: the draft's own rules, then sources it reads that are gone, then
+     * skills it follows that are gone or need a tool it is not allowed.
+     */
     List<String> problems(AgentDefinition draft) {
+        return problems(draft, pinnedSkills(draft));
+    }
+
+    private List<String> problems(AgentDefinition draft, List<PinnedSkill> pinned) {
         List<String> problems = new ArrayList<>(draft.problems());
         if (draft.knowledgeSources().stream().anyMatch(id -> sources.find(id).isEmpty())) {
             problems.add(SOURCE_MISSING);
         }
+        if (pinned.size() < draft.skills().size()) {
+            problems.add(SKILL_MISSING);
+        }
+        if (pinned.stream().anyMatch(skill -> !draft.tools().containsAll(skill.needs()))) {
+            problems.add(SKILL_NEEDS_TOOL);
+        }
         return List.copyOf(problems);
+    }
+
+    /** The skills the draft follows that this workspace can use, at the version each is pinned to. */
+    private List<PinnedSkill> pinnedSkills(AgentDefinition draft) {
+        return draft.skills().stream().map(skills::pinned).flatMap(Optional::stream).toList();
     }
 
     AgentView view(Agent agent) {
         List<AgentView.VersionInfo> versions = agents.versionInfos(agent.workspaceId(), agent.id());
+        List<PinnedSkill> pinned = pinnedSkills(agent.draft());
         return new AgentView(agent.id(), agent.status(), agent.revision(), agent.draft(), agent.publishedVersion(),
-                agent.draftPublished(), problems(agent.draft()), versions, agent.createdAt(), agent.updatedAt());
+                agent.draftPublished(), problems(agent.draft(), pinned), pinned, versions, agent.createdAt(),
+                agent.updatedAt());
     }
 
     AgentVersion version(Agent agent, int number) {

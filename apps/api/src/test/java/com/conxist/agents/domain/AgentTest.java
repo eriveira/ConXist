@@ -51,7 +51,7 @@ class AgentTest {
     @Test
     void a_draft_without_instructions_or_inputs_cannot_be_published() {
         Agent blank = Agent.create(UUID.randomUUID(), UUID.randomUUID(),
-                new AgentDefinition("Blank", "", " ", List.of(), List.of(), null, null, List.of(), null, null), NOW);
+                new AgentDefinition("Blank", "", " ", List.of(), List.of(), List.of(), null, null, List.of(), null, null), NOW);
 
         assertThat(blank.draft().problems()).containsExactly("instructions-required", "accepts-required");
         assertThatThrownBy(() -> blank.publish(NOW)).isInstanceOf(RuleViolation.class)
@@ -90,7 +90,7 @@ class AgentTest {
     @Test
     void the_definition_trims_counts_characters_and_removes_repeats() {
         AgentDefinition definition = new AgentDefinition("  Résumé 🤖 ", " Purpose ", "Do it.  \n",
-                List.of(), List.of(AgentTool.GET_TRANSCRIPT, AgentTool.GET_TRANSCRIPT), null, null,
+                List.of(), List.of(), List.of(AgentTool.GET_TRANSCRIPT, AgentTool.GET_TRANSCRIPT), null, null,
                 List.of(InputKind.TRANSCRIPT, InputKind.TRANSCRIPT), null, null);
 
         assertThat(definition.name()).isEqualTo("Résumé 🤖");
@@ -100,19 +100,19 @@ class AgentTest {
         assertThat(definition.accepts()).containsExactly(InputKind.TRANSCRIPT);
         assertThat(definition.model()).isEqualTo(ModelPolicy.BALANCED);
         assertThat(definition.limits()).isEqualTo(Limits.DEFAULT);
-        assertThat(new AgentDefinition("🤖".repeat(60), "", "", null, null, null, null, null, null, null).name())
+        assertThat(new AgentDefinition("🤖".repeat(60), "", "", null, null, null, null, null, null, null, null).name())
                 .hasSize(120);
     }
 
     @Test
     void the_definition_refuses_what_is_too_long_or_out_of_range() {
-        assertCode(() -> new AgentDefinition(" ", "", "", null, null, null, null, null, null, null),
+        assertCode(() -> new AgentDefinition(" ", "", "", null, null, null, null, null, null, null, null),
                 "agent.name-required");
-        assertCode(() -> new AgentDefinition("x".repeat(61), "", "", null, null, null, null, null, null, null),
+        assertCode(() -> new AgentDefinition("x".repeat(61), "", "", null, null, null, null, null, null, null, null),
                 "agent.name-too-long");
-        assertCode(() -> new AgentDefinition("A", "x".repeat(201), "", null, null, null, null, null, null, null),
+        assertCode(() -> new AgentDefinition("A", "x".repeat(201), "", null, null, null, null, null, null, null, null),
                 "agent.purpose-too-long");
-        assertCode(() -> new AgentDefinition("A", "", "x".repeat(8_001), null, null, null, null, null, null, null),
+        assertCode(() -> new AgentDefinition("A", "", "x".repeat(8_001), null, null, null, null, null, null, null, null),
                 "agent.instructions-too-long");
         assertCode(() -> new Limits(0, 120, 10), "agent.limits-steps");
         assertCode(() -> new Limits(6, 5, 10), "agent.limits-time");
@@ -138,7 +138,7 @@ class AgentTest {
 
     private static AgentDefinition renamed(AgentDefinition definition, String name) {
         return new AgentDefinition(name, definition.purpose(), definition.instructions(),
-                definition.knowledgeSources(), definition.tools(), definition.model(), definition.style(),
+                definition.knowledgeSources(), definition.skills(), definition.tools(), definition.model(), definition.style(),
                 definition.accepts(), definition.givesBack(), definition.limits());
     }
 

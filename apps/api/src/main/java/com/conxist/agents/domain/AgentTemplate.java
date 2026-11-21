@@ -103,7 +103,7 @@ public enum AgentTemplate {
             case EN -> instructionsEn;
             case ES -> instructionsEs;
         };
-        return new AgentDefinition(name, purpose, instructions, List.of(), tools, model, Style.PRECISE, accepts,
+        return new AgentDefinition(name, purpose, instructions, List.of(), List.of(), tools, model, Style.PRECISE, accepts,
                 givesBack, Limits.DEFAULT);
     }
 }

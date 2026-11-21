@@ -17,7 +17,12 @@ import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTemplate;
 import com.conxist.agents.domain.AgentVersion;
+import com.conxist.agents.domain.BuiltInSkill;
+import com.conxist.agents.domain.InputKind;
 import com.conxist.agents.domain.Language;
+import com.conxist.agents.domain.SkillDefinition;
+import com.conxist.agents.domain.SkillPin;
+import com.conxist.agents.domain.SkillSource;
 import com.conxist.platform.Conflict;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
@@ -35,8 +40,13 @@ class AgentsTest {
     private final Map<UUID, SourceSummary> sources = new HashMap<>();
     private final TestClock.Moving clock = TestClock.moving();
     private FixedWorkspace workspace = FixedWorkspace.standard();
+    private final SkillBook skills = new SkillBook(new InMemorySkills(), () -> workspace.id(), () -> Language.EN,
+            new ImmediateUnitOfWork(), clock);
     private final AgentBook book = new AgentBook(repository, () -> workspace.id(),
-            id -> Optional.ofNullable(sources.get(id)), new ImmediateUnitOfWork(), clock);
+            id -> Optional.ofNullable(sources.get(id)), skills, new ImmediateUnitOfWork(), clock);
+    private final AddSkill addSkill = new AddSkill(skills);
+    private final SaveSkillDraft saveSkill = new SaveSkillDraft(skills);
+    private final PublishSkill publishSkill = new PublishSkill(skills);
     private final CreateAgent create = new CreateAgent(book);
     private final ListAgents list = new ListAgents(book);
     private final ReadAgent read = new ReadAgent(book);
@@ -139,6 +149,60 @@ class AgentsTest {
     }
 
     @Test
+    void an_agent_follows_a_skill_at_the_version_it_is_pinned_to() {
+        SkillView skill = addSkill.create("Acme style");
+        SkillView drafted = saveSkill.save(skill.id(), skill.revision(), new SkillDefinition("Acme style",
+                "When writing for customers.", "Say customer, never user.", List.of()));
+        SkillView v1 = publishSkill.publish(drafted.id(), drafted.revision(), "First version");
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+
+        AgentView following = save.save(created.id(), created.revision(),
+                withSkills(created.draft(), List.of(new SkillPin(skill.id(), 1))));
+        SkillView edited = saveSkill.save(v1.id(), v1.revision(), new SkillDefinition("Acme style",
+                "When writing for customers.", "Say customer. Short sentences.", List.of()));
+        publishSkill.publish(edited.id(), edited.revision(), "");
+
+        assertThat(read.get(following.id()).skills()).singleElement().satisfies(pinned -> {
+            assertThat(pinned.version()).isEqualTo(1);
+            assertThat(pinned.newestVersion()).isEqualTo(2);
+            assertThat(pinned.source()).isEqualTo(SkillSource.YOURS);
+        });
+        assertThat(list.list()).singleElement().extracting(AgentSummary::skills)
+                .isEqualTo(List.of(new SkillPin(skill.id(), 1)));
+        assertThat(publish.publish(following.id(), following.revision()).publishedVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void a_skill_that_needs_a_tool_the_agent_lacks_blocks_publishing() {
+        AgentView created = create.create(AgentTemplate.BLANK, "Writer", Language.EN);
+        AgentView ready = save.save(created.id(), created.revision(), withSkills(
+                new AgentDefinition("Writer", "", "Write.", List.of(), List.of(), List.of(), null, null,
+                        List.of(InputKind.TOPIC), null, null),
+                List.of(new SkillPin(BuiltInSkill.MEETING_SUMMARY.id(), 1))));
+
+        assertThat(ready.problems()).containsExactly("skill-needs-tool");
+        assertThat(ready.skills()).singleElement().extracting(PinnedSkill::name).isEqualTo("Meeting summary");
+        assertCode(() -> publish.publish(ready.id(), ready.revision()), "agent.skill-needs-tool");
+    }
+
+    @Test
+    void a_pin_to_a_skill_this_workspace_cannot_use_is_missing() {
+        SkillView other = addSkill.create("Elsewhere");
+        SkillView drafted = saveSkill.save(other.id(), other.revision(),
+                new SkillDefinition("Elsewhere", "When in another workspace.", "Do it.", List.of()));
+        publishSkill.publish(drafted.id(), drafted.revision(), "");
+        workspace = new FixedWorkspace(UUID.randomUUID());
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+
+        AgentView pinned = save.save(created.id(), created.revision(), withSkills(created.draft(), List.of(
+                new SkillPin(other.id(), 1), new SkillPin(BuiltInSkill.PLAIN_WRITING.id(), 9))));
+
+        assertThat(pinned.skills()).isEmpty();
+        assertThat(pinned.problems()).containsExactly("skill-missing");
+        assertCode(() -> publish.publish(pinned.id(), pinned.revision()), "agent.skill-missing");
+    }
+
+    @Test
     void archived_agents_stay_listed_and_can_come_back() {
         AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
         AgentView archived = archive.archive(created.id(), created.revision());
@@ -158,13 +222,18 @@ class AgentsTest {
     }
 
     private static AgentDefinition renamed(AgentDefinition d, String name) {
-        return new AgentDefinition(name, d.purpose(), d.instructions(), d.knowledgeSources(), d.tools(), d.model(),
-                d.style(), d.accepts(), d.givesBack(), d.limits());
+        return new AgentDefinition(name, d.purpose(), d.instructions(), d.knowledgeSources(), d.skills(), d.tools(),
+                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
     }
 
     private static AgentDefinition withSources(AgentDefinition d, List<UUID> sources) {
-        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), sources, d.tools(), d.model(),
-                d.style(), d.accepts(), d.givesBack(), d.limits());
+        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), sources, d.skills(), d.tools(),
+                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
+    }
+
+    private static AgentDefinition withSkills(AgentDefinition d, List<SkillPin> skills) {
+        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), skills, d.tools(),
+                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
     }
 
     private static void assertCode(Runnable action, String code) {

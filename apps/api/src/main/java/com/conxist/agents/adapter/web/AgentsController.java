@@ -21,6 +21,7 @@ import com.conxist.agents.domain.Language;
 import com.conxist.agents.domain.Limits;
 import com.conxist.agents.domain.ModelPolicy;
 import com.conxist.agents.domain.OutputKind;
+import com.conxist.agents.domain.SkillPin;
 import com.conxist.agents.domain.Style;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -139,6 +140,7 @@ class AgentsController {
             @Size(max = MAX_LINE_INPUT) String purpose,
             @Size(max = MAX_TEXT_INPUT) String instructions,
             @Size(max = MAX_LIST_INPUT) List<UUID> knowledgeSources,
+            @Size(max = MAX_LIST_INPUT) List<@Valid SkillPinBody> skills,
             @Size(max = MAX_LIST_INPUT) List<AgentTool> tools,
             ModelPolicy model,
             Style style,
@@ -147,9 +149,15 @@ class AgentsController {
             @NotNull LimitsBody limits) {
 
         AgentDefinition toDefinition() {
-            return new AgentDefinition(name, purpose, instructions, knowledgeSources, tools, model, style, accepts,
-                    givesBack, new Limits(limits.maxSteps(), limits.timeoutSeconds(), limits.maxToolCalls()));
+            List<SkillPin> pins = skills == null ? null
+                    : skills.stream().map(pin -> pin == null ? null : new SkillPin(pin.skillId(), pin.version()))
+                            .toList();
+            return new AgentDefinition(name, purpose, instructions, knowledgeSources, pins, tools, model, style,
+                    accepts, givesBack, new Limits(limits.maxSteps(), limits.timeoutSeconds(), limits.maxToolCalls()));
         }
+    }
+
+    record SkillPinBody(@NotNull UUID skillId, int version) {
     }
 
     record LimitsBody(int maxSteps, int timeoutSeconds, int maxToolCalls) {
