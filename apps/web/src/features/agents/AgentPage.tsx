@@ -9,6 +9,7 @@ import { problemMessage } from '../../i18n/problems';
 import { AGENTS_HREF } from '../../navigation';
 import { AgentSections } from './AgentSections';
 import { AgentStatePill } from './AgentStatePill';
+import { AgentTestPanel, type RunBlock } from './AgentTestPanel';
 import { AgentVersionSummary, HistoryDialog } from './HistoryDialog';
 import { SaveStatus } from './SaveStatus';
 import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
@@ -72,6 +73,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
   const problems = Array.from(new Set([...localProblems(draft), ...currentProblems(agent.problems, draft, agent.skills, choices)]));
   const blocked = blockedBy(draft);
   const stuck = blocked !== null || save === 'conflict';
+  const runBlock: RunBlock = archived ? 'archived' : problems.length > 0 ? 'problems'
+    : save === 'waiting' || save === 'saving' ? 'saving' : save !== 'saved' || blocked !== null ? 'unsaved' : null;
   const canPublish = !archived && problems.length === 0 && !stuck && save !== 'failed'
     && !(agent.draftPublished && save === 'saved');
 
@@ -143,10 +146,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
         <AgentSections draft={draft} pinned={agent.skills} onChange={editor.edit} disabled={archived || save === 'conflict'}
           choices={choices} onRetryChoices={loadChoices} />
         <aside className="agent-side">
-          <div className="side-card">
-            <h2><Icon name="chat" size={18} /> {t('agent.test.title')}</h2>
-            <p>{t('agent.test.soon')}</p>
-          </div>
+          <AgentTestPanel agentId={agent.id} reads={draft.knowledgeSources} givesBack={draft.givesBack}
+            sources={choices.status === 'ready' ? choices.sources : null} block={runBlock} />
         </aside>
       </div>
       {historyOpen && (

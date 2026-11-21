@@ -1,6 +1,7 @@
 package com.conxist.agents.config;
 
 import java.time.Clock;
+import com.conxist.agents.AgentBriefs;
 import com.conxist.agents.application.AddSkill;
 import com.conxist.agents.application.AgentBook;
 import com.conxist.agents.application.AgentRepository;
@@ -13,6 +14,7 @@ import com.conxist.agents.application.PersonLanguage;
 import com.conxist.agents.application.PublishAgent;
 import com.conxist.agents.application.PublishSkill;
 import com.conxist.agents.application.ReadAgent;
+import com.conxist.agents.application.ReadAgentBriefs;
 import com.conxist.agents.application.ReadSkill;
 import com.conxist.agents.application.RestoreAgentVersion;
 import com.conxist.agents.application.RestoreSkillVersion;
@@ -110,5 +112,10 @@ class AgentsConfiguration {
     @Bean
     ArchiveSkill archiveSkill(SkillBook book) {
         return new ArchiveSkill(book);
+    }
+
+    @Bean
+    AgentBriefs agentBriefs(AgentBook book, SkillBook skills) {
+        return new ReadAgentBriefs(book, skills);
     }
 }

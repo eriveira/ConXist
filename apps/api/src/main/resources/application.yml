@@ -51,6 +51,27 @@ conxist:
       mcp-url: ${CONXIST_PLAUD_MCP_URL:https://mcp.plaud.ai/mcp}
       # Where Plaud's sign-in page sends the person back: this API's callback, on this machine.
       redirect-uri: ${CONXIST_PLAUD_REDIRECT_URI:http://127.0.0.1:${server.port}/api/recorders/plaud/callback}
+  runs:
+    # Test runs (ADR 0012). The owner's own Anthropic key; blank means test runs say a key is missing.
+    anthropic-api-key: ${CONXIST_ANTHROPIC_API_KEY:}
+    # Blank for Anthropic's own API.
+    anthropic-base-url: ${CONXIST_ANTHROPIC_BASE_URL:}
+    fast:
+      model: claude-haiku-5-5
+      effort: LOW
+      fallbacks: false # Haiku has no server-side fallback
+      max-tokens: 8000
+    balanced:
+      model: claude-sonnet-5-5
+      effort: MEDIUM
+      fallbacks: true
+      max-tokens: 16000
+    thorough:
+      model: claude-opus-5-5
+      effort: HIGH
+      fallbacks: true
+      # A call that does not stream; more room than this needs streaming (ADR 0012, later).
+      max-tokens: 16000
   secrets:
     # 32 random bytes, base64: openssl rand -base64 32. Required; there is no default on purpose.
     encryption-key: ${CONXIST_SECRETS_KEY:}

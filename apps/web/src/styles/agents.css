@@ -90,3 +90,43 @@
   .limits { grid-template-columns: minmax(0, 1fr); }
   .agent-section { padding: 16px 14px 4px; }
 }
+
+/* The Test panel (ADR 0012). */
+.side-card.test-card { border-style: solid; }
+.side-card.test-card > p { margin-bottom: 12px; }
+.test-card .alert { margin: 0 0 12px; }
+.test-card .alert p { margin: 4px 0 0; color: inherit; }
+.test-state { display: flex; align-items: center; gap: 8px; }
+.test-pick select { min-height: 44px; padding: 0 12px; width: 100%; border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); background: var(--cx-surface-raised); }
+.side-card .test-note { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; margin: 0 0 12px; }
+.test-note svg { flex: none; margin-top: 2px; }
+.test-run { width: 100%; justify-content: center; }
+.side-card .test-block { margin-top: 8px; font-size: 12.5px; }
+.test-empty a { font-weight: 600; color: var(--cx-accent-text); }
+.test-result { margin-top: 14px; border-top: 1px solid var(--cx-border); padding-top: 14px; }
+.test-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 12.5px; color: var(--cx-fg-muted); margin-bottom: 12px; }
+.test-model { font-family: var(--cx-font-mono); overflow-wrap: anywhere; }
+.test-answer h3 { margin: 0 0 8px; font-size: 14px; font-weight: 800; }
+.test-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; color: var(--cx-fg) !important; }
+.answer-fields { margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+.answer-fields dt { font-size: 12px; font-weight: 700; color: var(--cx-fg-muted); }
+.answer-fields dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+.answer-list { margin: 0; padding-left: 18px; }
+.answer-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.answer-cards > li { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); padding: 10px; background: var(--cx-surface); }
+.answer-cards .answer-fields { gap: 6px; }
+.test-steps { margin-top: 14px; font-size: 13px; }
+.test-steps summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.test-steps ol { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.step-row { display: flex; gap: 8px; }
+.step-row > .muted { white-space: nowrap; }
+.alert.test-key { align-items: flex-start; }
+.alert.test-key svg { margin-top: 2px; }
+.step-row .grow { flex: 1; min-width: 0; }
+.test-steps li.failed { color: var(--cx-err-fg); }
+.test-detail { display: block; font-size: 12px; color: var(--cx-fg-muted); overflow-wrap: anywhere; }
+/* Room at the end for the floating Ask ConXist button, so it never covers the last lines of a result. */
+.agent-page { padding-bottom: 88px; }
+@media (min-width: 1001px) {
+  .agent-side { max-height: calc(100vh - 112px); overflow: auto; padding-bottom: 88px; }
+}

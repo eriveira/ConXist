@@ -12,7 +12,8 @@ import org.springframework.modulith.core.ApplicationModules;
 class ArchitectureTest {
 
     private static final String[] OUTER_RING = {
-            "org.springframework..", "jakarta..", "org.apache..", "..adapter..", "..config.."};
+            "org.springframework..", "jakarta..", "org.apache..", "com.anthropic..", "tools.jackson..", "..adapter..",
+            "..config.."};
 
     private final JavaClasses classes = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)

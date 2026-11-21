@@ -35,7 +35,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   shared standards.
 
 - `apps/api/`: the API. Spring Boot with Spring Modulith; each top-level package
-  is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`) with `domain`,
+  is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`, `runs`) with `domain`,
   `application`, `adapter` and `config` inside. Modules talk through their root
   package (API) and events. See `docs/adr/0002-stack.md` (accepted).
 - `apps/web/`: the web app (the Sources, Agents and Skills pages and their dialogs). `domain` and `api` stay
@@ -58,10 +58,15 @@ Sources page does not show it for now, owner decision 2026-11-17).
   Home (empty for now), Flow, Agents (with Skills), Sources, Knowledge; Flow, Knowledge and Ask ConXist show "coming soon".
 - Agents (ADR 0010, step 1 of 4 the owner set: Agents, Skills, Test run, Schedules): an `agents` module and the
   Agents pages. Create from a template, edit a draft that saves itself (revision check), publish numbered versions,
-  History and Restore, Archive. Nothing runs agents yet; Test shows "coming soon".
+  History and Restore, Archive.
 - Skills (ADR 0011, step 2): in the `agents` module, under an Agents | Skills tab. Write, import a SKILL.md, or copy a
   built-in skill; publish numbered versions with a note. An agent pins a skill version and gets "vN available" when a
   newer one is published. Reference files and GitHub import show "coming soon".
+- Test run (ADR 0012, step 3): a `runs` module and the Test panel on an agent's page. It runs the saved draft once on
+  a picked meeting with Claude (Anthropic Java SDK), with the draft's read tools, sources and limits, and shows the
+  answer, its shape check and each step. Nothing of a run is kept. Local only until sign-in (owner, 2026-11-21): the
+  API reads the owner's key from `CONXIST_ANTHROPIC_API_KEY`; without it the panel says how to add one.
+  `mvn spring-boot:test-run` also runs a fake Claude, so the panel works without a key.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

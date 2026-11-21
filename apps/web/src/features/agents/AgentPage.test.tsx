@@ -36,6 +36,8 @@ function api(agent: Agent, routes: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/sources': () => ({ body: [SOURCE] }),
     'GET /api/agents/tools': () => ({ body: TOOLS }),
     'GET /api/skills': () => ({ body: SKILLS }),
+    'GET /api/test-runs/status': () => ({ body: { ready: true } }),
+    [`GET /api/sources/${SOURCE.id}/documents`]: () => ({ body: [] }),
     ...routes,
   });
 }

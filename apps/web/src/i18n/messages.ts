@@ -4,6 +4,7 @@ import { sourceEn, sourceEs } from './sourceMessages';
 import { editEn, editEs } from './editMessages';
 import { agentEn, agentEs } from './agentMessages';
 import { skillEn, skillEs } from './skillMessages';
+import { runEn, runEs } from './runMessages';
 
 const en = {
   ...pickerEn,
@@ -12,6 +13,7 @@ const en = {
   ...shellEn,
   ...agentEn,
   ...skillEn,
+  ...runEn,
   'app.theme': 'Theme',
   'app.theme.system': 'System',
   'app.theme.light': 'Light',
@@ -207,6 +209,7 @@ const es: Messages = {
   ...shellEs,
   ...agentEs,
   ...skillEs,
+  ...runEs,
   'app.theme': 'Tema',
   'app.theme.system': 'Sistema',
   'app.theme.light': 'Claro',
