@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { type AgentSummary, sortAgents } from '../../domain/agents';
 import { useT } from '../../i18n/i18n';
-import { agentHref } from '../../navigation';
+import { agentHref, useArrivalNotice } from '../../navigation';
 import { AgentStatePill } from './AgentStatePill';
 import { NewAgentDialog } from './NewAgentDialog';
 
@@ -12,6 +12,7 @@ type ListState = { status: 'loading' } | { status: 'error' } | { status: 'ready'
 /** The workspace's agents, each opening its page, and New to start one from a template. */
 export function AgentsPage() {
   const t = useT();
+  const notice = useArrivalNotice();
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [creating, setCreating] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -41,6 +42,7 @@ export function AgentsPage() {
         </button>
         <p>{t('agents.lead')}</p>
       </div>
+      <p className="notice" role="status">{notice && <><Icon name="check" size={16} /> {notice}</>}</p>
       {state.status === 'loading' && <div className="page-state" role="status"><Icon name="sync" /> {t('agents.loading')}</div>}
       {state.status === 'error' && (
         <div className="page-state" role="alert">

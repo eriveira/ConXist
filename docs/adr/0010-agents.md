@@ -33,7 +33,8 @@ flows that stay on a version until a person moves them, and Skills under Agents.
   refused while the draft has problems (`instructions-required`, `accepts-required`, `source-missing`) or nothing
   changed since the newest version.
 - Restore copies a version into the draft; nothing is published until the person publishes again.
-- Archive takes an agent off the list in use; its versions stay and it can be brought back. Nothing is deleted.
+- Archive takes an agent off the list in use; its versions stay and it can be brought back. Nothing is deleted. (ADR 0013 adds
+  Delete, for an agent nothing uses.)
   "Archive is refused while a flow uses it" comes with flows (step 4 of the plan).
 - Templates (Meeting summarizer, Requirements analyst, Decision logger, Topic classifier, Blank) fill a first draft,
   with the brief in the person's language (English or Spanish). Nothing stays tied to the template.

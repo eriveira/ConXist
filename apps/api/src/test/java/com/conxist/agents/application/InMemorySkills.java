@@ -36,6 +36,17 @@ final class InMemorySkills implements SkillRepository {
     }
 
     @Override
+    public boolean delete(UUID workspaceId, UUID skillId, long expectedRevision) {
+        Skill current = skills.get(skillId);
+        if (current == null || !current.workspaceId().equals(workspaceId) || current.revision() != expectedRevision) {
+            return false;
+        }
+        skills.remove(skillId);
+        versions.removeIf(version -> version.skillId().equals(skillId));
+        return true;
+    }
+
+    @Override
     public Optional<Skill> find(UUID workspaceId, UUID skillId) {
         return Optional.ofNullable(skills.get(skillId)).filter(s -> s.workspaceId().equals(workspaceId));
     }

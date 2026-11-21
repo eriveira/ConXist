@@ -60,6 +60,29 @@ export function useAgentsRoute(): AgentsRoute {
   return route;
 }
 
+/** A notice a page leaves for the next one, such as "deleted", shown there once. */
+let arrivalNotice: string | null = null;
+
+/** Opens another page and has it show `notice` once it is there. */
+export function goWithNotice(href: string, notice: string): void {
+  arrivalNotice = notice;
+  window.location.hash = href;
+}
+
+/**
+ * The notice the last page left for this one, if any, shown on this visit only. It arrives just after the page
+ * mounts, so a live region already on the page announces it.
+ */
+export function useArrivalNotice(): string | null {
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (arrivalNotice === null) return;
+    setNotice(arrivalNotice);
+    arrivalNotice = null;
+  }, []);
+  return notice;
+}
+
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => routeOf(window.location.hash));
   useEffect(() => {

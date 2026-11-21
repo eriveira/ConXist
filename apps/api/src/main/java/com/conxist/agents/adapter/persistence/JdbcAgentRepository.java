@@ -72,6 +72,23 @@ class JdbcAgentRepository implements AgentRepository {
     }
 
     @Override
+    public boolean delete(UUID workspaceId, UUID agentId, long expectedRevision) {
+        jdbc.sql("""
+                delete from agent_versions where agent_id = :id and exists (
+                    select 1 from agents where id = :id and workspace_id = :workspaceId and revision = :revision)
+                """)
+                .param("id", agentId)
+                .param("workspaceId", workspaceId)
+                .param("revision", expectedRevision)
+                .update();
+        return jdbc.sql("delete from agents where id = :id and workspace_id = :workspaceId and revision = :revision")
+                .param("id", agentId)
+                .param("workspaceId", workspaceId)
+                .param("revision", expectedRevision)
+                .update() == 1;
+    }
+
+    @Override
     public Optional<Agent> find(UUID workspaceId, UUID agentId) {
         return jdbc.sql("select " + COLUMNS + " from agents where id = :id and workspace_id = :workspaceId")
                 .param("id", agentId)

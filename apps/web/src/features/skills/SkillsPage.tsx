@@ -5,7 +5,7 @@ import { Pill } from '../../components/Pill';
 import type { AgentSummary } from '../../domain/agents';
 import { SKILL_FILTERS, type SkillFilter, type SkillSummary, sortSkills, usersOf } from '../../domain/skills';
 import { useLanguage, toolLabel, useT } from '../../i18n/i18n';
-import { NEW_SKILL_HREF, SKILLS_HREF, skillHref } from '../../navigation';
+import { NEW_SKILL_HREF, SKILLS_HREF, skillHref, useArrivalNotice } from '../../navigation';
 import { AgentStatePill } from '../agents/AgentStatePill';
 import { ImportSkillDialog } from './ImportSkillDialog';
 import { NewSkillDialog } from './NewSkillDialog';
@@ -21,6 +21,7 @@ type ListState =
  */
 export function SkillsPage({ creating }: { creating: boolean }) {
   const t = useT();
+  const notice = useArrivalNotice();
   const language = useLanguage();
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [importing, setImporting] = useState(false);
@@ -54,6 +55,7 @@ export function SkillsPage({ creating }: { creating: boolean }) {
         </div>
         <p>{t('skills.lead')}</p>
       </div>
+      <p className="notice" role="status">{notice && <><Icon name="check" size={16} /> {notice}</>}</p>
       {state.status === 'loading' && <div className="page-state" role="status"><Icon name="sync" /> {t('skills.loading')}</div>}
       {state.status === 'error' && (
         <div className="page-state" role="alert">

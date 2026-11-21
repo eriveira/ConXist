@@ -110,10 +110,50 @@ describe('SkillPage', () => {
     expect(await screen.findByLabelText('Name')).toHaveAttribute('readonly');
     expect(screen.getByRole('textbox', { name: 'Instructions' })).not.toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     expect(screen.getByText(/can’t be changed/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
 
     await waitFor(() => expect(window.location.hash).toBe(`#/skills/${copyId}`));
     expect(calls.some((call) => call.key.startsWith('PUT'))).toBe(false);
+  });
+
+  it('does not delete a skill an agent follows: it names the agent and links there, accessibly', async () => {
+    const calls = api(SKILL, {
+      [`GET /api/skills/${ID}/uses`]: () => ({ body: [
+        { kind: 'AGENT', id: AGENT.id, name: 'Analyst', where: 'BOTH', archived: false },
+        { kind: 'AGENT', id: '66666666-6666-6666-6666-666666666666', name: 'Old digest', where: 'LIVE', archived: true },
+      ] }),
+    });
+    render(<SkillPage skillId={ID} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Can’t delete Acme style yet' });
+    expect(within(dialog).getByRole('heading', { name: '2 agents follow this skill.' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Analyst' })).toHaveAttribute('href', `#/agents/${AGENT.id}`);
+    expect(within(dialog).getByText('Live · archived')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(await accessibilityViolations(dialog)).toEqual([]);
+    expect(calls.some((call) => call.key.startsWith('DELETE'))).toBe(false);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('deletes a skill nothing uses after asking, at the revision it read, and says so on the list', async () => {
+    window.location.hash = `#/skills/${ID}`;
+    const calls = api(SKILL, {
+      [`GET /api/skills/${ID}/uses`]: () => ({ body: [] }),
+      [`DELETE /api/skills/${ID}?revision=4`]: () => ({ status: 204, body: null }),
+    });
+    render(<SkillPage skillId={ID} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete Acme style?' });
+    expect(within(dialog).getByText('Its draft and its 1 version are deleted for good.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(window.location.hash).toBe('#/skills'));
+    expect(calls.filter((call) => call.key.startsWith('DELETE'))).toHaveLength(1);
   });
 });

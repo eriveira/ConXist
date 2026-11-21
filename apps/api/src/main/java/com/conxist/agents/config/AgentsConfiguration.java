@@ -7,7 +7,10 @@ import com.conxist.agents.application.AgentBook;
 import com.conxist.agents.application.AgentRepository;
 import com.conxist.agents.application.ArchiveAgent;
 import com.conxist.agents.application.ArchiveSkill;
+import com.conxist.agents.application.AgentUses;
 import com.conxist.agents.application.CreateAgent;
+import com.conxist.agents.application.DeleteAgent;
+import com.conxist.agents.application.DeleteSkill;
 import com.conxist.agents.application.ListAgents;
 import com.conxist.agents.application.ListSkills;
 import com.conxist.agents.application.PersonLanguage;
@@ -112,6 +115,22 @@ class AgentsConfiguration {
     @Bean
     ArchiveSkill archiveSkill(SkillBook book) {
         return new ArchiveSkill(book);
+    }
+
+    @Bean
+    DeleteSkill deleteSkill(SkillBook skills, AgentBook agents) {
+        return new DeleteSkill(skills, agents);
+    }
+
+    /** Nothing uses an agent until flows and schedules exist; they replace this bean with their uses. */
+    @Bean
+    AgentUses agentUses() {
+        return AgentUses.none();
+    }
+
+    @Bean
+    DeleteAgent deleteAgent(AgentBook book, AgentUses uses) {
+        return new DeleteAgent(book, uses);
     }
 
     @Bean

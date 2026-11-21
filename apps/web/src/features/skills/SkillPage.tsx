@@ -6,8 +6,9 @@ import type { AgentSummary, AgentToolInfo } from '../../domain/agents';
 import { localSkillProblems, type SkillVersion } from '../../domain/skills';
 import { useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
-import { SKILLS_HREF, skillHref } from '../../navigation';
+import { SKILLS_HREF, goWithNotice, skillHref } from '../../navigation';
 import { AgentStatePill } from '../agents/AgentStatePill';
+import { DeleteDialog } from '../agents/DeleteDialog';
 import { HistoryDialog } from '../agents/HistoryDialog';
 import { SaveStatus } from '../agents/SaveStatus';
 import type { ActResult } from '../agents/useDraftEditor';
@@ -37,6 +38,7 @@ export function SkillPage({ skillId }: { skillId: string }) {
   const [context, setContext] = useState<SkillContext>({ status: 'loading' });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionProblem, setActionProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
@@ -62,6 +64,8 @@ export function SkillPage({ skillId }: { skillId: string }) {
   useEffect(() => {
     if (ready) headingRef.current?.focus();
   }, [ready, skillId]);
+
+  const loadSkillUses = useCallback(() => api.skillUses(skillId), [skillId]);
 
   if (state.status === 'loading') {
     return <div className="page-state" role="status"><Icon name="sync" /> {t('agent.loading')}</div>;
@@ -120,6 +124,8 @@ export function SkillPage({ skillId }: { skillId: string }) {
   const restore = async (number: number) => {
     if (await run(null, () => editor.restore(number), t('agent.restored', { version: number }))) setHistoryOpen(false);
   };
+  // A change on its way to the server would change the revision under the delete, so it waits for it.
+  const canDelete = busy === null && save !== 'conflict' && save !== 'saving' && (save !== 'waiting' || blocked !== null);
 
   return (
     <section className="page agent-page skill-page" aria-labelledby="skill-title">
@@ -143,6 +149,9 @@ export function SkillPage({ skillId }: { skillId: string }) {
             </button>
           ) : (
             <>
+              <button type="button" className="btn ghost danger-text" disabled={!canDelete} onClick={() => setDeleting(true)}>
+                <Icon name="trash" size={16} /> {t('delete.button')}
+              </button>
               {archived ? (
                 <button type="button" className="btn" disabled={busy !== null}
                   onClick={() => void run('archive', editor.unarchive, t('skill.unarchived'))}>
@@ -191,6 +200,13 @@ export function SkillPage({ skillId }: { skillId: string }) {
           renderVersion={(version: SkillVersion) => <pre className="skill-md">{version.definition.instructions || '—'}</pre>}
           archivedNote={t('skill.history.archived')} hasUnpublished={!skill.draftPublished || save !== 'saved'}
           archived={archived} blocked={stuck} onRestore={restore} onClose={() => setHistoryOpen(false)} />
+      )}
+      {deleting && (
+        <DeleteDialog what="skill" name={skill.draft.name} versions={skill.versions.length} archived={archived}
+          loadUses={loadSkillUses} remove={() => api.deleteSkill(skill.id, skill.revision)}
+          onArchive={() => { setDeleting(false); void run('archive', editor.archive, t('skill.archivedNotice')); }}
+          onDeleted={() => goWithNotice(SKILLS_HREF, t('delete.done', { name: skill.draft.name }))}
+          onClose={() => setDeleting(false)} />
       )}
       {publishing && (
         <PublishSkillDialog skill={skill} context={context} onPublish={publish} onClose={() => setPublishing(false)} />
