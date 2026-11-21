@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './components/Icon';
+import { AgentPage } from './features/agents/AgentPage';
+import { AgentsPage } from './features/agents/AgentsPage';
 import type { Workspace } from './domain/workspaces';
 import { AppHeader } from './features/shell/AppHeader';
 import { AskConxist } from './features/shell/AskConxist';
@@ -14,7 +16,7 @@ import { NewWorkspaceDialog } from './features/workspaces/NewWorkspaceDialog';
 import { useWorkspaces } from './features/workspaces/useWorkspaces';
 import { I18nProvider, translator } from './i18n/i18n';
 import { LANGUAGES, type Language } from './i18n/messages';
-import { useRoute as useSourceRoute } from './navigation';
+import { useAgentRoute, useRoute as useSourceRoute } from './navigation';
 import { readPreference, savePreference } from './preferences';
 
 /** How long "Acme is ready" stays after creating a workspace. */
@@ -55,6 +57,7 @@ function Workspaces(settings: SettingsProps) {
   const { state, retry, switchTo, created, refresh } = useWorkspaces();
   const [page, go] = useRoute();
   const sourceRoute = useSourceRoute();
+  const agentId = useAgentRoute();
   const [newOpen, setNewOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -99,7 +102,8 @@ function Workspaces(settings: SettingsProps) {
         {page === 'sources' && (sourceRoute.page === 'source'
           ? <SourcePage key={sourceRoute.sourceId} sourceId={sourceRoute.sourceId} />
           : <SourcesPage />)}
-        {(page === 'flow' || page === 'agents' || page === 'knowledge') && <ComingSoonPage page={page} />}
+        {page === 'agents' && (agentId ? <AgentPage key={agentId} agentId={agentId} /> : <AgentsPage />)}
+        {(page === 'flow' || page === 'knowledge') && <ComingSoonPage page={page} />}
       </main>
       <AskConxist />
       {newOpen && <NewWorkspaceDialog onClose={() => setNewOpen(false)} onCreated={onCreated} />}

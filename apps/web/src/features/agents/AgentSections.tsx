@@ -1,0 +1,220 @@
+import { useId, type ReactNode } from 'react';
+import { Icon } from '../../components/Icon';
+import { Pill } from '../../components/Pill';
+import {
+  type AgentDefinition, type AgentToolInfo, INPUT_KINDS, LIMIT_RANGES, limitInRange, type Limits,
+  MAX_INSTRUCTIONS_LENGTH, MAX_KNOWLEDGE_SOURCES, MAX_NAME_LENGTH, MAX_PURPOSE_LENGTH, MODEL_POLICIES, OUTPUT_KINDS,
+  STYLES, toggled,
+} from '../../domain/agents';
+import type { Source } from '../../domain/model';
+import { characterCount } from '../../domain/workspaces';
+import { type Translate, useT } from '../../i18n/i18n';
+import { MESSAGES, type MessageKey } from '../../i18n/messages';
+import { SOURCES_HREF } from '../../navigation';
+
+interface AgentSectionsProps {
+  draft: AgentDefinition;
+  onChange: (change: Partial<AgentDefinition>) => void;
+  disabled: boolean;
+  /** Null while loading. */
+  sources: Source[] | null;
+  tools: AgentToolInfo[] | null;
+}
+
+const LIMIT_KEYS = Object.keys(LIMIT_RANGES) as (keyof Limits)[];
+
+/** The parts of an agent, grouped the way a person thinks about them: what it is, what it uses, how it works. */
+export function AgentSections({ draft, onChange, disabled, sources, tools }: AgentSectionsProps) {
+  const t = useT();
+  const ids = { name: useId(), purpose: useId(), instructions: useId(), givesBack: useId(), hint: useId() };
+  const nameLength = characterCount(draft.name.trim());
+  const purposeLength = characterCount(draft.purpose.trim());
+  const instructionsLength = characterCount(draft.instructions);
+
+  return (
+    <fieldset className="agent-sections" disabled={disabled}>
+      <legend className="sr-only">{t('agent.sections')}</legend>
+      <Section number={1} title={t('agent.section.about')} lead={t('agent.section.about.lead')}>
+        <div className="field">
+          <label htmlFor={ids.name}>{t('agent.name')}</label>
+          <input id={ids.name} type="text" value={draft.name} onChange={(event) => onChange({ name: event.target.value })}
+            aria-invalid={!draft.name.trim() || nameLength > MAX_NAME_LENGTH || undefined} />
+          <Counter count={nameLength} max={MAX_NAME_LENGTH} />
+        </div>
+        <div className="field">
+          <label htmlFor={ids.purpose}>{t('agent.purpose')}</label>
+          <textarea id={ids.purpose} rows={2} value={draft.purpose} placeholder={t('agent.purpose.placeholder')}
+            onChange={(event) => onChange({ purpose: event.target.value })}
+            aria-invalid={purposeLength > MAX_PURPOSE_LENGTH || undefined} />
+          <Counter count={purposeLength} max={MAX_PURPOSE_LENGTH} />
+        </div>
+      </Section>
+
+      <Section number={2} title={t('agent.section.instructions')} lead={t('agent.section.instructions.lead')}>
+        <div className="field">
+          <label htmlFor={ids.instructions} className="sr-only">{t('agent.section.instructions')}</label>
+          <textarea id={ids.instructions} className="instructions" rows={9} value={draft.instructions}
+            placeholder={t('agent.instructions.placeholder')} aria-describedby={ids.hint}
+            onChange={(event) => onChange({ instructions: event.target.value })}
+            aria-invalid={instructionsLength > MAX_INSTRUCTIONS_LENGTH || undefined} />
+          <span id={ids.hint} className="hint"><Icon name="lock" size={14} /> {t('agent.instructions.safety')}</span>
+          <Counter count={instructionsLength} max={MAX_INSTRUCTIONS_LENGTH} />
+        </div>
+      </Section>
+
+      <Section number={3} title={t('agent.section.io')} lead={t('agent.section.io.lead')}>
+        <fieldset className="checks-row">
+          <legend>{t('agent.accepts')}</legend>
+          {INPUT_KINDS.map((kind) => (
+            <label key={kind} className="check-chip">
+              <input type="checkbox" checked={draft.accepts.includes(kind)}
+                onChange={() => onChange({ accepts: toggled(draft.accepts, kind, INPUT_KINDS) })} />
+              {t(`agent.input.${kind}`)}
+            </label>
+          ))}
+        </fieldset>
+        <div className="field">
+          <label htmlFor={ids.givesBack}>{t('agent.givesBack')}</label>
+          <select id={ids.givesBack} value={draft.givesBack}
+            onChange={(event) => onChange({ givesBack: event.target.value as AgentDefinition['givesBack'] })}>
+            {OUTPUT_KINDS.map((kind) => <option key={kind} value={kind}>{t(`agent.output.${kind}`)}</option>)}
+          </select>
+          <span className="hint">{t(`agent.output.${draft.givesBack}.desc`)}</span>
+        </div>
+      </Section>
+
+      <Section number={4} title={t('agent.section.knowledge')} lead={t('agent.section.knowledge.lead')}>
+        <Knowledge draft={draft} sources={sources} onChange={onChange} />
+      </Section>
+
+      <Section number={5} title={t('agent.section.tools')} lead={t('agent.section.tools.lead')}>
+        {tools === null ? <p className="muted">{t('agent.loadingChoices')}</p> : (
+          <div className="choice">
+            {tools.map((tool) => (
+              <label key={tool.id}>
+                <input type="checkbox" checked={draft.tools.includes(tool.id)}
+                  onChange={() => onChange({ tools: toggled(draft.tools, tool.id, tools.map((each) => each.id)) })} />
+                <span className="grow">
+                  <b>{t(`agent.tool.${tool.id}` as 'agent.tool.GET_TRANSCRIPT')}</b>
+                  <small>{t(`agent.tool.${tool.id}.desc` as 'agent.tool.GET_TRANSCRIPT.desc')}</small>
+                  <code className="tool-name">{tool.toolName}</code>
+                </span>
+                {tool.readOnly && <Pill tone="live">{t('agent.tool.readOnly')}</Pill>}
+              </label>
+            ))}
+          </div>
+        )}
+        <p className="note"><Icon name="info" size={14} /> {t('agent.tools.changeNote')}</p>
+      </Section>
+
+      <Section number={6} title={t('agent.section.model')} lead={t('agent.section.model.lead')}>
+        <fieldset className="choice segmented">
+          <legend>{t('agent.model')}</legend>
+          {MODEL_POLICIES.map((policy) => (
+            <label key={policy}>
+              <input type="radio" name="model" checked={draft.model === policy} onChange={() => onChange({ model: policy })} />
+              <span><b>{t(`agent.model.${policy}`)}</b><small>{t(`agent.model.${policy}.desc`)}</small></span>
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className="choice segmented">
+          <legend>{t('agent.style')}</legend>
+          {STYLES.map((style) => (
+            <label key={style}>
+              <input type="radio" name="style" checked={draft.style === style} onChange={() => onChange({ style })} />
+              <span><b>{t(`agent.style.${style}`)}</b><small>{t(`agent.style.${style}.desc`)}</small></span>
+            </label>
+          ))}
+        </fieldset>
+      </Section>
+
+      <Section number={7} title={t('agent.section.limits')} lead={t('agent.section.limits.lead')}>
+        <div className="limits">
+          {LIMIT_KEYS.map((key) => <LimitField key={key} name={key} value={draft.limits[key]}
+            onChange={(value) => onChange({ limits: { ...draft.limits, [key]: value } })} />)}
+        </div>
+      </Section>
+    </fieldset>
+  );
+}
+
+function Section({ number, title, lead, children }: { number: number; title: string; lead: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section className="agent-section" aria-labelledby={id}>
+      <h2 id={id}><span className="step-no" aria-hidden="true">{number}</span> {title}</h2>
+      <p className="lead">{lead}</p>
+      {children}
+    </section>
+  );
+}
+
+function Counter({ count, max }: { count: number; max: number }) {
+  const t = useT();
+  return (
+    <span className={count > max ? 'counter over' : 'counter'} aria-label={t('workspace.count.label', { count, max })}>
+      {t('workspace.count', { count, max })}
+    </span>
+  );
+}
+
+function LimitField({ name, value, onChange }: { name: keyof Limits; value: number; onChange: (value: number) => void }) {
+  const t = useT();
+  const id = useId();
+  const hintId = useId();
+  const range = LIMIT_RANGES[name];
+  const valid = limitInRange(name, value);
+  return (
+    <div className="field">
+      <label htmlFor={id}>{t(`agent.limit.${name}`)}</label>
+      <input id={id} type="number" inputMode="numeric" min={range.min} max={range.max} step={1}
+        value={Number.isNaN(value) ? '' : value} aria-invalid={!valid || undefined} aria-describedby={hintId}
+        onChange={(event) => onChange(event.target.value === '' ? Number.NaN : Number(event.target.value))} />
+      <span id={hintId} className={valid ? 'hint' : 'hint error-text'}>
+        {t('agent.limit.range', { min: range.min, max: range.max })}
+      </span>
+    </div>
+  );
+}
+
+function Knowledge({ draft, sources, onChange }: Pick<AgentSectionsProps, 'draft' | 'sources' | 'onChange'>) {
+  const t = useT();
+  if (sources === null) return <p className="muted">{t('agent.loadingChoices')}</p>;
+  const known = new Set(sources.map((source) => source.id));
+  const missing = draft.knowledgeSources.filter((id) => !known.has(id));
+  const order = [...sources.map((source) => source.id), ...missing];
+  const full = draft.knowledgeSources.length >= MAX_KNOWLEDGE_SOURCES;
+  const toggle = (id: string) => onChange({ knowledgeSources: toggled(draft.knowledgeSources, id, order) });
+
+  return (
+    <>
+      {sources.length === 0 ? (
+        <p className="muted">{t('agent.knowledge.none')} <a href={SOURCES_HREF}>{t('agent.knowledge.addSource')}</a></p>
+      ) : (
+        <div className="choice">
+          {sources.map((source) => {
+            const checked = draft.knowledgeSources.includes(source.id);
+            return (
+              <label key={source.id}>
+                <input type="checkbox" checked={checked} disabled={!checked && full} onChange={() => toggle(source.id)} />
+                <span><b>{source.name}</b><small>{providerLabel(source, t)}</small></span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {missing.map((id) => (
+        <p key={id} className="alert error">
+          <Icon name="alert" /> {t('agent.knowledge.missing')}
+          <button type="button" className="link" onClick={() => toggle(id)}>{t('agent.knowledge.remove')}</button>
+        </p>
+      ))}
+      <p className="note"><Icon name="lock" size={14} /> {t('agent.knowledge.readOnly')}</p>
+    </>
+  );
+}
+
+function providerLabel(source: Source, t: Translate): string {
+  const key = `provider.${source.provider}` as MessageKey;
+  return key in MESSAGES.en ? t(key) : source.provider;
+}

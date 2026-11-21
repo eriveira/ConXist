@@ -50,8 +50,8 @@ describe('App', () => {
     expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Flow', 'Agents', 'Sources', 'Knowledge']);
     expect(within(menu).getByRole('link', { name: 'Sources' })).toHaveAttribute('aria-current', 'page');
 
-    await userEvent.click(within(menu).getByRole('link', { name: 'Agents' }));
-    expect(await screen.findByRole('heading', { name: 'Agents is coming soon' })).toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole('link', { name: 'Flow' }));
+    expect(await screen.findByRole('heading', { name: 'Flow is coming soon' })).toBeInTheDocument();
     await userEvent.click(within(menu).getByRole('link', { name: 'Home' }));
     expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
     expect(await accessibilityViolations(container)).toEqual([]);

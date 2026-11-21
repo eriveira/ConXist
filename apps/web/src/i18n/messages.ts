@@ -2,12 +2,14 @@ import { pickerEn, pickerEs } from './pickerMessages';
 import { shellEn, shellEs } from './shellMessages';
 import { sourceEn, sourceEs } from './sourceMessages';
 import { editEn, editEs } from './editMessages';
+import { agentEn, agentEs } from './agentMessages';
 
 const en = {
   ...pickerEn,
   ...sourceEn,
   ...editEn,
   ...shellEn,
+  ...agentEn,
   'app.theme': 'Theme',
   'app.theme.system': 'System',
   'app.theme.light': 'Light',
@@ -201,6 +203,7 @@ const es: Messages = {
   ...sourceEs,
   ...editEs,
   ...shellEs,
+  ...agentEs,
   'app.theme': 'Tema',
   'app.theme.system': 'Sistema',
   'app.theme.light': 'Claro',

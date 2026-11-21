@@ -3,8 +3,8 @@ import { Pill } from '../../components/Pill';
 import { useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 
-type SoonPage = 'flow' | 'agents' | 'knowledge';
-const ICONS: Record<SoonPage, IconName> = { flow: 'flow', agents: 'agents', knowledge: 'knowledge' };
+type SoonPage = 'flow' | 'knowledge';
+const ICONS: Record<SoonPage, IconName> = { flow: 'flow', knowledge: 'knowledge' };
 
 /** A menu item whose page is not built yet: what it will do, marked Soon. */
 export function ComingSoonPage({ page }: { page: SoonPage }) {

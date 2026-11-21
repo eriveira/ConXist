@@ -4,6 +4,7 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
+import type { Agent, AgentDefinition, AgentSummary, AgentTemplate, AgentToolInfo, AgentVersion } from '../domain/agents';
 
 /** A request the API refused. `detail` is plain language written for the person using the app. */
 export class ApiError extends Error {
@@ -79,6 +80,23 @@ export interface NewWorkspace {
   description: string;
 }
 
+function putJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export interface NewAgent {
+  template: AgentTemplate;
+  name: string;
+  /** The language the template's brief is written in. */
+  language: 'en' | 'es';
+}
+
+const agentPath = (agentId: string) => `/api/agents/${encodeURIComponent(agentId)}`;
+
 export const api = {
   workspaces: () => request<Workspace[]>('/api/workspaces'),
   createWorkspace: (workspace: NewWorkspace) => postJson<Workspace>('/api/workspaces', workspace),
@@ -120,6 +138,19 @@ export const api = {
   signInAgain: (sourceId: string, signInId: string) =>
     postJson<RecorderConnection>(`/api/sources/${sourceId}/plaud-account/sign-in`, { signInId }),
   plaudConnections: () => request<RecorderConnection[]>('/api/recorders/plaud/connections'),
+  agents: () => request<AgentSummary[]>('/api/agents'),
+  agentTools: () => request<AgentToolInfo[]>('/api/agents/tools'),
+  createAgent: (agent: NewAgent) => postJson<Agent>('/api/agents', agent),
+  agent: (agentId: string) => request<Agent>(agentPath(agentId)),
+  /** Saves the draft only if the agent is still at `revision`; a 409 means it changed elsewhere. */
+  saveAgentDraft: (agentId: string, revision: number, draft: AgentDefinition) =>
+    putJson<Agent>(`${agentPath(agentId)}/draft`, { revision, draft }),
+  publishAgent: (agentId: string, revision: number) => postJson<Agent>(`${agentPath(agentId)}/publish`, { revision }),
+  agentVersion: (agentId: string, number: number) => request<AgentVersion>(`${agentPath(agentId)}/versions/${number}`),
+  restoreAgentVersion: (agentId: string, number: number, revision: number) =>
+    postJson<Agent>(`${agentPath(agentId)}/versions/${number}/restore`, { revision }),
+  archiveAgent: (agentId: string, revision: number) => postJson<Agent>(`${agentPath(agentId)}/archive`, { revision }),
+  unarchiveAgent: (agentId: string, revision: number) => postJson<Agent>(`${agentPath(agentId)}/unarchive`, { revision }),
   sync: (sourceId: string) => request<SyncResult>(`/api/sources/${sourceId}/sync`, { method: 'POST' }),
 };
 

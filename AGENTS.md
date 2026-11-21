@@ -35,13 +35,13 @@ Sources page does not show it for now, owner decision 2026-11-17).
   shared standards.
 
 - `apps/api/`: the API. Spring Boot with Spring Modulith; each top-level package
-  is a module (`platform`, `sources`, `capture`, `hub`) with `domain`,
+  is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`) with `domain`,
   `application`, `adapter` and `config` inside. Modules talk through their root
   package (API) and events. See `docs/adr/0002-stack.md` (accepted).
-- `apps/web/`: the web app (the Sources page and its add-source dialogs). `domain` and `api` stay
+- `apps/web/`: the web app (the Sources and Agents pages and their dialogs). `domain` and `api` stay
   free of React; screens live in `features`.
 
-## Current state (2026-11-18)
+## Current state (2026-11-20)
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
@@ -55,7 +55,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
   `mvn spring-boot:test-run` runs a fake Plaud that signs in as `alex@acme.test`.
 - Workspaces (ADR 0007): a person keeps several; first run asks for one (name, optional description up to 500
   characters). Every workspace request sends `X-Workspace-Id`; the app keeps the last one used. The header menu is
-  Home (empty for now), Flow, Agents, Sources, Knowledge; Flow, Agents, Knowledge and Ask ConXist show "coming soon".
+  Home (empty for now), Flow, Agents, Sources, Knowledge; Flow, Knowledge and Ask ConXist show "coming soon".
+- Agents (ADR 0010, step 1 of 4 the owner set: Agents, Skills, Test run, Schedules): an `agents` module and the
+  Agents pages. Create from a template, edit a draft that saves itself (revision check), publish numbered versions,
+  History and Restore, Archive. Nothing runs agents yet; Test and Skills show "coming soon".
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 
