@@ -65,7 +65,8 @@ class AgentsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(draft(revision, "Requirements")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.draft.name").value("Requirements"))
-                .andExpect(jsonPath("$.draft.model").value("FAST"))
+                .andExpect(jsonPath("$.draft.model.model").value("claude-haiku-5-5"))
+                .andExpect(jsonPath("$.draft.model.effort").value("LOW"))
                 .andExpect(jsonPath("$.draftPublished").value(false));
         mvc.perform(put("/api/agents/{id}/draft", id).header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON).content(draft(revision, "Stale tab")))
@@ -174,7 +175,7 @@ class AgentsIntegrationTest {
     private static String draft(int revision, String name) {
         return """
                 {"revision":%d,"draft":{"name":"%s","purpose":"Finds requirements","instructions":"Find them.",
-                "knowledgeSources":[],"tools":["GET_TRANSCRIPT"],"model":"FAST","style":"PRECISE",
+                "knowledgeSources":[],"tools":["GET_TRANSCRIPT"],"model":{"provider":"anthropic","model":"claude-haiku-5-5","effort":"LOW"},"style":"PRECISE",
                 "accepts":["TRANSCRIPT"],"givesBack":"REQUIREMENTS",
                 "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
                 """.formatted(revision, name);

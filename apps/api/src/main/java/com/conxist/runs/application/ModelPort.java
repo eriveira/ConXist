@@ -10,6 +10,9 @@ import java.util.Map;
  */
 public interface ModelPort {
 
+    /** The LLM provider this port calls, as the API's settings name it, such as {@code anthropic}. */
+    String provider();
+
     /** False when the model cannot be called, for example because no key is set; nothing is sent then. */
     boolean ready();
 

@@ -2,24 +2,10 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
 import type { AgentSummary } from '../../domain/agents';
-import type { ModelSettings } from '../../domain/settings';
-import { stubApi } from '../../testing';
+import { LLM_PROVIDERS, stubApi } from '../../testing';
 import { SettingsPage } from './SettingsPage';
 
 const WORKSPACE = { id: 'w1', name: 'Acme Product', description: 'Checkout', sourceCount: 2, createdAt: '2026-11-18T12:00:00Z' };
-const MODELS: ModelSettings = {
-  vendors: [{ id: 'anthropic', connected: true }],
-  presets: [
-    { preset: 'FAST', model: 'claude-haiku-5-5', defaultModel: 'claude-haiku-5-5', effort: 'LOW' },
-    { preset: 'BALANCED', model: 'claude-sonnet-5-5', defaultModel: 'claude-sonnet-5-5', effort: 'MEDIUM' },
-    { preset: 'THOROUGH', model: 'claude-opus-5-5', defaultModel: 'claude-opus-5-5', effort: 'HIGH' },
-  ],
-  models: [
-    { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
-    { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' },
-    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
-  ],
-};
 const agent = (name: string, model: AgentSummary['model']): AgentSummary => ({
   id: name, name, purpose: '', status: 'ACTIVE', publishedVersion: 0, draftPublished: false, givesBack: 'TOPICS', model,
   skills: [], updatedAt: '2026-11-24T00:00:00Z',
@@ -37,42 +23,58 @@ describe('SettingsPage', () => {
     window.location.hash = '';
   });
 
-  it('shows each setting with its model and the agents that use it, and saves a new pick', async () => {
+  it('lists each model with who uses it at what effort, and saves where new agents start', async () => {
     const calls = stubApi({
-      'GET /api/model-settings': () => ({ body: MODELS }),
-      'GET /api/agents': () => ({ body: [agent('Topic classifier', 'FAST'), agent('Analyst', 'THOROUGH')] }),
-      'PUT /api/model-settings/presets/FAST': () => ({
-        body: { ...MODELS, presets: [{ ...MODELS.presets[0], model: 'claude-sonnet-5-5' }, ...MODELS.presets.slice(1)] },
+      'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
+      'GET /api/agents': () => ({ body: [
+        agent('Topic classifier', { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }),
+        agent('Analyst', { provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' }),
+      ] }),
+      'PUT /api/llm-providers/default': (init) => ({
+        body: { ...LLM_PROVIDERS, defaultForNewAgents: JSON.parse(String(init?.body)) },
       }),
     });
-    const { container } = open('#/settings/connectors');
+    const { container } = open('#/settings/llm');
 
-    const fast = await screen.findByRole('combobox', { name: 'Fast model' });
+    const model = await screen.findByRole('combobox', { name: 'Model for new agents' });
     expect(screen.getByText('Connected')).toBeInTheDocument();
-    expect(screen.getByRole('row', { name: /Fast/ })).toHaveTextContent('Topic classifier');
-    expect(screen.getByRole('row', { name: /Balanced/ })).toHaveTextContent('No agents yet');
-    expect(screen.getByRole('heading', { name: /Storage/ })).toHaveTextContent('Coming soon');
+    expect(screen.getByRole('row', { name: /Claude Haiku 5.5/ })).toHaveTextContent('Topic classifier (low)');
+    expect(screen.getByRole('row', { name: /Claude Opus 5.5/ })).toHaveTextContent('Analyst (high)');
+    expect(screen.getByRole('row', { name: /Claude Sonnet 5.5/ })).toHaveTextContent('No agents yet');
+    expect(screen.getByText(/More providers/)).toHaveTextContent('Coming soon');
+    expect(model).toHaveValue('anthropic/claude-sonnet-5-5');
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
-    await userEvent.selectOptions(fast, 'claude-sonnet-5-5');
+    await userEvent.selectOptions(model, 'anthropic/claude-opus-5-5');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Effort for new agents' }), 'HIGH');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('Saved')).toBeInTheDocument();
-    expect(JSON.parse(String(calls.find((call) => call.key === 'PUT /api/model-settings/presets/FAST')?.init?.body)))
-      .toEqual({ model: 'claude-sonnet-5-5' });
-    expect(fast).toHaveValue('claude-sonnet-5-5');
+    expect(JSON.parse(String(calls.find((call) => call.key === 'PUT /api/llm-providers/default')?.init?.body)))
+      .toEqual({ provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
-  it('says how to add a key when no vendor is connected', async () => {
+  it('says how to add a key when no provider is connected, and offers no default', async () => {
     stubApi({
-      'GET /api/model-settings': () => ({ body: { ...MODELS, vendors: [{ id: 'anthropic', connected: false }] } }),
+      'GET /api/llm-providers': () => ({ body: { ...LLM_PROVIDERS, providers: [{ ...LLM_PROVIDERS.providers[0], connected: false }] } }),
       'GET /api/agents': () => ({ body: [] }),
     });
-    open('#/settings/connectors');
+    open('#/settings/llm');
 
     expect(await screen.findByText('No key')).toBeInTheDocument();
     expect(screen.getByText(/Add CONXIST_ANTHROPIC_API_KEY/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('No provider is connected yet');
+    expect(screen.queryByRole('combobox', { name: 'Model for new agents' })).not.toBeInTheDocument();
+  });
+
+  it('shows storage and the AI tools that reach ConXist as coming soon', async () => {
+    const { container } = open('#/settings/connectors');
+
+    expect(screen.getByText('Storage').parentElement).toHaveTextContent('Coming soon');
+    expect(screen.getByText('AI tools that reach ConXist').parentElement).toHaveTextContent('Coming soon');
+    expect(await accessibilityViolations(container)).toEqual([]);
   });
 
   it('starts with no topics, adds one with its description, and refuses a taken name under the field', async () => {

@@ -13,7 +13,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.agents.domain.Agent;
+import com.conxist.agents.AgentModels;
 import com.conxist.agents.domain.AgentDefinition;
+import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTemplate;
 import com.conxist.agents.domain.AgentVersion;
@@ -42,8 +44,9 @@ class AgentsTest {
     private FixedWorkspace workspace = FixedWorkspace.standard();
     private final SkillBook skills = new SkillBook(new InMemorySkills(), () -> workspace.id(), () -> Language.EN,
             new ImmediateUnitOfWork(), clock);
+    private final Models models = new Models();
     private final AgentBook book = new AgentBook(repository, () -> workspace.id(),
-            id -> Optional.ofNullable(sources.get(id)), skills, new ImmediateUnitOfWork(), clock);
+            id -> Optional.ofNullable(sources.get(id)), skills, models, new ImmediateUnitOfWork(), clock);
     private final AddSkill addSkill = new AddSkill(skills);
     private final SaveSkillDraft saveSkill = new SaveSkillDraft(skills);
     private final PublishSkill publishSkill = new PublishSkill(skills);
@@ -69,6 +72,34 @@ class AgentsTest {
             assertThat(summary.name()).isEqualTo("Requirements analyst");
             assertThat(summary.publishedVersion()).isZero();
         });
+    }
+
+    @Test
+    void a_template_starts_on_its_tier_and_a_blank_agent_on_the_workspace_default() {
+        assertThat(create.create(AgentTemplate.TOPIC_CLASSIFIER, "Topics", Language.EN).draft().model())
+                .isEqualTo(new AgentModel("anthropic", "claude-haiku-5-5", AgentModel.Effort.LOW));
+        assertThat(create.create(AgentTemplate.BLANK, "Mine", Language.EN).draft().model())
+                .isEqualTo(new AgentModel("anthropic", "default-model", AgentModel.Effort.HIGH));
+        assertThat(models.asked).containsExactly(Optional.of("FAST"), Optional.empty());
+    }
+
+    @Test
+    void an_agent_without_a_model_or_on_a_model_that_cannot_run_is_not_published() {
+        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentDefinition d = created.draft();
+
+        AgentView none = save.save(created.id(), created.revision(), withModel(d, null));
+        assertThat(none.problems()).containsExactly("model-required");
+
+        AgentView retired = save.save(created.id(), none.revision(),
+                withModel(d, new AgentModel("anthropic", "claude-retired", AgentModel.Effort.LOW)));
+        assertThat(retired.problems()).containsExactly("model-unavailable");
+        assertCode(() -> publish.publish(created.id(), retired.revision()), "agent.model-unavailable");
+
+        AgentView back = save.save(created.id(), retired.revision(), withModel(d, SONNET));
+        assertThat(back.problems()).isEmpty();
+        models.connected = false;
+        assertThat(read.get(created.id()).problems()).containsExactly("model-unavailable");
     }
 
     @Test
@@ -179,7 +210,7 @@ class AgentsTest {
     void a_skill_that_needs_a_tool_the_agent_lacks_blocks_publishing() {
         AgentView created = create.create(AgentTemplate.BLANK, "Writer", Language.EN);
         AgentView ready = save.save(created.id(), created.revision(), withSkills(
-                new AgentDefinition("Writer", "", "Write.", List.of(), List.of(), List.of(), null, null,
+                new AgentDefinition("Writer", "", "Write.", List.of(), List.of(), List.of(), SONNET, null,
                         List.of(InputKind.TOPIC), null, null),
                 List.of(new SkillPin(BuiltInSkill.MEETING_SUMMARY.id(), 1))));
 
@@ -284,6 +315,11 @@ class AgentsTest {
                 d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
     }
 
+    private static AgentDefinition withModel(AgentDefinition d, AgentModel model) {
+        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), d.skills(), d.tools(),
+                model, d.style(), d.accepts(), d.givesBack(), d.limits());
+    }
+
     private static AgentDefinition withSources(AgentDefinition d, List<UUID> sources) {
         return new AgentDefinition(d.name(), d.purpose(), d.instructions(), sources, d.skills(), d.tools(),
                 d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
@@ -292,6 +328,30 @@ class AgentsTest {
     private static AgentDefinition withSkills(AgentDefinition d, List<SkillPin> skills) {
         return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), skills, d.tools(),
                 d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
+    }
+
+    private static final AgentModel SONNET = new AgentModel("anthropic", "claude-sonnet-5-5", AgentModel.Effort.MEDIUM);
+
+    /** Anthropic with its three models; a blank agent starts on a made-up workspace default. */
+    private static final class Models implements AgentModels {
+        private final List<Optional<String>> asked = new ArrayList<>();
+        private boolean connected = true;
+
+        @Override
+        public Start start(Optional<String> tier) {
+            asked.add(tier);
+            return tier.map(name -> switch (name) {
+                case "FAST" -> new Start("anthropic", "claude-haiku-5-5", "LOW");
+                case "THOROUGH" -> new Start("anthropic", "claude-opus-5-5", "HIGH");
+                default -> new Start("anthropic", "claude-sonnet-5-5", "MEDIUM");
+            }).orElse(new Start("anthropic", "default-model", "HIGH"));
+        }
+
+        @Override
+        public boolean available(String provider, String model) {
+            return connected && provider.equals("anthropic") && List.of("claude-haiku-5-5", "claude-sonnet-5-5",
+                    "claude-opus-5-5", "default-model").contains(model);
+        }
     }
 
     private static void assertCode(Runnable action, String code) {

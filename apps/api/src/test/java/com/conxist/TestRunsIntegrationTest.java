@@ -47,40 +47,79 @@ class TestRunsIntegrationTest {
     FakeClaudeServer claude;
 
     @Test
-    void a_run_uses_the_model_the_workspace_picked_in_settings() throws Exception {
-        String workspace = workspace("Picks");
+    void settings_list_the_providers_and_set_where_new_blank_agents_start() throws Exception {
+        String workspace = workspace("Providers");
+
+        mvc.perform(get("/api/llm-providers").header(HEADER, workspace))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providers[0].id").value("anthropic"))
+                .andExpect(jsonPath("$.providers[0].connected").value(true))
+                .andExpect(jsonPath("$.providers[0].models[0].label").value("Claude Haiku 5.5"))
+                .andExpect(jsonPath("$.providers[0].apiKey").doesNotExist())
+                .andExpect(jsonPath("$.defaultForNewAgents.model").value("claude-sonnet-5-5"))
+                .andExpect(jsonPath("$.defaultForNewAgents.effort").value("MEDIUM"));
+        mvc.perform(put("/api/llm-providers/default").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"anthropic\",\"model\":\"claude-opus-5-5\",\"effort\":\"HIGH\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultForNewAgents.model").value("claude-opus-5-5"));
+        mvc.perform(put("/api/llm-providers/default").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"anthropic\",\"model\":\"gpt-9\",\"effort\":\"HIGH\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("model.unavailable"));
+        mvc.perform(get("/api/llm-providers").header(HEADER, workspace("Untouched")))
+                .andExpect(jsonPath("$.defaultForNewAgents.model").value("claude-sonnet-5-5"));
+
+        mvc.perform(post("/api/agents").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"template\":\"BLANK\",\"name\":\"Mine\",\"language\":\"EN\"}"))
+                .andExpect(jsonPath("$.draft.model.model").value("claude-opus-5-5"))
+                .andExpect(jsonPath("$.draft.model.effort").value("HIGH"));
+        mvc.perform(post("/api/agents").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"template\":\"TOPIC_CLASSIFIER\",\"name\":\"Topics\",\"language\":\"EN\"}"))
+                .andExpect(jsonPath("$.draft.model.model").value("claude-haiku-5-5"))
+                .andExpect(jsonPath("$.draft.model.effort").value("LOW"));
+    }
+
+    @Test
+    void a_run_uses_the_agents_own_model_and_a_model_that_cannot_run_is_refused() throws Exception {
+        String workspace = workspace("Own model");
         String source = source(workspace, "Specs");
         String meeting = upload(workspace, source, "# Kickoff\nAna: we need guest checkout.");
-        String agent = agent(workspace, "{\"template\":\"REQUIREMENTS_ANALYST\",\"name\":\"Analyst\",\"language\":\"EN\"}");
+        String agent = agent(workspace, "{\"template\":\"MEETING_SUMMARIZER\",\"name\":\"Summary\",\"language\":\"EN\"}");
+        String run = "{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}";
 
-        mvc.perform(get("/api/model-settings").header(HEADER, workspace))
+        mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(summaryDraft(1, "claude-opus-5-5")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.vendors[0].id").value("anthropic"))
-                .andExpect(jsonPath("$.vendors[0].connected").value(true))
-                .andExpect(jsonPath("$.presets[2].preset").value("THOROUGH"))
-                .andExpect(jsonPath("$.presets[2].model").value("claude-opus-5-5"))
-                .andExpect(jsonPath("$.models[0].label").value("Claude Haiku 5.5"))
-                .andExpect(jsonPath("$.anthropicApiKey").doesNotExist());
-        mvc.perform(put("/api/model-settings/presets/THOROUGH").header(HEADER, workspace)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"model\":\"claude-sonnet-5-5\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.presets[2].model").value("claude-sonnet-5-5"))
-                .andExpect(jsonPath("$.presets[2].defaultModel").value("claude-opus-5-5"));
-        mvc.perform(put("/api/model-settings/presets/THOROUGH").header(HEADER, workspace)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"model\":\"gpt-9\"}"))
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("model.unknown-model"));
-        mvc.perform(get("/api/model-settings").header(HEADER, workspace("Untouched")))
-                .andExpect(jsonPath("$.presets[2].model").value("claude-opus-5-5"));
-
+                .andExpect(jsonPath("$.problems").isEmpty());
         mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content(run))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.model").value("claude-sonnet-5-5"))
-                .andExpect(jsonPath("$.preset").value("THOROUGH"));
+                .andExpect(jsonPath("$.model").value("claude-opus-5-5"))
+                .andExpect(jsonPath("$.effort").value("LOW"));
         org.assertj.core.api.Assertions.assertThat(claude.requests().getLast().path("model").asString())
-                .isEqualTo("claude-sonnet-5-5");
+                .isEqualTo("claude-opus-5-5");
+
+        int before = claude.requests().size();
+        mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(summaryDraft(2, "claude-retired")))
+                .andExpect(jsonPath("$.problems[0]").value("model-unavailable"));
+        mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(run))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("run.agent-not-ready"));
+        org.assertj.core.api.Assertions.assertThat(claude.requests()).hasSize(before);
+    }
+
+    private static String summaryDraft(int revision, String model) {
+        return """
+                {"revision":%d,"draft":{"name":"Summary","purpose":"","instructions":"Sum it up.",
+                "knowledgeSources":[],"skills":[],"tools":["GET_TRANSCRIPT"],
+                "model":{"provider":"anthropic","model":"%s","effort":"LOW"},"style":"PRECISE",
+                "accepts":["TRANSCRIPT"],"givesBack":"FREE_TEXT",
+                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                """.formatted(revision, model);
     }
 
     @Test
@@ -98,7 +137,7 @@ class TestRunsIntegrationTest {
                 .andExpect(jsonPath("$.outcome").value("ANSWERED"))
                 .andExpect(jsonPath("$.matchesShape").value(true))
                 .andExpect(jsonPath("$.model").value("claude-opus-5-5"))
-                .andExpect(jsonPath("$.preset").value("THOROUGH"))
+                .andExpect(jsonPath("$.effort").value("HIGH"))
                 .andExpect(jsonPath("$.structured.requirements[0].type").value("BUG"))
                 .andExpect(jsonPath("$.steps[0].kind").value("MODEL"));
 

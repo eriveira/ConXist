@@ -1,4 +1,4 @@
-import type { AgentSummary, ModelPolicy } from './agents';
+import type { AgentModel, AgentSummary, Effort } from './agents';
 
 /** A subject the team talks about, that the topic classifier sorts meetings into. */
 export interface Topic {
@@ -11,43 +11,51 @@ export const MAX_TOPIC_NAME = 60;
 export const MAX_TOPIC_DESCRIPTION = 300;
 export const MAX_TOPICS = 50;
 
-export interface ModelVendor {
-  id: string;
-  /** Whether the API has a key for it. The key itself never reaches the app. */
-  connected: boolean;
-}
-
-export interface ModelPreset {
-  preset: ModelPolicy;
-  /** What the preset runs on in this workspace. */
-  model: string;
-  /** What it runs on when the workspace has not picked one. */
-  defaultModel: string;
-  effort: 'LOW' | 'MEDIUM' | 'HIGH';
-}
-
-export interface ModelOption {
+export interface LlmModel {
   id: string;
   label: string;
 }
 
-export interface ModelSettings {
-  vendors: ModelVendor[];
-  presets: ModelPreset[];
-  models: ModelOption[];
+export interface LlmProvider {
+  id: string;
+  /** Whether the API has a key for it. The key itself never reaches the app. */
+  connected: boolean;
+  models: LlmModel[];
 }
 
-/** The agents on each preset, archived ones left out, by name. */
-export function agentsByPreset(agents: readonly AgentSummary[]): Record<ModelPolicy, string[]> {
-  const byPreset: Record<ModelPolicy, string[]> = { FAST: [], BALANCED: [], THOROUGH: [] };
-  agents
-    .filter((agent) => agent.status !== 'ARCHIVED')
-    .forEach((agent) => byPreset[agent.model].push(agent.name));
-  Object.values(byPreset).forEach((names) => names.sort((a, b) => a.localeCompare(b)));
-  return byPreset;
+/** The providers a workspace can use (ADR 0014), and where its new blank agents start. */
+export interface LlmProviders {
+  providers: LlmProvider[];
+  defaultForNewAgents: AgentModel;
 }
 
-/** The presets whose pick differs from what the workspace has saved. */
-export function changedPicks(saved: readonly ModelPreset[], picks: Readonly<Record<string, string>>): ModelPreset[] {
-  return saved.filter((preset) => picks[preset.preset] !== undefined && picks[preset.preset] !== preset.model);
+/** Whether the agent's pick can run now: its provider is connected and still lists the model. */
+export function modelAvailable(providers: LlmProviders, pick: AgentModel | null): boolean {
+  if (!pick) return false;
+  const provider = providers.providers.find((each) => each.id === pick.provider);
+  return Boolean(provider?.connected && provider.models.some((model) => model.id === pick.model));
+}
+
+/** The model's name as its provider lists it, or its id when no provider lists it any more. */
+export function modelLabel(providers: LlmProviders, provider: string, model: string): string {
+  return providers.providers.find((each) => each.id === provider)?.models.find((each) => each.id === model)?.label
+    ?? model;
+}
+
+export interface ModelUser {
+  name: string;
+  effort: Effort;
+}
+
+/** Who runs on this model and at what effort, archived agents left out, by name. */
+export function modelUsers(agents: readonly AgentSummary[], provider: string, model: string): ModelUser[] {
+  return agents
+    .filter((agent) => agent.status !== 'ARCHIVED' && agent.model?.provider === provider && agent.model.model === model)
+    .map((agent) => ({ name: agent.name, effort: (agent.model as AgentModel).effort }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Whether two picks name the same provider, model and effort. */
+export function samePick(a: AgentModel, b: AgentModel): boolean {
+  return a.provider === b.provider && a.model === b.model && a.effort === b.effort;
 }

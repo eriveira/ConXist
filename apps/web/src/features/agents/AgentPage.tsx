@@ -4,6 +4,7 @@ import { Icon } from '../../components/Icon';
 import { type AgentDefinition, type AgentToolInfo, localProblems } from '../../domain/agents';
 import { type PinnedSkill, SKILL_PROBLEMS, type SkillSummary, skillRowProblems, skillRows } from '../../domain/skills';
 import type { Source } from '../../domain/model';
+import { type LlmProviders, modelAvailable } from '../../domain/settings';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { AGENTS_HREF, goWithNotice } from '../../navigation';
@@ -19,7 +20,7 @@ import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
 export type Choices =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[] };
+  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[]; providers: LlmProviders };
 
 type Busy = 'publish' | 'archive' | null;
 
@@ -42,8 +43,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
 
   const loadChoices = useCallback(() => {
     setChoices({ status: 'loading' });
-    Promise.all([api.sources(), api.agentTools(), api.skills()])
-      .then(([sources, tools, skills]) => setChoices({ status: 'ready', sources, tools, skills }))
+    Promise.all([api.sources(), api.agentTools(), api.skills(), api.llmProviders()])
+      .then(([sources, tools, skills, providers]) => setChoices({ status: 'ready', sources, tools, skills, providers }))
       .catch(() => setChoices({ status: 'error' }));
   }, []);
 
@@ -161,7 +162,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
       {historyOpen && (
         <HistoryDialog name={agent.draft.name} versions={agent.versions} publishedVersion={agent.publishedVersion}
           loadVersion={(number) => api.agentVersion(agent.id, number)}
-          renderVersion={(version) => <AgentVersionSummary version={version} />}
+          renderVersion={(version) => <AgentVersionSummary version={version}
+            providers={choices.status === 'ready' ? choices.providers : null} />}
           archivedNote={t('agent.history.archived')} hasUnpublished={!agent.draftPublished || save !== 'saved'}
           archived={archived} blocked={stuck} onRestore={restore} onClose={() => setHistoryOpen(false)} />
       )}
@@ -176,12 +178,15 @@ export function AgentPage({ agentId }: { agentId: string }) {
   );
 }
 
+const MODEL_PROBLEMS = ['model-required', 'model-unavailable'];
+
 /**
- * The server's problems describe the saved draft. Once the skills list is in, the skill problems are worked out from
- * what is on screen instead, so adding a tool or removing a skill clears them at once.
+ * The server's problems describe the saved draft. Once the choices are in, the skill and model problems are worked
+ * out from what is on screen instead, so adding a tool, removing a skill or picking a model clears them at once.
  */
 function currentProblems(saved: string[], draft: AgentDefinition, pinned: PinnedSkill[], choices: Choices): string[] {
   if (choices.status !== 'ready') return saved;
-  return [...saved.filter((code) => !SKILL_PROBLEMS.includes(code)),
-    ...skillRowProblems(skillRows(draft.skills, pinned, choices.skills), draft.tools)];
+  const modelProblem = draft.model && !modelAvailable(choices.providers, draft.model) ? ['model-unavailable'] : [];
+  return [...saved.filter((code) => !SKILL_PROBLEMS.includes(code) && !MODEL_PROBLEMS.includes(code)),
+    ...modelProblem, ...skillRowProblems(skillRows(draft.skills, pinned, choices.skills), draft.tools)];
 }

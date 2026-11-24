@@ -32,19 +32,17 @@ public final class StartTestRun {
     private final AgentBriefs agents;
     private final MeetingLibrary library;
     private final RunTools tools;
-    private final ModelPort model;
-    private final ModelSettings modelSettings;
+    private final LlmProviders providers;
     private final AnswerReader reader;
     private final CurrentWorkspace workspace;
     private final Clock clock;
 
-    public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, ModelPort model,
-            ModelSettings modelSettings, AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
+    public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
+            AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
         this.agents = agents;
         this.library = library;
         this.tools = tools;
-        this.model = model;
-        this.modelSettings = modelSettings;
+        this.providers = providers;
         this.reader = reader;
         this.workspace = workspace;
         this.clock = clock;
@@ -52,7 +50,7 @@ public final class StartTestRun {
 
     /** Whether a model can be called at all, so the app can say what to set up before anyone presses Run. */
     public boolean ready() {
-        return model.ready();
+        return providers.anyConnected();
     }
 
     public TestRunResult run(UUID agentId, UUID sourceId, UUID meetingId) {
@@ -61,16 +59,21 @@ public final class StartTestRun {
         if (agent.archived()) {
             throw new RuleViolation("run.agent-archived", "This agent is archived. Bring it back to test it.");
         }
-        if (!agent.problems().isEmpty()) {
-            throw new RuleViolation("run.agent-not-ready", "Fix what the agent page lists before running a test.");
-        }
-        if (!model.ready()) {
+        if (!providers.anyConnected()) {
             throw new RuleViolation("run.no-model-key",
                     "No model key is set. Add CONXIST_ANTHROPIC_API_KEY to the API's settings and start it again.");
         }
+        if (!agent.problems().isEmpty()) {
+            throw notReady();
+        }
+        LlmProviders.Call call = providers.callFor(agent).orElseThrow(StartTestRun::notReady);
         MeetingLibrary.Text meeting = library.read(sourceId, meetingId)
                 .orElseThrow(() -> new NotFound("run.meeting-not-found", "This meeting is no longer in ConXist."));
-        return new Loop(agent, meeting).run();
+        return new Loop(agent, meeting, call).run();
+    }
+
+    private static RuleViolation notReady() {
+        return new RuleViolation("run.agent-not-ready", "Fix what the agent page lists before running a test.");
     }
 
     /** One run's state: the turns so far, what was spent, and what the person will see. */
@@ -78,6 +81,7 @@ public final class StartTestRun {
 
         private final AgentBrief agent;
         private final MeetingLibrary.Text meeting;
+        private final ModelPort model;
         private final ModelChoice choice;
         private final Optional<OutputShape> shape;
         private final RunTools.Scope scope;
@@ -93,10 +97,11 @@ public final class StartTestRun {
         private long inputTokens;
         private long outputTokens;
 
-        Loop(AgentBrief agent, MeetingLibrary.Text meeting) {
+        Loop(AgentBrief agent, MeetingLibrary.Text meeting, LlmProviders.Call call) {
             this.agent = agent;
             this.meeting = meeting;
-            this.choice = modelSettings.choiceFor(Preset.valueOf(agent.model()));
+            this.model = call.port();
+            this.choice = call.choice();
             this.shape = OutputShape.of(agent.givesBack());
             this.scope = new RunTools.Scope(agent.tools(), agent.knowledgeSources(), meeting.sourceId(), meeting.id());
             this.offered = tools.specs(agent.tools());
@@ -187,7 +192,7 @@ public final class StartTestRun {
                             + "{7} tool calls, {8,number,#} input and {9,number,#} output tokens, {10,number,#} ms",
                     agent.id(), workspace.id(), meeting.id(), outcome, choice.id(), RunPrompt.VERSION, turns,
                     toolCalls, inputTokens, outputTokens, millis);
-            return new TestRunResult(agent.id(), outcome, agent.model(), choice.id(), answer, structured, matches,
+            return new TestRunResult(agent.id(), outcome, choice.effort().name(), choice.id(), answer, structured, matches,
                     List.copyOf(steps), toolCalls, inputTokens, outputTokens, millis);
         }
 

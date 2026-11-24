@@ -22,6 +22,10 @@ public final class PublishAgent {
                 throw new InvalidAgent(AgentBook.SOURCE_MISSING,
                         "A source this agent reads was removed. Remove it from Knowledge, then publish.");
             }
+            if (problems.contains(AgentBook.MODEL_UNAVAILABLE)) {
+                throw new InvalidAgent(AgentBook.MODEL_UNAVAILABLE,
+                        "This agent's model can't run here now. Pick another in How it thinks, then publish.");
+            }
             if (problems.contains(AgentBook.SKILL_MISSING)) {
                 throw new InvalidAgent(AgentBook.SKILL_MISSING,
                         "A skill this agent follows was removed. Remove it from Skills, then publish.");

@@ -5,13 +5,20 @@ export const INPUT_KINDS = ['TRANSCRIPT', 'DOCUMENT', 'TOPIC', 'REQUIREMENT'] as
 export type InputKind = (typeof INPUT_KINDS)[number];
 export const OUTPUT_KINDS = ['SUMMARY', 'TOPICS', 'REQUIREMENTS', 'DECISIONS', 'DRAFTS', 'FREE_TEXT'] as const;
 export type OutputKind = (typeof OUTPUT_KINDS)[number];
-export const MODEL_POLICIES = ['FAST', 'BALANCED', 'THOROUGH'] as const;
-export type ModelPolicy = (typeof MODEL_POLICIES)[number];
+export const EFFORTS = ['LOW', 'MEDIUM', 'HIGH'] as const;
+export type Effort = (typeof EFFORTS)[number];
 export const STYLES = ['PRECISE', 'CREATIVE'] as const;
 export type Style = (typeof STYLES)[number];
 export const TEMPLATES = ['MEETING_SUMMARIZER', 'REQUIREMENTS_ANALYST', 'DECISION_LOGGER', 'TOPIC_CLASSIFIER', 'BLANK'] as const;
 export type AgentTemplate = (typeof TEMPLATES)[number];
 export type AgentStatus = 'ACTIVE' | 'ARCHIVED';
+
+/** What an agent runs on (ADR 0014): a provider connected in Settings, one of its models, and how hard it thinks. */
+export interface AgentModel {
+  provider: string;
+  model: string;
+  effort: Effort;
+}
 
 export interface Limits {
   maxSteps: number;
@@ -28,7 +35,8 @@ export interface AgentDefinition {
   /** The skills it follows, each at a fixed version. */
   skills: SkillPin[];
   tools: string[];
-  model: ModelPolicy;
+  /** Null only for an agent saved before agents picked their own model, until someone picks one. */
+  model: AgentModel | null;
   style: Style;
   accepts: InputKind[];
   givesBack: OutputKind;
@@ -78,8 +86,8 @@ export interface AgentSummary {
   publishedVersion: number;
   draftPublished: boolean;
   givesBack: OutputKind;
-  /** Its draft's model setting, so Settings can show which agents use each one. */
-  model: ModelPolicy;
+  /** What its draft runs on, so Settings can show who uses each model. */
+  model: AgentModel | null;
   /** The skills its draft follows, so a skill can show who uses it. */
   skills: SkillPin[];
   updatedAt: string;
@@ -123,6 +131,7 @@ export function localProblems(draft: AgentDefinition): string[] {
   if (!draft.name.trim()) problems.push('name-required');
   if (!draft.instructions.trim()) problems.push('instructions-required');
   if (draft.accepts.length === 0) problems.push('accepts-required');
+  if (!draft.model) problems.push('model-required');
   return problems;
 }
 

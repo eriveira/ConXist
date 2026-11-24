@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * What an agent is: its purpose, its brief, what it may read, the skills it follows and the tools it may use, how it thinks, what it takes in and gives back,
- * and where it stops. A draft may be unfinished; {@link #problems()} says what must be done before it is published.
+ * and where it stops. A draft may be unfinished (even without a model); {@link #problems()} says what must be done before it is published.
  */
 public record AgentDefinition(
         String name,
@@ -18,7 +18,7 @@ public record AgentDefinition(
         List<UUID> knowledgeSources,
         List<SkillPin> skills,
         List<AgentTool> tools,
-        ModelPolicy model,
+        AgentModel model,
         Style style,
         List<InputKind> accepts,
         OutputKind givesBack,
@@ -52,7 +52,6 @@ public record AgentDefinition(
         }
         tools = distinct(tools);
         accepts = distinct(accepts);
-        model = Objects.requireNonNullElse(model, ModelPolicy.BALANCED);
         style = Objects.requireNonNullElse(style, Style.PRECISE);
         givesBack = Objects.requireNonNullElse(givesBack, OutputKind.FREE_TEXT);
         limits = Objects.requireNonNullElse(limits, Limits.DEFAULT);
@@ -66,6 +65,9 @@ public record AgentDefinition(
         }
         if (accepts.isEmpty()) {
             problems.add("accepts-required");
+        }
+        if (model == null) {
+            problems.add("model-required");
         }
         return List.copyOf(problems);
     }

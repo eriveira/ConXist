@@ -55,6 +55,14 @@ public final class ClaudeModel implements ModelPort {
         this.client = builder.build();
     }
 
+    /** The provider name the API's settings use for Claude. */
+    public static final String PROVIDER = "anthropic";
+
+    @Override
+    public String provider() {
+        return PROVIDER;
+    }
+
     @Override
     public boolean ready() {
         return ready;

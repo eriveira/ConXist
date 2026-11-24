@@ -1,40 +1,58 @@
-# 0014. Workspace Settings: General, Connectors (models) and Topics
+# 0014. Workspace Settings: General, LLM providers, Connectors and Topics
 
 - Status: Proposed
 - Date: 2026-11-24
 - Deciders: owner, Claude
+- Changes: ADR 0010's "agents name a setting (Fast, Balanced, Thorough), never a model"
 
 ## Context
 
 Before the topic classifier (the first Knowledge workflow, see the storage plan) can sort meetings, each workspace
-needs its own list of topics, and the owner wants to choose which model each task runs on, per workspace, with more
-vendors later. The owner approved the mock `App/mocks/workspace-settings-v1/` on 2026-11-24: a Settings button in
-the workspace menu, and Settings with General, Connectors and Topics. Sources stay in their own menu; Connectors in
-Settings holds models now and storage later. Invite members was dropped.
+needs its own list of topics. The owner approved a first Settings mock (`App/mocks/workspace-settings-v1/`) with a
+workspace that mapped Fast, Balanced and Thorough to models. Before UAT the owner changed direction (2026-11-24):
+ConXist will work with several LLM providers, and LLMs will also reach ConXist, so Settings should only connect
+providers; each agent (and later each skill) passes its own provider, model and effort. The owner also asked to see
+which models are used by whom, and for a default model. Mock `App/mocks/workspace-settings-v2/` shows this, and the
+owner said go. Sources stay in their own menu; Invite members was dropped.
 
 ## Decision
 
 - **General**: `PUT /api/workspaces/{id}` renames a workspace and edits its description, under the same rules as a
   new one (ADR 0007). Like the other `/api/workspaces` calls it names the workspace in the path, not the header.
+- **Agents pick their own model**: an agent definition holds `model: {provider, model, effort}` with effort LOW,
+  MEDIUM or HIGH (`AgentModel`). A draft without one has the problem `model-required`; a pick whose provider is not
+  connected, or whose model the provider no longer lists, has `model-unavailable`. Either blocks publish and test run.
+  V14 rewrites existing agents and versions: Fast became Haiku at low effort, Balanced Sonnet at medium, Thorough
+  Opus at high, all on Anthropic.
+- **LLM providers**: the API's settings list the models agents may use (`conxist.runs.models`: provider, id, label,
+  whether the provider may fall back, token limit) and where each template tier starts (`conxist.runs.fast`,
+  `balanced`, `thorough`: model and effort). A template keeps its tier only as a starting point. The `agents` module
+  asks through its `AgentModels` port where a new agent starts and whether a pick can run; the `runs` module answers
+  (`LlmProviders`), so no module depends on the other both ways.
+- **Default for new agents**: table `workspace_model_defaults` (V15, `runs` module) keeps one provider, model and
+  effort per workspace, where a new blank agent starts. It is not linked afterwards: changing it moves no agent. A
+  template starts on its tier unless that model can't run, then on the default. A saved default that can no longer
+  run falls back to the balanced tier.
+- `GET /api/llm-providers` returns each provider (connected when its key is set) with its models, and the default;
+  `PUT /api/llm-providers/default` saves the default. Keys stay in `CONXIST_ANTHROPIC_API_KEY` and never reach the app.
+- The app shows, per model, "Used by (effort)" from the agents list, which carries each agent's model.
+- **Connectors** now hold what is not a model: Storage (where Knowledge and Memories will be saved) and AI tools that
+  reach ConXist over MCP. Both show "coming soon".
 - **Topics** live in the `workspaces` module: table `workspace_topics` (V13) with a name of 1 to 60 characters,
   unique per workspace ignoring case, and a description up to 300. A workspace keeps up to 50, which the app enforces.
   `/api/topics` (GET, POST, PUT and DELETE `/{id}`) acts for the workspace in `X-Workspace-Id`.
-- **Models**: the API's settings list the models a workspace may pick (`conxist.runs.models`: id, label, whether the
-  provider may fall back). Each preset keeps its default model, effort and token limit there. A workspace picks only
-  the model for a preset; table `workspace_model_picks` (V14, `runs` module) holds the picks, and a preset with no
-  pick, or a pick no longer listed, runs on its default. `GET /api/model-settings` returns the vendor (connected when
-  the key is set), the presets and the models; `PUT /api/model-settings/presets/{preset}` saves a pick. Test runs use
-  the pick. The key stays in `CONXIST_ANTHROPIC_API_KEY` and never reaches the app.
-- The app shows "used by" per preset from the agents list, which now carries each agent's model setting.
-- Coming soon, shown but not built: more vendors, keys saved in Settings (they need sign-in), the zero data
-  retention rule, a monthly limit, and Storage (where Knowledge and Memories will be saved).
+- Coming soon, shown but not built: more providers, keys saved in Settings (they need sign-in), the zero data
+  retention rule and a monthly limit per provider.
 
 ## Consequences
 
-- Changing a pick changes every agent on that preset in the workspace at once, which is the point: agents name a
-  setting, never a model (ADR 0010).
-- Removing a model from the list does not break a workspace that picked it; it falls back to the preset's default.
+- Moving many agents to a new model is now one edit per agent, not one setting. That is the cost of each agent
+  saying exactly what it runs on, which is what portable agents (and other LLMs calling ConXist) need.
+- Removing a model from the list, or disconnecting a provider, does not change any agent; its agents show
+  `model-unavailable` and can't run or publish until someone picks another.
+- Adding a provider means a `ModelPort` adapter with its `provider()` id and its models in the settings list.
+- Skills do not pick a model yet. When they do, the same `AgentModel` shape applies.
 - Removing a topic changes nothing else yet. Once Knowledge files exist per topic, removing or renaming one must ask
   where its files go (in the mock's note).
-- No read tool exposes topics yet. The classifier (next step) reads them from its skill first; a `list_topics` tool
-  follows if the agent needs the live list.
+- No read tool exposes topics or models yet. The classifier (next step) reads topics from its skill first; a
+  `list_topics` tool follows if the agent needs the live list.
