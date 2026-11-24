@@ -5,10 +5,10 @@ import type { Language } from '../../i18n/messages';
 import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 import { AccountMenu, type Theme } from './AccountMenu';
 import { MainNav } from './MainNav';
-import type { Page } from './useRoute';
+import type { RoutePage } from './useRoute';
 
 interface AppHeaderProps {
-  page: Page;
+  page: RoutePage;
   workspaces: readonly Workspace[];
   current: Workspace;
   onSwitch: (workspace: Workspace) => void;

@@ -69,10 +69,17 @@ export function useWorkspaces() {
     open([...others, workspace], workspace);
   }, [state, open]);
 
+  /** Shows a workspace's new name and description everywhere, keeping which one is current. */
+  const updated = useCallback((workspace: Workspace) => {
+    if (state.status !== 'ready') return;
+    const workspaces = state.workspaces.map((w) => (w.id === workspace.id ? workspace : w));
+    open(workspaces, state.current.id === workspace.id ? workspace : state.current);
+  }, [state, open]);
+
   /** Brings source counts up to date, keeping the current workspace. */
   const refresh = useCallback(() => {
     if (state.status === 'ready') void load(state.current.id);
   }, [state, load]);
 
-  return { state, retry, switchTo, created, refresh };
+  return { state, retry, switchTo, created, updated, refresh };
 }

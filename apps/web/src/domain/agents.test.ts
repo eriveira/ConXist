@@ -6,7 +6,7 @@ const DRAFT: AgentDefinition = {
 };
 
 function summary(change: Partial<AgentSummary>): AgentSummary {
-  return { id: 'a', name: 'A', purpose: '', status: 'ACTIVE', publishedVersion: 0, draftPublished: false, givesBack: 'SUMMARY', skills: [], updatedAt: '2026-11-20T10:00:00Z', ...change };
+  return { id: 'a', name: 'A', purpose: '', status: 'ACTIVE', publishedVersion: 0, draftPublished: false, givesBack: 'SUMMARY', model: 'BALANCED', skills: [], updatedAt: '2026-11-20T10:00:00Z', ...change };
 }
 
 describe('agents', () => {

@@ -4,6 +4,8 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
+import type { ModelPolicy } from '../domain/agents';
+import type { ModelSettings, Topic } from '../domain/settings';
 import type { Agent, AgentDefinition, AgentSummary, AgentUse, AgentTemplate, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
 import type { TestRunResult, TestRunStatus } from '../domain/testRuns';
@@ -111,6 +113,17 @@ const skillPath = (skillId: string) => `/api/skills/${encodeURIComponent(skillId
 export const api = {
   workspaces: () => request<Workspace[]>('/api/workspaces'),
   createWorkspace: (workspace: NewWorkspace) => postJson<Workspace>('/api/workspaces', workspace),
+  /** A new name and description for a workspace; names stay unique. */
+  updateWorkspace: (workspaceId: string, workspace: NewWorkspace) =>
+    putJson<Workspace>(`/api/workspaces/${encodeURIComponent(workspaceId)}`, workspace),
+  topics: () => request<Topic[]>('/api/topics'),
+  addTopic: (topic: Omit<Topic, 'id'>) => postJson<Topic>('/api/topics', topic),
+  changeTopic: (topicId: string, topic: Omit<Topic, 'id'>) => putJson<Topic>(`/api/topics/${encodeURIComponent(topicId)}`, topic),
+  removeTopic: (topicId: string) => request<void>(`/api/topics/${encodeURIComponent(topicId)}`, { method: 'DELETE' }),
+  modelSettings: () => request<ModelSettings>('/api/model-settings'),
+  /** Which listed model a preset runs on in this workspace. */
+  pickModel: (preset: ModelPolicy, model: string) =>
+    putJson<ModelSettings>(`/api/model-settings/presets/${preset}`, { model }),
   providers: () => request<Provider[]>('/api/providers'),
   sources: () => request<Source[]>('/api/sources'),
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),

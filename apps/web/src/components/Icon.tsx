@@ -31,6 +31,8 @@ const PATHS = {
   skill: 'M12 3l2.6 5.8 6.4.6-4.8 4.2 1.4 6.3L12 16.7 6.4 19.9l1.4-6.3L3 9.4l6.4-.6z',
   download: 'M12 4v12M7 11l5 5 5-5M4 20h16',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  settings: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1',
+  vendor: 'M12 3l2.6 5.6L20 11l-5.4 2.4L12 19l-2.6-5.6L4 11l5.4-2.4z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

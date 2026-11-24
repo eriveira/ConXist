@@ -78,6 +78,8 @@ export interface AgentSummary {
   publishedVersion: number;
   draftPublished: boolean;
   givesBack: OutputKind;
+  /** Its draft's model setting, so Settings can show which agents use each one. */
+  model: ModelPolicy;
   /** The skills its draft follows, so a skill can show who uses it. */
   skills: SkillPin[];
   updatedAt: string;
