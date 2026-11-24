@@ -12,13 +12,21 @@ public interface TopicRepository {
 
     Optional<Topic> find(UUID workspaceId, UUID topicId);
 
-    int count(UUID workspaceId);
+    /**
+     * Holds the workspace's topic list until the transaction ends, so two adds at once cannot both pass the limit.
+     * Returns how many topics the workspace has.
+     */
+    int lockAndCount(UUID workspaceId);
+
+    /** Adds a topic unless another topic of the workspace has the name (ignoring case), as when two saves race. */
+    boolean addIfNameFree(Topic topic);
 
     /**
-     * Saves a new topic or a topic's new text, unless another topic of the workspace has the name (ignoring case),
-     * which can happen when two saves race.
+     * Saves a topic's new text unless another topic of the workspace has the name.
+     *
+     * @throws com.conxist.platform.NotFound when the topic is no longer in its workspace
      */
-    boolean saveIfNameFree(Topic topic);
+    boolean updateIfNameFree(Topic topic);
 
     boolean delete(UUID workspaceId, UUID topicId);
 }

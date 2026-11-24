@@ -113,18 +113,30 @@ class ManageTopicsTest {
         }
 
         @Override
-        public int count(UUID workspaceId) {
+        public int lockAndCount(UUID workspaceId) {
             return findAll(workspaceId).size();
         }
 
         @Override
-        public boolean saveIfNameFree(Topic topic) {
-            if (findAll(topic.workspaceId()).stream().anyMatch(t -> !t.id().equals(topic.id())
-                    && t.name().equalsIgnoreCase(topic.name()))) {
+        public boolean addIfNameFree(Topic topic) {
+            return !nameTaken(topic) && topics.add(topic);
+        }
+
+        @Override
+        public boolean updateIfNameFree(Topic topic) {
+            if (find(topic.workspaceId(), topic.id()).isEmpty()) {
+                throw new NotFound("topic.not-found", "gone");
+            }
+            if (nameTaken(topic)) {
                 return false;
             }
-            topics.removeIf(t -> t.id().equals(topic.id()));
-            return topics.add(topic);
+            topics.replaceAll(t -> t.id().equals(topic.id()) ? topic : t);
+            return true;
+        }
+
+        private boolean nameTaken(Topic topic) {
+            return findAll(topic.workspaceId()).stream().anyMatch(t -> !t.id().equals(topic.id())
+                    && t.name().equalsIgnoreCase(topic.name()));
         }
 
         @Override

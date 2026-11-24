@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import type { Workspace } from '../../domain/workspaces';
 import { useT } from '../../i18n/i18n';
-import { useWorkspaceForm } from '../workspaces/useCreateWorkspace';
+import { useWorkspaceForm } from '../workspaces/useWorkspaceForm';
 import { WorkspaceFields } from '../workspaces/WorkspaceFields';
 import { SavedStatus, SettingsCard } from './SettingsParts';
 

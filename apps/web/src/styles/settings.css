@@ -61,7 +61,7 @@
 .topics-empty { padding: 20px; border: 1px dashed var(--cx-input-border); border-radius: var(--cx-radius-md); text-align: center; }
 .topics-empty h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
 .topics-empty p { margin: 0 auto; max-width: 52ch; color: var(--cx-fg-muted); font-size: 14px; }
-.settings-card > .save-status { min-height: 0; margin: 0 0 8px; }
+.settings-card > .save-status { display: flex; min-height: 0; margin: 0 0 8px; }
 .settings-card > .save-status:empty { margin: 0; }
 
 @media (max-width: 760px) {
@@ -69,6 +69,14 @@
   .settings-nav { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--page-gutter)); padding: 0 var(--page-gutter); }
   .settings-nav a { flex: none; }
   .settings-card { padding: 16px; }
-  .presets select { min-width: 180px; }
+  /* Each setting stacks: its name, the model, then who uses it, so the select is never off screen. */
+  .presets thead { display: none; }
+  .presets tr { display: grid; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--cx-border); }
+  .presets tr:last-child { border-bottom: 0; }
+  .presets th, .presets td { padding: 0; border: 0; min-width: 0; }
+  .presets select { min-width: 0; }
+  .preset-users::before { content: attr(data-label) " "; font-weight: 700; color: var(--cx-fg); }
   .settings-actions .btn { flex: 1; }
 }
+.settings-page .page-h h1:focus { outline: none; }
+.settings-card .panel h3 { margin: 0 0 6px; font-size: 18px; font-weight: 800; color: var(--cx-fg); }

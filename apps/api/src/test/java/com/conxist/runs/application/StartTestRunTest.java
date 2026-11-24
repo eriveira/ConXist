@@ -46,15 +46,15 @@ class StartTestRunTest {
 
     private final TestClock.Moving clock = TestClock.moving();
     private final ScriptedModel model = new ScriptedModel();
-    private final Map<String, String> picks = new HashMap<>();
-    private final ModelSettings models = new ModelSettings(PRESETS, new ModelSettingsRepository() {
+    private final Map<Preset, String> picks = new HashMap<>();
+    private final ModelSettings modelSettings = new ModelSettings(PRESETS, new ModelSettingsRepository() {
         @Override
-        public Map<String, String> picks(UUID workspaceId) {
+        public Map<Preset, String> picks(UUID workspaceId) {
             return Map.copyOf(picks);
         }
 
         @Override
-        public void pick(UUID workspaceId, String preset, String modelId, Instant at) {
+        public void pick(UUID workspaceId, Preset preset, String modelId, Instant at) {
             picks.put(preset, modelId);
         }
     }, model, FixedWorkspace.standard(), TestClock.fixed());
@@ -77,7 +77,7 @@ class StartTestRunTest {
     };
 
     private final StartTestRun run = new StartTestRun(id -> Optional.ofNullable(agents.get(id)), library,
-            new RunTools(id -> Optional.ofNullable(sources.get(id)), library), model, models,
+            new RunTools(id -> Optional.ofNullable(sources.get(id)), library), model, modelSettings,
             (answer, required) -> answer.startsWith("{") && required.stream().allMatch(answer::contains)
                     ? Optional.of(Map.of("raw", answer)) : Optional.empty(),
             FixedWorkspace.standard(), clock);
@@ -94,7 +94,7 @@ class StartTestRunTest {
     @Test
     void a_run_uses_the_model_the_workspace_picked_for_the_preset_with_the_preset_effort() {
         agent(List.of(), List.of(), 6, 10, 120);
-        models.pick("BALANCED", "claude-opus-5-5");
+        modelSettings.pick("BALANCED", "claude-opus-5-5");
         model.then(request -> answer("{\"requirements\":[]}"));
 
         TestRunResult result = run.run(AGENT_ID, SOURCE_ID, MEETING_ID);

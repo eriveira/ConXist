@@ -17,8 +17,7 @@ const en = {
   ...skillEn, ...runEn, ...deleteEn, ...settingsEn,
   'app.theme': 'Theme',
   'app.theme.system': 'System',
-  'app.theme.light': 'Light',
-  'app.theme.dark': 'Dark',
+  'app.theme.light': 'Light', 'app.theme.dark': 'Dark',
   'app.language': 'Language',
 
   'sources.title': 'Sources',
@@ -212,8 +211,7 @@ const es: Messages = {
   ...skillEs, ...runEs, ...deleteEs, ...settingsEs,
   'app.theme': 'Tema',
   'app.theme.system': 'Sistema',
-  'app.theme.light': 'Claro',
-  'app.theme.dark': 'Oscuro',
+  'app.theme.light': 'Claro', 'app.theme.dark': 'Oscuro',
   'app.language': 'Idioma',
 
   'sources.title': 'Fuentes',

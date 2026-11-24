@@ -44,16 +44,16 @@ class WorkspacesController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    WorkspaceView create(@Valid @RequestBody CreateRequest request) {
+    WorkspaceView create(@Valid @RequestBody WorkspaceRequest request) {
         return createWorkspace.create(request.name(), request.description());
     }
 
     @PutMapping("/{id}")
-    WorkspaceView update(@PathVariable UUID id, @Valid @RequestBody CreateRequest request) {
+    WorkspaceView update(@PathVariable UUID id, @Valid @RequestBody WorkspaceRequest request) {
         return updateWorkspace.update(id, request.name(), request.description());
     }
 
     /** A new workspace, or a workspace's new name and description. */
-    record CreateRequest(@Size(max = MAX_INPUT) String name, @Size(max = MAX_INPUT) String description) {
+    record WorkspaceRequest(@Size(max = MAX_INPUT) String name, @Size(max = MAX_INPUT) String description) {
     }
 }

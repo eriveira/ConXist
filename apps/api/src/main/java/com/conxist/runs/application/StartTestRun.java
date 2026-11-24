@@ -33,18 +33,18 @@ public final class StartTestRun {
     private final MeetingLibrary library;
     private final RunTools tools;
     private final ModelPort model;
-    private final ModelSettings models;
+    private final ModelSettings modelSettings;
     private final AnswerReader reader;
     private final CurrentWorkspace workspace;
     private final Clock clock;
 
     public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, ModelPort model,
-            ModelSettings models, AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
+            ModelSettings modelSettings, AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
         this.agents = agents;
         this.library = library;
         this.tools = tools;
         this.model = model;
-        this.models = models;
+        this.modelSettings = modelSettings;
         this.reader = reader;
         this.workspace = workspace;
         this.clock = clock;
@@ -96,7 +96,7 @@ public final class StartTestRun {
         Loop(AgentBrief agent, MeetingLibrary.Text meeting) {
             this.agent = agent;
             this.meeting = meeting;
-            this.choice = models.choiceFor(agent.model());
+            this.choice = modelSettings.choiceFor(Preset.valueOf(agent.model()));
             this.shape = OutputShape.of(agent.givesBack());
             this.scope = new RunTools.Scope(agent.tools(), agent.knowledgeSources(), meeting.sourceId(), meeting.id());
             this.offered = tools.specs(agent.tools());

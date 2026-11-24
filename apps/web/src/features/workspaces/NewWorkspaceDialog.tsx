@@ -2,7 +2,7 @@ import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import type { Workspace } from '../../domain/workspaces';
 import { useT } from '../../i18n/i18n';
-import { useCreateWorkspace } from './useCreateWorkspace';
+import { useCreateWorkspace } from './useWorkspaceForm';
 import { WorkspaceFields } from './WorkspaceFields';
 
 /** The New workspace pop-up, opened from the workspace switcher. */

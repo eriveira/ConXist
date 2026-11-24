@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.conxist.platform.NotFound;
 import com.conxist.workspaces.application.TopicRepository;
 import com.conxist.workspaces.domain.Topic;
 import org.springframework.dao.DuplicateKeyException;
@@ -29,7 +30,7 @@ class JdbcTopicRepository implements TopicRepository {
 
     @Override
     public List<Topic> findAll(UUID workspaceId) {
-        return jdbc.sql("select * from workspace_topics where workspace_id = :workspaceId order by lower(name), id")
+        return jdbc.sql("select id, workspace_id, name, description, created_at from workspace_topics where workspace_id = :workspaceId order by lower(name), id")
                 .param("workspaceId", workspaceId)
                 .query(TOPIC)
                 .list();
@@ -37,7 +38,7 @@ class JdbcTopicRepository implements TopicRepository {
 
     @Override
     public Optional<Topic> find(UUID workspaceId, UUID topicId) {
-        return jdbc.sql("select * from workspace_topics where workspace_id = :workspaceId and id = :id")
+        return jdbc.sql("select id, workspace_id, name, description, created_at from workspace_topics where workspace_id = :workspaceId and id = :id")
                 .param("workspaceId", workspaceId)
                 .param("id", topicId)
                 .query(TOPIC)
@@ -45,7 +46,11 @@ class JdbcTopicRepository implements TopicRepository {
     }
 
     @Override
-    public int count(UUID workspaceId) {
+    public int lockAndCount(UUID workspaceId) {
+        jdbc.sql("select id from workspaces where id = :workspaceId for update")
+                .param("workspaceId", workspaceId)
+                .query(UUID.class)
+                .optional();
         return jdbc.sql("select count(*) from workspace_topics where workspace_id = :workspaceId")
                 .param("workspaceId", workspaceId)
                 .query(Integer.class)
@@ -53,13 +58,11 @@ class JdbcTopicRepository implements TopicRepository {
     }
 
     @Override
-    public boolean saveIfNameFree(Topic topic) {
+    public boolean addIfNameFree(Topic topic) {
         try {
             return jdbc.sql("""
                     insert into workspace_topics (id, workspace_id, name, description, created_at)
                     values (:id, :workspaceId, :name, :description, :createdAt)
-                    on conflict (id) do update set name = excluded.name, description = excluded.description
-                    where workspace_topics.workspace_id = excluded.workspace_id
                     """)
                     .param("id", topic.id())
                     .param("workspaceId", topic.workspaceId())
@@ -70,6 +73,28 @@ class JdbcTopicRepository implements TopicRepository {
         } catch (DuplicateKeyException taken) {
             return false;
         }
+    }
+
+    @Override
+    public boolean updateIfNameFree(Topic topic) {
+        int updated;
+        try {
+            updated = jdbc.sql("""
+                    update workspace_topics set name = :name, description = :description
+                    where id = :id and workspace_id = :workspaceId
+                    """)
+                    .param("id", topic.id())
+                    .param("workspaceId", topic.workspaceId())
+                    .param("name", topic.name())
+                    .param("description", topic.description())
+                    .update();
+        } catch (DuplicateKeyException taken) {
+            return false;
+        }
+        if (updated == 0) {
+            throw new NotFound("topic.not-found", "This topic no longer exists.");
+        }
+        return true;
     }
 
     @Override

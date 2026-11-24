@@ -9,8 +9,6 @@ import java.util.Optional;
  */
 public record ModelPresets(ModelChoice fast, ModelChoice balanced, ModelChoice thorough, List<ModelOption> models) {
 
-    public static final List<String> NAMES = List.of("FAST", "BALANCED", "THOROUGH");
-
     public ModelPresets {
         models = List.copyOf(models);
         List<String> listed = models.stream().map(ModelOption::id).toList();
@@ -21,16 +19,16 @@ public record ModelPresets(ModelChoice fast, ModelChoice balanced, ModelChoice t
         }
     }
 
-    ModelChoice of(String preset) {
+    ModelChoice of(Preset preset) {
         return switch (preset) {
-            case "FAST" -> fast;
-            case "THOROUGH" -> thorough;
-            default -> balanced;
+            case FAST -> fast;
+            case BALANCED -> balanced;
+            case THOROUGH -> thorough;
         };
     }
 
     /** The preset with the model the workspace picked, when it is still listed; else the preset as set up. */
-    ModelChoice of(String preset, Optional<String> picked) {
+    ModelChoice of(Preset preset, Optional<String> picked) {
         ModelChoice base = of(preset);
         return picked.flatMap(this::option)
                 .map(model -> new ModelChoice(model.id(), base.effort(), model.fallbacks(), base.maxTokens()))

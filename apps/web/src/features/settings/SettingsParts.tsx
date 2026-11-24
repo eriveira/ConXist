@@ -28,7 +28,7 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="page-state" role="alert">
       <div className="panel">
-        <h2>{t('settings.error.title')}</h2>
+        <h3>{t('settings.error.title')}</h3>
         <p>{t('settings.error.body')}</p>
         <button type="button" className="btn primary" onClick={onRetry}>{t('settings.retry')}</button>
       </div>

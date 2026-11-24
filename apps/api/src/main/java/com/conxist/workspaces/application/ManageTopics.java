@@ -32,17 +32,20 @@ public final class ManageTopics {
         UUID workspaceId = workspace.id();
         Topic topic = Topic.create(UUID.randomUUID(), workspaceId, name, description, clock.instant());
         return unitOfWork.inTransaction(() -> {
-            if (topics.count(workspaceId) >= Topic.MAX_PER_WORKSPACE) {
+            if (topics.lockAndCount(workspaceId) >= Topic.MAX_PER_WORKSPACE) {
                 throw new RuleViolation("topic.too-many",
                         "A workspace keeps up to " + Topic.MAX_PER_WORKSPACE + " topics. Remove one first.");
             }
-            return saved(topic);
+            return nameFree(topics.addIfNameFree(topic), topic);
         });
     }
 
     public Topic change(UUID topicId, String name, String description) {
         UUID workspaceId = workspace.id();
-        return unitOfWork.inTransaction(() -> saved(existing(workspaceId, topicId).withText(name, description)));
+        return unitOfWork.inTransaction(() -> {
+            Topic topic = existing(workspaceId, topicId).withText(name, description);
+            return nameFree(topics.updateIfNameFree(topic), topic);
+        });
     }
 
     public void remove(UUID topicId) {
@@ -56,8 +59,8 @@ public final class ManageTopics {
         return topics.find(workspaceId, topicId).orElseThrow(ManageTopics::notFound);
     }
 
-    private Topic saved(Topic topic) {
-        if (!topics.saveIfNameFree(topic)) {
+    private static Topic nameFree(boolean saved, Topic topic) {
+        if (!saved) {
             throw new RuleViolation("topic.name-taken", "There is already a topic named \"" + topic.name() + "\".");
         }
         return topic;

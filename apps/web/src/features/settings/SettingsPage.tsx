@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { Workspace } from '../../domain/workspaces';
 import { useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
@@ -10,11 +11,15 @@ import { TopicsSection } from './TopicsSection';
 export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onSaved: (workspace: Workspace) => void }) {
   const t = useT();
   const section = useSettingsSection();
+  const title = useRef<HTMLHeadingElement>(null);
+
+  // Opened from the workspace menu, whose link goes away: focus lands on the page, not the document.
+  useEffect(() => { title.current?.focus(); }, []);
 
   return (
     <section className="page settings-page" aria-labelledby="settings-title">
       <div className="page-h">
-        <h1 id="settings-title">{t('settings.title')}</h1>
+        <h1 id="settings-title" ref={title} tabIndex={-1}>{t('settings.title')}</h1>
         <p>{t('settings.lead', { name: workspace.name })}</p>
       </div>
       <div className="settings-layout">

@@ -1,6 +1,7 @@
 package com.conxist.runs.application;
 
 import java.time.Clock;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,19 +33,18 @@ public final class ModelSettings {
     }
 
     public View view() {
-        Map<String, String> picked = picks.picks(workspace.id());
-        List<PresetView> rows = ModelPresets.NAMES.stream().map(name -> {
-            ModelChoice choice = presets.of(name, Optional.ofNullable(picked.get(name)));
-            return new PresetView(name, choice.id(), presets.of(name).id(), choice.effort());
+        Map<Preset, String> picked = picks.picks(workspace.id());
+        List<PresetView> rows = Arrays.stream(Preset.values()).map(preset -> {
+            ModelChoice choice = presets.of(preset, Optional.ofNullable(picked.get(preset)));
+            return new PresetView(preset, choice.id(), presets.of(preset).id(), choice.effort());
         }).toList();
         List<ModelView> models = presets.models().stream().map(m -> new ModelView(m.id(), m.label())).toList();
         return new View(List.of(new VendorView(ANTHROPIC, model.ready())), rows, models);
     }
 
-    public View pick(String preset, String modelId) {
-        if (!ModelPresets.NAMES.contains(preset)) {
-            throw new RuleViolation("model.unknown-preset", "Pick Fast, Balanced or Thorough.");
-        }
+    public View pick(String presetName, String modelId) {
+        Preset preset = Preset.named(presetName)
+                .orElseThrow(() -> new RuleViolation("model.unknown-preset", "Pick Fast, Balanced or Thorough."));
         if (presets.option(modelId).isEmpty()) {
             throw new RuleViolation("model.unknown-model", "Pick one of the models on the list.");
         }
@@ -53,7 +53,7 @@ public final class ModelSettings {
     }
 
     /** What an agent on this preset runs on in the current workspace. */
-    ModelChoice choiceFor(String preset) {
+    ModelChoice choiceFor(Preset preset) {
         return presets.of(preset, Optional.ofNullable(picks.picks(workspace.id()).get(preset)));
     }
 
@@ -64,7 +64,7 @@ public final class ModelSettings {
     }
 
     /** {@code defaultModel} is what the preset runs on when the workspace has not picked one. */
-    public record PresetView(String preset, String model, String defaultModel, ModelChoice.Effort effort) {
+    public record PresetView(Preset preset, String model, String defaultModel, ModelChoice.Effort effort) {
     }
 
     public record ModelView(String id, String label) {

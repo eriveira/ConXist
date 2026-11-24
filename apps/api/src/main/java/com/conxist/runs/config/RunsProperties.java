@@ -41,9 +41,10 @@ public record RunsProperties(
     }
 
     private static ModelChoice choice(Preset preset, List<ModelOption> options) {
-        boolean fallbacks = options.stream().filter(o -> o.id().equals(preset.model())).findFirst()
-                .map(ModelOption::fallbacks).orElse(false);
-        return new ModelChoice(preset.model(), preset.effort(), fallbacks, preset.maxTokens());
+        ModelOption model = options.stream().filter(o -> o.id().equals(preset.model())).findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "conxist.runs: a preset's model must be one of conxist.runs.models: " + preset.model()));
+        return new ModelChoice(model.id(), preset.effort(), model.fallbacks(), preset.maxTokens());
     }
 
     /** Never printed: the key stays out of logs and error pages. */

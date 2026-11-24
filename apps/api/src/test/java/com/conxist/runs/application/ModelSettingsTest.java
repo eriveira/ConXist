@@ -27,18 +27,18 @@ class ModelSettingsTest {
     private final Map<List<Object>, String> stored = new HashMap<>();
     private final ModelSettingsRepository repository = new ModelSettingsRepository() {
         @Override
-        public Map<String, String> picks(UUID workspaceId) {
-            Map<String, String> picks = new HashMap<>();
+        public Map<Preset, String> picks(UUID workspaceId) {
+            Map<Preset, String> picks = new HashMap<>();
             stored.forEach((key, model) -> {
                 if (key.get(0).equals(workspaceId)) {
-                    picks.put((String) key.get(1), model);
+                    picks.put((Preset) key.get(1), model);
                 }
             });
             return picks;
         }
 
         @Override
-        public void pick(UUID workspaceId, String preset, String modelId, Instant at) {
+        public void pick(UUID workspaceId, Preset preset, String modelId, Instant at) {
             stored.put(List.of(workspaceId, preset), modelId);
         }
     };
@@ -66,10 +66,10 @@ class ModelSettingsTest {
 
         assertThat(view.vendors()).containsExactly(new ModelSettings.VendorView("anthropic", true));
         assertThat(view.presets()).containsExactly(
-                new ModelSettings.PresetView("FAST", "claude-haiku-5-5", "claude-haiku-5-5", ModelChoice.Effort.LOW),
-                new ModelSettings.PresetView("BALANCED", "claude-sonnet-5-5", "claude-sonnet-5-5",
+                new ModelSettings.PresetView(Preset.FAST, "claude-haiku-5-5", "claude-haiku-5-5", ModelChoice.Effort.LOW),
+                new ModelSettings.PresetView(Preset.BALANCED, "claude-sonnet-5-5", "claude-sonnet-5-5",
                         ModelChoice.Effort.MEDIUM),
-                new ModelSettings.PresetView("THOROUGH", "claude-opus-5-5", "claude-opus-5-5",
+                new ModelSettings.PresetView(Preset.THOROUGH, "claude-opus-5-5", "claude-opus-5-5",
                         ModelChoice.Effort.HIGH));
         assertThat(view.models()).extracting(ModelSettings.ModelView::label)
                 .containsExactly("Claude Haiku 5.5", "Claude Sonnet 5.5", "Claude Opus 5.5");
@@ -80,17 +80,17 @@ class ModelSettingsTest {
         settings.pick("FAST", "claude-sonnet-5-5");
 
         assertThat(settings.view().presets().get(0).model()).isEqualTo("claude-sonnet-5-5");
-        assertThat(settings.choiceFor("FAST"))
+        assertThat(settings.choiceFor(Preset.FAST))
                 .isEqualTo(new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.LOW, true, 8_000));
         settings.pick("THOROUGH", "claude-haiku-5-5");
-        assertThat(settings.choiceFor("THOROUGH").fallbacks()).isFalse();
+        assertThat(settings.choiceFor(Preset.THOROUGH).fallbacks()).isFalse();
     }
 
     @Test
     void each_workspace_keeps_its_own_picks() {
         settings.pick("BALANCED", "claude-opus-5-5");
 
-        assertThat(settings(OTHER).choiceFor("BALANCED").id()).isEqualTo("claude-sonnet-5-5");
+        assertThat(settings(OTHER).choiceFor(Preset.BALANCED).id()).isEqualTo("claude-sonnet-5-5");
     }
 
     @Test
@@ -105,9 +105,9 @@ class ModelSettingsTest {
 
     @Test
     void a_pick_no_longer_listed_falls_back_to_the_preset_default() {
-        stored.put(List.of(FixedWorkspace.WORKSPACE_ID, "FAST"), "claude-retired-1");
+        stored.put(List.of(FixedWorkspace.WORKSPACE_ID, Preset.FAST), "claude-retired-1");
 
-        assertThat(settings.choiceFor("FAST").id()).isEqualTo("claude-haiku-5-5");
+        assertThat(settings.choiceFor(Preset.FAST).id()).isEqualTo("claude-haiku-5-5");
         assertThat(settings.view().presets().get(0).model()).isEqualTo("claude-haiku-5-5");
     }
 

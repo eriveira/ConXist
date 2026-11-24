@@ -55,15 +55,20 @@ function ModelsCard({ settings, agents, onSaved }: Loaded & { onSaved: (settings
   async function save() {
     setBusy(true);
     setError(null);
+    // One request per changed setting: keep what the API saved even when a later one fails.
+    let latest = settings;
+    const left = { ...picks };
     try {
-      let latest = settings;
-      for (const preset of changed) latest = await api.pickModel(preset.preset, picks[preset.preset]);
-      setPicks({});
+      for (const preset of changed) {
+        latest = await api.pickModel(preset.preset, picks[preset.preset]);
+        delete left[preset.preset];
+      }
       setSaved(true);
-      onSaved(latest);
     } catch (problem) {
       setError(problemMessage(problem, t));
     } finally {
+      setPicks(left);
+      onSaved(latest);
       setBusy(false);
     }
   }
@@ -124,7 +129,7 @@ function ModelsCard({ settings, agents, onSaved }: Loaded & { onSaved: (settings
                       ))}
                     </select>
                   </td>
-                  <td className="preset-users">{names.length ? names.join(', ') : <span className="muted">{t('settings.usedBy.none')}</span>}</td>
+                  <td className="preset-users" data-label={t('settings.usedBy.label')}>{names.length ? names.join(', ') : <span className="muted">{t('settings.usedBy.none')}</span>}</td>
                 </tr>
               );
             })}
