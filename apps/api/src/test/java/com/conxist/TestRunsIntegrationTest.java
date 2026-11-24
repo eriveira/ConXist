@@ -3,6 +3,7 @@ package com.conxist;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +45,43 @@ class TestRunsIntegrationTest {
 
     @Autowired
     FakeClaudeServer claude;
+
+    @Test
+    void a_run_uses_the_model_the_workspace_picked_in_settings() throws Exception {
+        String workspace = workspace("Picks");
+        String source = source(workspace, "Specs");
+        String meeting = upload(workspace, source, "# Kickoff\nAna: we need guest checkout.");
+        String agent = agent(workspace, "{\"template\":\"REQUIREMENTS_ANALYST\",\"name\":\"Analyst\",\"language\":\"EN\"}");
+
+        mvc.perform(get("/api/model-settings").header(HEADER, workspace))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vendors[0].id").value("anthropic"))
+                .andExpect(jsonPath("$.vendors[0].connected").value(true))
+                .andExpect(jsonPath("$.presets[2].preset").value("THOROUGH"))
+                .andExpect(jsonPath("$.presets[2].model").value("claude-opus-5-5"))
+                .andExpect(jsonPath("$.models[0].label").value("Claude Haiku 5.5"))
+                .andExpect(jsonPath("$.anthropicApiKey").doesNotExist());
+        mvc.perform(put("/api/model-settings/presets/THOROUGH").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"model\":\"claude-sonnet-5-5\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.presets[2].model").value("claude-sonnet-5-5"))
+                .andExpect(jsonPath("$.presets[2].defaultModel").value("claude-opus-5-5"));
+        mvc.perform(put("/api/model-settings/presets/THOROUGH").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"model\":\"gpt-9\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("model.unknown-model"));
+        mvc.perform(get("/api/model-settings").header(HEADER, workspace("Untouched")))
+                .andExpect(jsonPath("$.presets[2].model").value("claude-opus-5-5"));
+
+        mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.model").value("claude-sonnet-5-5"))
+                .andExpect(jsonPath("$.preset").value("THOROUGH"));
+        org.assertj.core.api.Assertions.assertThat(claude.requests().getLast().path("model").asString())
+                .isEqualTo("claude-sonnet-5-5");
+    }
 
     @Test
     void an_agents_draft_runs_on_a_meeting_and_answers_in_its_shape() throws Exception {

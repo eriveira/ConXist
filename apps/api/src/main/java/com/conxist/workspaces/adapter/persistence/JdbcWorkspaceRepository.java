@@ -2,15 +2,25 @@ package com.conxist.workspaces.adapter.persistence;
 
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import com.conxist.workspaces.application.WorkspaceRepository;
 import com.conxist.workspaces.application.WorkspaceView;
 import com.conxist.workspaces.domain.Workspace;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
 class JdbcWorkspaceRepository implements WorkspaceRepository {
+
+    private static final RowMapper<WorkspaceView> VIEW = (row, rowNumber) -> new WorkspaceView(
+            row.getObject("id", UUID.class),
+            row.getString("name"),
+            row.getString("description"),
+            row.getInt("source_count"),
+            row.getTimestamp("created_at").toInstant());
 
     private final JdbcClient jdbc;
 
@@ -33,18 +43,38 @@ class JdbcWorkspaceRepository implements WorkspaceRepository {
     }
 
     @Override
+    public boolean updateIfNameFree(Workspace workspace) {
+        try {
+            return jdbc.sql("update workspaces set name = :name, description = :description where id = :id")
+                    .param("id", workspace.id())
+                    .param("name", workspace.name())
+                    .param("description", workspace.description())
+                    .update() == 1;
+        } catch (DuplicateKeyException taken) {
+            return false;
+        }
+    }
+
+    @Override
+    public Optional<WorkspaceView> find(UUID workspaceId) {
+        return jdbc.sql("""
+                select w.id, w.name, w.description, w.created_at, count(s.source_id) as source_count
+                from workspaces w left join workspace_sources s on s.workspace_id = w.id
+                where w.id = :id group by w.id
+                """)
+                .param("id", workspaceId)
+                .query(VIEW)
+                .optional();
+    }
+
+    @Override
     public List<WorkspaceView> findAll() {
         return jdbc.sql("""
                 select w.id, w.name, w.description, w.created_at, count(s.source_id) as source_count
                 from workspaces w left join workspace_sources s on s.workspace_id = w.id
                 group by w.id order by w.created_at, w.id
                 """)
-                .query((row, rowNumber) -> new WorkspaceView(
-                        row.getObject("id", UUID.class),
-                        row.getString("name"),
-                        row.getString("description"),
-                        row.getInt("source_count"),
-                        row.getTimestamp("created_at").toInstant()))
+                .query(VIEW)
                 .list();
     }
 

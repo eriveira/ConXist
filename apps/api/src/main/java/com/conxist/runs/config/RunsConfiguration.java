@@ -8,7 +8,8 @@ import com.conxist.runs.adapter.model.ClaudeModel;
 import com.conxist.runs.adapter.model.JsonAnswerReader;
 import com.conxist.runs.application.AnswerReader;
 import com.conxist.runs.application.ModelPort;
-import com.conxist.runs.application.ModelPresets;
+import com.conxist.runs.application.ModelSettings;
+import com.conxist.runs.application.ModelSettingsRepository;
 import com.conxist.runs.application.RunTools;
 import com.conxist.runs.application.StartTestRun;
 import com.conxist.sources.SourceCatalog;
@@ -16,7 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Wires test runs: the read tools, Claude as the model, and the use case. */
+/** Wires test runs and model settings: the read tools, Claude as the model, and the use cases. */
 @Configuration(proxyBeanMethods = false)
 class RunsConfiguration {
 
@@ -37,10 +38,14 @@ class RunsConfiguration {
     }
 
     @Bean
+    ModelSettings modelSettings(RunsProperties properties, ModelSettingsRepository picks, ModelPort model,
+            CurrentWorkspace workspace, Clock clock) {
+        return new ModelSettings(properties.presets(), picks, model, workspace, clock);
+    }
+
+    @Bean
     StartTestRun startTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, ModelPort model,
-            RunsProperties properties, AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
-        ModelPresets presets = new ModelPresets(properties.fast().choice(), properties.balanced().choice(),
-                properties.thorough().choice());
-        return new StartTestRun(agents, library, tools, model, presets, reader, workspace, clock);
+            ModelSettings models, AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
+        return new StartTestRun(agents, library, tools, model, models, reader, workspace, clock);
     }
 }

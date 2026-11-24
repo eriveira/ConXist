@@ -39,10 +39,25 @@ class StartTestRunTest {
     private static final ModelChoice BALANCED = new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.MEDIUM, true, 16_000);
     private static final ModelPresets PRESETS = new ModelPresets(
             new ModelChoice("claude-haiku-5-5", ModelChoice.Effort.LOW, false, 16_000), BALANCED,
-            new ModelChoice("claude-opus-5-5", ModelChoice.Effort.HIGH, true, 16_000));
+            new ModelChoice("claude-opus-5-5", ModelChoice.Effort.HIGH, true, 16_000),
+            List.of(new ModelOption("claude-haiku-5-5", "Claude Haiku 5.5", false),
+                    new ModelOption("claude-sonnet-5-5", "Claude Sonnet 5.5", true),
+                    new ModelOption("claude-opus-5-5", "Claude Opus 5.5", true)));
 
     private final TestClock.Moving clock = TestClock.moving();
     private final ScriptedModel model = new ScriptedModel();
+    private final Map<String, String> picks = new HashMap<>();
+    private final ModelSettings models = new ModelSettings(PRESETS, new ModelSettingsRepository() {
+        @Override
+        public Map<String, String> picks(UUID workspaceId) {
+            return Map.copyOf(picks);
+        }
+
+        @Override
+        public void pick(UUID workspaceId, String preset, String modelId, Instant at) {
+            picks.put(preset, modelId);
+        }
+    }, model, FixedWorkspace.standard(), TestClock.fixed());
     private final Map<UUID, AgentBrief> agents = new HashMap<>();
     private final Map<UUID, SourceSummary> sources = new HashMap<>();
     private final Map<UUID, List<MeetingLibrary.Text>> meetings = new HashMap<>();
@@ -62,7 +77,7 @@ class StartTestRunTest {
     };
 
     private final StartTestRun run = new StartTestRun(id -> Optional.ofNullable(agents.get(id)), library,
-            new RunTools(id -> Optional.ofNullable(sources.get(id)), library), model, PRESETS,
+            new RunTools(id -> Optional.ofNullable(sources.get(id)), library), model, models,
             (answer, required) -> answer.startsWith("{") && required.stream().allMatch(answer::contains)
                     ? Optional.of(Map.of("raw", answer)) : Optional.empty(),
             FixedWorkspace.standard(), clock);
@@ -74,6 +89,19 @@ class StartTestRunTest {
                 DocumentOrigin.RECORDING, "Ana: we need guest checkout.")));
         meetings.put(OTHER_SOURCE_ID, List.of(new MeetingLibrary.Text(OTHER_MEETING_ID, OTHER_SOURCE_ID, "Pricing",
                 DocumentOrigin.RECORDING, "Secret pricing talk.")));
+    }
+
+    @Test
+    void a_run_uses_the_model_the_workspace_picked_for_the_preset_with_the_preset_effort() {
+        agent(List.of(), List.of(), 6, 10, 120);
+        models.pick("BALANCED", "claude-opus-5-5");
+        model.then(request -> answer("{\"requirements\":[]}"));
+
+        TestRunResult result = run.run(AGENT_ID, SOURCE_ID, MEETING_ID);
+
+        assertThat(result.model()).isEqualTo("claude-opus-5-5");
+        assertThat(model.requests.get(0).model())
+                .isEqualTo(new ModelChoice("claude-opus-5-5", ModelChoice.Effort.MEDIUM, true, 16_000));
     }
 
     @Test
