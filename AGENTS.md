@@ -38,10 +38,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
   is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`, `runs`) with `domain`,
   `application`, `adapter` and `config` inside. Modules talk through their root
   package (API) and events. See `docs/adr/0002-stack.md` (accepted).
-- `apps/web/`: the web app (the Sources, Agents and Skills pages and their dialogs). `domain` and `api` stay
+- `apps/web/`: the web app (the Sources, Agents, Skills and Settings pages and their dialogs). `domain` and `api` stay
   free of React; screens live in `features`.
 
-## Current state (2026-11-21)
+## Current state (2026-11-24)
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
@@ -72,6 +72,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
   answer, its shape check and each step. Nothing of a run is kept. Local only until sign-in (owner, 2026-11-21): the
   API reads the owner's key from `CONXIST_ANTHROPIC_API_KEY`; without it the panel says how to add one.
   `mvn spring-boot:test-run` also runs a fake Claude, so the panel works without a key.
+- Workspace Settings (ADR 0014, owner 2026-11-24): a Settings button in the workspace menu opens `#/settings` with
+  General (rename, description), Connectors (which listed model each preset runs on in this workspace, with the agents
+  using it; more vendors, storage, zero retention and a monthly limit are coming soon) and Topics (up to 50 per
+  workspace, for the topic classifier). The models a workspace may pick are listed in `conxist.runs.models`.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 
