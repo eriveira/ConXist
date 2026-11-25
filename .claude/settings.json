@@ -1,4 +1,16 @@
 {
+  "extraKnownMarketplaces": {
+    "wdteams": {
+      "source": {
+        "source": "github",
+        "repo": "eriveira/engineering-standards"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "engineering-standards@wdteams": true,
+    "superpowers@claude-plugins-official": false
+  },
   "hooks": {
     "PostToolUse": [
       {

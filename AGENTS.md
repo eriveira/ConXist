@@ -14,7 +14,10 @@ standards and re-sync (see `docs/standards/VERSION`).
 3. `docs/standards/TOOL_CALLING_STANDARDS.md`: tools and MCP.
 4. `docs/adr/`: decisions already made, and those still proposed.
 
-For any change, follow the `build-flow` skill (`.claude/skills/build-flow/`).
+For any change, follow the `build-flow` skill. It comes from the
+`engineering-standards` plugin (repo `eriveira/engineering-standards`,
+`skills/build-flow/SKILL.md`), which `.claude/settings.json` turns on; agents
+without Claude Code plugins read that file directly (ADR 0016).
 
 ## What ConXist is
 
@@ -31,7 +34,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   `brand/VERSION`).
 - `docs/standards/`: the shared standards, copied.
 - `docs/adr/`: decision records.
-- `.claude/`: the build-flow skill, reviewer agents and UI hook, copied from the
+- `.claude/`: the reviewer agents (the CI reviewer reads them) and UI hook, copied from the
   shared standards.
 
 - `apps/api/`: the API. Spring Boot with Spring Modulith; each top-level package
