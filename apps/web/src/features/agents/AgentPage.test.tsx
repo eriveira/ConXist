@@ -244,6 +244,18 @@ describe('AgentPage', () => {
     expect(sent.draft.tools).toEqual(['LIST_MEETINGS', 'GET_TRANSCRIPT']);
   });
 
+  it('says there is nothing to add yet when the workspace has no published skill', async () => {
+    api(AGENT, { 'GET /api/skills': () => ({ body: [] }) });
+    render(<AgentPage agentId={ID} />);
+    const skills = await screen.findByRole('region', { name: /Skills/ });
+
+    await userEvent.click(await within(skills).findByRole('button', { name: 'Add' }));
+
+    expect(within(skills).getByText('No published skills yet. Write one and publish it to add it here.')).toBeInTheDocument();
+    expect(within(skills).queryByText('Every published skill is added.')).not.toBeInTheDocument();
+    expect(within(skills).getByRole('link', { name: /New skill/ })).toHaveAttribute('href', '#/skills/new');
+  });
+
   it('never turns on a tool that changes something when a skill is added', async () => {
     api(AGENT, { 'GET /api/agents/tools': () => ({ body: TOOLS.map((tool) => ({ ...tool, readOnly: false })) }) });
     render(<AgentPage agentId={ID} />);

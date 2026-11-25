@@ -26,8 +26,9 @@ export function AgentSkills({ draft, pinned, skills, tools, onChange }: AgentSki
   const [notice, setNotice] = useState<string | null>(null);
   const rows = skillRows(draft.skills, pinned, skills);
   const toolName = (id: string) => toolLabel(t, id);
-  const addable = skills.filter((skill) => skill.status === 'ACTIVE' && skill.publishedVersion > 0
-    && !draft.skills.some((pin) => pin.skillId === skill.id));
+  const published = skills.filter((skill) => skill.status === 'ACTIVE' && skill.publishedVersion > 0);
+  const anyPublished = published.length > 0;
+  const addable = published.filter((skill) => !draft.skills.some((pin) => pin.skillId === skill.id));
   const full = draft.skills.length >= MAX_SKILLS;
 
   function add(skill: SkillSummary) {
@@ -127,7 +128,9 @@ export function AgentSkills({ draft, pinned, skills, tools, onChange }: AgentSki
         {popover.open && (
           <div className="menu skill-menu" role="group" aria-label={t('agent.skills.menu')} data-popover>
             <div className="menu-h">{t('agent.skills.menu')}</div>
-            {addable.length === 0 && <p className="muted menu-empty">{t('agent.skills.allAdded')}</p>}
+            {addable.length === 0 && (
+              <p className="muted menu-empty">{t(anyPublished ? 'agent.skills.allAdded' : 'agent.skills.nonePublished')}</p>
+            )}
             {addable.map((skill) => (
               <button key={skill.id} type="button" className="mitem" onClick={() => add(skill)}>
                 <span className="mtext">

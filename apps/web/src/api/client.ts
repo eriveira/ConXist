@@ -25,17 +25,9 @@ export function setRequestWorkspace(workspaceId: string | null): void {
   currentWorkspace = workspaceId;
 }
 
-/** The person's language, sent as Accept-Language so the API can answer in it. */
-let currentLanguage: string | null = null;
-
-export function setRequestLanguage(language: string | null): void {
-  currentLanguage = language;
-}
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (currentWorkspace) headers.set(WORKSPACE_HEADER, currentWorkspace);
-  if (currentLanguage) headers.set('Accept-Language', currentLanguage);
   const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     const problem = await problemOf(response);

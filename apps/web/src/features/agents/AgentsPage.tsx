@@ -9,7 +9,7 @@ import { NewAgentDialog } from './NewAgentDialog';
 
 type ListState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; agents: AgentSummary[] };
 
-/** The workspace's agents, each opening its page, and New to start one from a template. */
+/** The workspace's agents, each opening its page, and New to name an empty agent. */
 export function AgentsPage() {
   const t = useT();
   const notice = useArrivalNotice();

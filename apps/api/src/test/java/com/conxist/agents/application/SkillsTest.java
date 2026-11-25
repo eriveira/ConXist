@@ -73,7 +73,7 @@ class SkillsTest {
     }
 
     @Test
-    void names_are_unique_and_never_those_of_a_built_in_skill() {
+    void names_are_unique_in_a_workspace_ignoring_case() {
         add.create("Acme style");
 
         assertCode(() -> add.create("ACME STYLE"), "skill.name-taken");

@@ -25,8 +25,11 @@ wrote or imported.
 - Without templates there are no tiers. `conxist.runs.fast`, `balanced` and `thorough` become one setting,
   `conxist.runs.new-agents` (model and effort, Sonnet at medium), where a workspace's new agents start until it picks
   its own default in Settings (ADR 0014).
+- The app stops sending `Accept-Language`: only built-in skills and template briefs were written by ConXist in the
+  person's language, so the API no longer reads it. The app's own text is still English or Spanish.
 - No migration. Nothing stored names a template, and skills marked built-in were never stored. An agent draft that
-  pinned a built-in skill would now show that skill as missing; no such agent exists outside test data.
+  pinned a built-in skill would now show that skill as missing; no such agent exists outside test data. Comments in
+  V12 and V15 still mention built-in skills and the balanced setting; they stay as written so Flyway checksums hold.
 
 ## Consequences
 

@@ -81,7 +81,7 @@ class LlmProvidersTest {
     }
 
     @Test
-    void a_saved_default_that_can_no_longer_run_falls_back_to_the_balanced_tier() {
+    void a_saved_default_that_can_no_longer_run_falls_back_to_where_the_settings_start_new_agents() {
         defaults.saved.put(FixedWorkspace.standard().id(),
                 new ModelStart("anthropic", "claude-retired", ModelChoice.Effort.LOW));
 

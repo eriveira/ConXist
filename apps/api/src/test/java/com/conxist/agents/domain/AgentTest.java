@@ -125,6 +125,19 @@ class AgentTest {
     }
 
     @Test
+    void an_empty_draft_has_only_its_name_and_model_and_needs_instructions() {
+        AgentDefinition empty = AgentDefinition.empty(" Mine ", MODEL);
+
+        assertThat(empty.name()).isEqualTo("Mine");
+        assertThat(empty.instructions()).isEmpty();
+        assertThat(empty.tools()).isEmpty();
+        assertThat(empty.model()).isEqualTo(MODEL);
+        assertThat(empty.accepts()).containsExactly(InputKind.TRANSCRIPT);
+        assertThat(empty.givesBack()).isEqualTo(OutputKind.FREE_TEXT);
+        assertThat(empty.problems()).containsExactly("instructions-required");
+    }
+
+    @Test
     void every_tool_only_reads_until_the_approval_runtime_exists() {
         // A tool that changes something needs a person's approval when it runs (TOOL_CALLING_STANDARDS.md §3); that
         // runtime does not exist yet, so adding one must fail here first.
