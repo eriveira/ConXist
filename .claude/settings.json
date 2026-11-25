@@ -5,10 +5,17 @@
         "source": "github",
         "repo": "eriveira/engineering-standards"
       }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
     }
   },
   "enabledPlugins": {
     "engineering-standards@wdteams": true,
+    "ponytail@ponytail": true,
     "superpowers@claude-plugins-official": false
   },
   "hooks": {
