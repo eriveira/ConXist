@@ -4,7 +4,7 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
-import type { LlmProviders, Topic } from '../domain/settings';
+import type { LlmProviders, OfferedModels, Topic } from '../domain/settings';
 import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
 import type { TestRunResult, TestRunStatus } from '../domain/testRuns';
@@ -111,6 +111,13 @@ export const api = {
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
   /** Where this workspace's new blank agents start; agents already made keep their own pick. */
   setDefaultModel: (pick: AgentModel) => putJson<LlmProviders>('/api/llm-providers/default', pick),
+  /** Every model the provider offers; `refresh` asks the provider now instead of using the list the API kept. */
+  offeredModels: (provider: string, refresh = false) =>
+    request<OfferedModels>(`/api/llm-providers/${encodeURIComponent(provider)}/models${refresh ? '?refresh=true' : ''}`),
+  /** Ticks or unticks a model for this workspace. */
+  allowModel: (provider: string, model: string, allowed: boolean) =>
+    putJson<OfferedModels>(`/api/llm-providers/${encodeURIComponent(provider)}/models/${encodeURIComponent(model)}`,
+      { allowed }),
   providers: () => request<Provider[]>('/api/providers'),
   sources: () => request<Source[]>('/api/sources'),
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),

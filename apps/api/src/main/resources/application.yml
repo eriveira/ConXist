@@ -56,7 +56,8 @@ conxist:
     anthropic-api-key: ${CONXIST_ANTHROPIC_API_KEY:}
     # Blank for Anthropic's own API.
     anthropic-base-url: ${CONXIST_ANTHROPIC_BASE_URL:}
-    # The models agents may run on (ADR 0014). An agent keeps its own provider, model and effort.
+    # The models a workspace allows until it ticks its own in Settings, and how to call them (ADR 0014). Settings lists
+    # every model the provider offers; an agent keeps its own provider, model and effort.
     models:
       - provider: anthropic
         id: claude-haiku-5-5
@@ -78,6 +79,13 @@ conxist:
     new-agents:
       model: claude-sonnet-5-5
       effort: MEDIUM
+    # The answer length of a model the provider offers that is not listed above (no fallbacks for it).
+    default-max-tokens: 16000
+    # How long the provider's model list is kept before Settings asks again, how old it must be before Refresh asks
+    # again, and how long asking may take (all pages together).
+    model-list-kept-for: 1h
+    model-list-min-refresh: 30s
+    model-list-timeout: 10s
   secrets:
     # 32 random bytes, base64: openssl rand -base64 32. Required; there is no default on purpose.
     encryption-key: ${CONXIST_SECRETS_KEY:}

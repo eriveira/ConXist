@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
+import com.conxist.runs.application.ProviderModel;
 import com.conxist.runs.domain.OutputShape;
 import com.conxist.testing.FakeClaudeServer;
 import org.junit.jupiter.api.AfterEach;
@@ -93,6 +94,19 @@ class ClaudeModelTest {
 
         assertThat(new ClaudeModel("", null).ready()).isFalse();
         assertThat(claude.ready()).isTrue();
+    }
+
+    @Test
+    void the_models_come_back_as_anthropic_lists_them_and_a_wrong_key_is_told_apart() {
+        assertThat(claude.models(Duration.ofSeconds(10))).extracting(ProviderModel::id, ProviderModel::label)
+                .startsWith(org.assertj.core.groups.Tuple.tuple("claude-fable-5-2", "Claude Fable 5.2"),
+                        org.assertj.core.groups.Tuple.tuple("claude-opus-5-5", "Claude Opus 5.5"))
+                .hasSize(FakeClaudeServer.MODELS.size());
+
+        ClaudeModel wrongKey = new ClaudeModel("wrong", server.baseUrl().toString());
+        assertThatThrownBy(() -> wrongKey.models(Duration.ofSeconds(10)))
+                .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
+                        assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.KEY_REJECTED));
     }
 
     @Test

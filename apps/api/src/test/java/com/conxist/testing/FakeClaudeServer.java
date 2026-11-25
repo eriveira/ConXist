@@ -36,6 +36,7 @@ public final class FakeClaudeServer implements AutoCloseable {
     public FakeClaudeServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/messages", this::messages);
+        server.createContext("/v1/models", this::models);
         server.start();
     }
 
@@ -60,6 +61,30 @@ public final class FakeClaudeServer implements AutoCloseable {
     /** From now on every answer is a refusal, as when a model declines. */
     public void decline() {
         declineWith = "refusal";
+    }
+
+    /** The models the fake offers, newest first, as Anthropic's Models API lists them. */
+    public static final List<Map<String, String>> MODELS = List.of(
+            Map.of("id", "claude-fable-5-2", "display_name", "Claude Fable 5.2"),
+            Map.of("id", "claude-opus-5-5", "display_name", "Claude Opus 5.5"),
+            Map.of("id", "claude-sonnet-5-5", "display_name", "Claude Sonnet 5.5"),
+            Map.of("id", "claude-haiku-5-5", "display_name", "Claude Haiku 5.5"),
+            Map.of("id", "claude-opus-5", "display_name", "Claude Opus 5"),
+            Map.of("id", "claude-haiku-4-5", "display_name", "Claude Haiku 4.5"));
+
+    private void models(HttpExchange exchange) throws IOException {
+        String key = exchange.getRequestHeaders().getFirst("x-api-key");
+        String bearer = exchange.getRequestHeaders().getFirst("Authorization");
+        if (!KEY.equals(key) && !("Bearer " + KEY).equals(bearer)) {
+            send(exchange, 401, Map.of("type", "error",
+                    "error", Map.of("type", "authentication_error", "message", "invalid x-api-key")));
+            return;
+        }
+        List<Map<String, Object>> data = MODELS.stream().map(model -> Map.<String, Object>of("type", "model",
+                "id", model.get("id"), "display_name", model.get("display_name"),
+                "created_at", "2026-11-01T00:00:00Z")).toList();
+        send(exchange, 200, Map.of("data", data, "has_more", false,
+                "first_id", MODELS.getFirst().get("id"), "last_id", MODELS.getLast().get("id")));
     }
 
     private void messages(HttpExchange exchange) throws IOException {

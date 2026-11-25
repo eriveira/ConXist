@@ -1,5 +1,6 @@
 package com.conxist.runs.config;
 
+import java.time.Duration;
 import java.util.List;
 import com.conxist.runs.application.ModelCatalog;
 import com.conxist.runs.application.ModelChoice;
@@ -14,8 +15,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * The models agents may run on, where a new agent starts, and the key to call them (ADR 0012,
- * ADR 0014). Model ids are settings, not code (TOOL_CALLING_STANDARDS.md §6). A blank key is allowed: the API starts,
+ * The models a workspace allows until it ticks its own, how to call them, where a new agent starts, how long a
+ * provider's model list is kept, and the key to call them (ADR 0012, ADR 0014). Model ids are settings, not code
+ * (TOOL_CALLING_STANDARDS.md §6). A blank key is allowed: the API starts,
  * and the provider shows as not connected.
  */
 @Validated
@@ -24,7 +26,11 @@ public record RunsProperties(
         String anthropicApiKey,
         String anthropicBaseUrl,
         @NotEmpty List<@Valid Model> models,
-        @NotNull @Valid Start newAgents) {
+        @NotNull @Valid Start newAgents,
+        @Positive long defaultMaxTokens,
+        @NotNull Duration modelListKeptFor,
+        @NotNull Duration modelListMinRefresh,
+        @NotNull Duration modelListTimeout) {
 
     public record Model(@NotBlank String provider, @NotBlank String id, @NotBlank String label, boolean fallbacks,
             @Positive long maxTokens) {
@@ -41,12 +47,14 @@ public record RunsProperties(
         ModelOption model = options.stream().filter(o -> o.id().equals(newAgents.model())).findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "conxist.runs.new-agents: the model must be one of conxist.runs.models: " + newAgents.model()));
-        return new ModelCatalog(options, new ModelStart(model.provider(), model.id(), newAgents.effort()));
+        return new ModelCatalog(options, new ModelStart(model.provider(), model.id(), newAgents.effort()),
+                defaultMaxTokens);
     }
 
     /** Never printed: the key stays out of logs and error pages. */
     @Override
     public String toString() {
-        return "RunsProperties[models=" + models + ", newAgents=" + newAgents + "]";
+        return "RunsProperties[models=" + models + ", newAgents=" + newAgents + ", defaultMaxTokens="
+                + defaultMaxTokens + "]";
     }
 }

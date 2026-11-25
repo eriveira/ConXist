@@ -33,13 +33,6 @@ export function providerLabel(t: Translate, id: string): string {
   return label === key ? id : label;
 }
 
-/** What a model is good for, or nothing when this version of the app has no words for it. */
-export function modelGoodFor(t: Translate, id: string): string {
-  const key = `settings.model.goodFor.${id}` as MessageKey;
-  const text = t(key);
-  return text === key ? '' : text;
-}
-
 /** What a tool does, or nothing when this version of the app has no words for it yet. */
 export function toolDescription(t: Translate, id: string): string {
   const key = `agent.tool.${id}.desc` as MessageKey;
