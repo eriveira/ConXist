@@ -5,7 +5,8 @@ import java.util.UUID;
 
 /**
  * An agent as a run reads it: its job, the skills it follows with their text at the pinned version, and its limits.
- * Choices are the names of the agent's own settings ({@code model} is FAST, BALANCED or THOROUGH; {@code style} PRECISE
+ * Choices are the names of the agent's own settings ({@code provider} and {@code model} as the API's settings list
+ * them, {@code effort} LOW, MEDIUM or HIGH, or all three null when no model is picked; {@code style} PRECISE
  * or CREATIVE; {@code givesBack} an output kind such as REQUIREMENTS), so a reader does not depend on this module's
  * inner types.
  *
@@ -21,7 +22,9 @@ public record AgentBrief(
         String instructions,
         List<UUID> knowledgeSources,
         List<String> tools,
+        String provider,
         String model,
+        String effort,
         String style,
         String givesBack,
         int maxSteps,

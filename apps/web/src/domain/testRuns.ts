@@ -16,8 +16,9 @@ export interface TestRunStep {
 export interface TestRunResult {
   agentId: string;
   outcome: RunOutcome;
-  preset: string;
   model: string;
+  /** LOW, MEDIUM or HIGH: how hard the model was asked to think. */
+  effort: string;
   answer: string | null;
   /** The answer read as JSON when the agent gives back a shape and the answer has it. */
   structured: unknown;

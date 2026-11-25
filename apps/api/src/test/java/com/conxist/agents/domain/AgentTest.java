@@ -12,11 +12,13 @@ import org.junit.jupiter.api.Test;
 
 class AgentTest {
 
+    private static final AgentModel MODEL = new AgentModel("anthropic", "claude-sonnet-5-5", AgentModel.Effort.MEDIUM);
+
     private static final Instant NOW = Instant.parse("2026-11-20T12:00:00Z");
     private static final Instant LATER = NOW.plus(Duration.ofMinutes(5));
 
     private final Agent agent = Agent.create(UUID.randomUUID(), UUID.randomUUID(),
-            AgentTemplate.MEETING_SUMMARIZER.draft("Summarizer", Language.EN), NOW);
+            AgentTemplate.MEETING_SUMMARIZER.draft("Summarizer", Language.EN, MODEL), NOW);
 
     @Test
     void a_new_agent_is_an_unpublished_draft() {
@@ -53,7 +55,7 @@ class AgentTest {
         Agent blank = Agent.create(UUID.randomUUID(), UUID.randomUUID(),
                 new AgentDefinition("Blank", "", " ", List.of(), List.of(), List.of(), null, null, List.of(), null, null), NOW);
 
-        assertThat(blank.draft().problems()).containsExactly("instructions-required", "accepts-required");
+        assertThat(blank.draft().problems()).containsExactly("instructions-required", "accepts-required", "model-required");
         assertThatThrownBy(() -> blank.publish(NOW)).isInstanceOf(RuleViolation.class)
                 .extracting(e -> ((RuleViolation) e).code()).isEqualTo("agent.not-ready");
     }
@@ -98,7 +100,8 @@ class AgentTest {
         assertThat(definition.instructions()).isEqualTo("Do it.");
         assertThat(definition.tools()).containsExactly(AgentTool.GET_TRANSCRIPT);
         assertThat(definition.accepts()).containsExactly(InputKind.TRANSCRIPT);
-        assertThat(definition.model()).isEqualTo(ModelPolicy.BALANCED);
+        assertThat(definition.model()).isNull();
+        assertThat(definition.problems()).contains("model-required");
         assertThat(definition.limits()).isEqualTo(Limits.DEFAULT);
         assertThat(new AgentDefinition("🤖".repeat(60), "", "", null, null, null, null, null, null, null, null).name())
                 .hasSize(120);
@@ -121,11 +124,11 @@ class AgentTest {
 
     @Test
     void templates_write_the_brief_in_the_persons_language() {
-        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analista", Language.ES).instructions())
+        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analista", Language.ES, MODEL).instructions())
                 .startsWith("Encuentra los requisitos");
-        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analyst", Language.EN).givesBack())
+        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analyst", Language.EN, MODEL).givesBack())
                 .isEqualTo(OutputKind.REQUIREMENTS);
-        assertThat(AgentTemplate.BLANK.draft("Mine", Language.EN).problems()).containsExactly("instructions-required");
+        assertThat(AgentTemplate.BLANK.draft("Mine", Language.EN, MODEL).problems()).containsExactly("instructions-required");
     }
 
     @Test
@@ -133,6 +136,11 @@ class AgentTest {
         // A tool that changes something needs a person's approval when it runs (TOOL_CALLING_STANDARDS.md §3); that
         // runtime does not exist yet, so adding one must fail here first.
         assertThat(AgentTool.values()).allMatch(AgentTool::readOnly);
+        assertCode(() -> new AgentModel(" ", "claude-sonnet-5-5", AgentModel.Effort.LOW), "agent.model-invalid");
+        assertCode(() -> new AgentModel("anthropic", "x".repeat(101), AgentModel.Effort.LOW), "agent.model-invalid");
+        assertCode(() -> new AgentModel("anthropic", "claude-sonnet-5-5", null), "agent.model-invalid");
+        assertThat(new AgentModel(" anthropic ", " claude-sonnet-5-5 ", AgentModel.Effort.LOW).model())
+                .isEqualTo("claude-sonnet-5-5");
         assertThat(AgentTool.values()).extracting(AgentTool::toolName).allMatch(name -> name.startsWith("conxist."));
     }
 

@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import type { Provider } from './domain/model';
+import type { LlmProviders } from './domain/settings';
 
 export const PROVIDERS: Provider[] = [
   { provider: 'UPLOAD', category: 'CAPTURE', availability: 'LIVE', displayName: 'File upload', signInRequired: false },
@@ -26,3 +27,15 @@ export function stubApi(routes: Record<string, Route>) {
   vi.stubGlobal('fetch', fetchStub);
   return calls;
 }
+
+/** Anthropic connected with its three models; new blank agents start on Sonnet at medium effort. */
+export const LLM_PROVIDERS: LlmProviders = {
+  providers: [{
+    id: 'anthropic', connected: true, models: [
+      { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
+      { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' },
+      { id: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
+    ],
+  }],
+  defaultForNewAgents: { provider: 'anthropic', model: 'claude-sonnet-5-5', effort: 'MEDIUM' },
+};

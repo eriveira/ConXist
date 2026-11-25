@@ -5,6 +5,7 @@ import './styles/source.css';
 import './styles/shell.css';
 import './styles/agents.css';
 import './styles/skills.css';
+import './styles/settings.css';
 import { App } from './App';
 
 createRoot(document.getElementById('root')!).render(

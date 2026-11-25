@@ -1,0 +1,84 @@
+/* A workspace's Settings: section menu, cards, models table, topics. Tokens only. */
+.settings-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; max-width: 1040px; }
+.settings-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; }
+.settings-nav a {
+  display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: var(--cx-radius-sm);
+  color: var(--cx-fg-muted); font-weight: 700; text-decoration: none;
+}
+.settings-nav a:hover { color: var(--cx-fg); background: var(--cx-surface-raised); }
+.settings-nav a[aria-current="page"] { color: var(--cx-accent-text); background: var(--cx-accent-soft); }
+.settings-content { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.settings-card {
+  background: var(--cx-surface-raised); border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md);
+  box-shadow: var(--cx-shadow-card); padding: 20px 22px;
+}
+.settings-card-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.settings-card-h h2 { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+.settings-card .lead { margin: 4px 0 16px; color: var(--cx-fg-muted); font-size: 14px; max-width: 70ch; }
+.settings-card form > .field { max-width: 720px; }
+.settings-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 8px; }
+.settings-card .alert { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 16px; font-size: 14px; }
+
+.vendors { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vendor { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); background: var(--cx-surface); }
+.vendor.soon { border-style: dashed; }
+.vendor .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vendor-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: var(--cx-radius-sm); background: var(--cx-accent-soft); color: var(--cx-accent-text); }
+.vendor.soon .vendor-icon { background: var(--cx-soon-bg); color: var(--cx-fg-muted); }
+.vendor-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 800; }
+.vendor-desc { font-size: 13.5px; color: var(--cx-fg-muted); overflow-wrap: anywhere; }
+
+.presets-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); }
+.presets { width: 100%; border-collapse: collapse; font-size: 14px; }
+.presets th, .presets td { padding: 10px 14px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--cx-border); }
+.presets tr:last-child th, .presets tr:last-child td { border-bottom: 0; }
+.presets thead th { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--cx-fg-muted); background: var(--cx-surface); }
+.presets tbody th { font-weight: 500; min-width: 150px; }
+.presets tbody th b { display: block; font-size: 15px; }
+.presets tbody th small { display: block; font-size: 12.5px; color: var(--cx-fg-muted); }
+.presets td.muted { color: var(--cx-fg-muted); }
+.default-pick { margin: 0 0 16px; padding: 14px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); }
+.default-pick legend { padding: 0 6px; font-weight: 800; }
+.default-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; }
+.default-fields select {
+  min-height: 44px; width: 100%; padding: 0 10px; border: 1px solid var(--cx-input-border);
+  border-radius: var(--cx-radius-sm); background: var(--cx-surface); color: var(--cx-fg); font: inherit;
+}
+.default-pick .hint { display: block; margin: 8px 0 0; font-size: 13px; color: var(--cx-fg-muted); }
+.default-pick .settings-actions { margin-top: 10px; }
+.preset-users { color: var(--cx-fg-muted); min-width: 160px; }
+.soon-check { margin-bottom: 10px; color: var(--cx-fg-muted); }
+.soon-check b { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--cx-fg); }
+.soon-check > svg { flex: none; margin-top: 2px; }
+
+.topics { list-style: none; margin: 0; padding: 0; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); }
+.topic { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--cx-border); }
+.topic:last-child { border-bottom: 0; }
+.topic .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.topic-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--cx-accent); }
+.topic-name { font-weight: 800; overflow-wrap: anywhere; }
+.topic-desc { font-size: 13.5px; color: var(--cx-fg-muted); overflow-wrap: anywhere; }
+.topic .icon-btn { width: 44px; height: 44px; }
+.topics-count { margin: 10px 0 0; font-size: 13px; color: var(--cx-fg-muted); }
+.topics-empty { padding: 20px; border: 1px dashed var(--cx-input-border); border-radius: var(--cx-radius-md); text-align: center; }
+.topics-empty h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
+.topics-empty p { margin: 0 auto; max-width: 52ch; color: var(--cx-fg-muted); font-size: 14px; }
+.settings-card > .save-status { display: flex; min-height: 0; margin: 0 0 8px; }
+.settings-card > .save-status:empty { margin: 0; }
+
+@media (max-width: 760px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .settings-nav { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--page-gutter)); padding: 0 var(--page-gutter); }
+  .settings-nav a { flex: none; }
+  .settings-card { padding: 16px; }
+  /* Each model stacks: its name, what it is good for, then who uses it. */
+  .presets thead { display: none; }
+  .presets tr { display: grid; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--cx-border); }
+  .presets tr:last-child { border-bottom: 0; }
+  .presets th, .presets td { padding: 0; border: 0; min-width: 0; }
+  .default-fields { grid-template-columns: minmax(0, 1fr); }
+  .preset-users::before { content: attr(data-label) " "; font-weight: 700; color: var(--cx-fg); }
+  .settings-actions .btn { flex: 1; }
+}
+.settings-page .page-h h1:focus { outline: none; }
+.settings-card .panel h3 { margin: 0 0 6px; font-size: 18px; font-weight: 800; color: var(--cx-fg); }

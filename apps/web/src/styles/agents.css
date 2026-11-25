@@ -39,7 +39,7 @@
 .agent-section .field select, .agent-section .field input[type=number] { min-height: 44px; padding: 0 12px; }
 .agent-section textarea { resize: vertical; line-height: 1.5; }
 .agent-section textarea.instructions { min-height: 200px; }
-.agent-section [aria-invalid="true"] { border-color: var(--cx-err-fg); }
+.agent-section .field [aria-invalid="true"], .agent-section [aria-invalid="true"] { border-color: var(--cx-err-fg); }
 .counter { align-self: flex-end; font-size: 12px; color: var(--cx-fg-muted); }
 .counter.over, .error-text { color: var(--cx-err-fg); }
 .field .hint { display: flex; gap: 6px; align-items: flex-start; }
@@ -56,6 +56,7 @@
 .agent-section .choice .grow { flex: 1; min-width: 0; }
 .choice.segmented { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .choice.segmented legend { grid-column: 1 / -1; }
+.model-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
 .limits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .agent-section .note { margin: 0 0 14px; }
 

@@ -1,6 +1,7 @@
 package com.conxist.runs.config;
 
 import java.time.Clock;
+import java.util.List;
 import com.conxist.agents.AgentBriefs;
 import com.conxist.capture.MeetingLibrary;
 import com.conxist.platform.CurrentWorkspace;
@@ -8,7 +9,8 @@ import com.conxist.runs.adapter.model.ClaudeModel;
 import com.conxist.runs.adapter.model.JsonAnswerReader;
 import com.conxist.runs.application.AnswerReader;
 import com.conxist.runs.application.ModelPort;
-import com.conxist.runs.application.ModelPresets;
+import com.conxist.runs.application.LlmProviders;
+import com.conxist.runs.application.ModelDefaultsRepository;
 import com.conxist.runs.application.RunTools;
 import com.conxist.runs.application.StartTestRun;
 import com.conxist.sources.SourceCatalog;
@@ -16,7 +18,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Wires test runs: the read tools, Claude as the model, and the use case. */
+/** Wires test runs and LLM providers: the read tools, Claude as the model, and the use cases. */
 @Configuration(proxyBeanMethods = false)
 class RunsConfiguration {
 
@@ -36,11 +38,16 @@ class RunsConfiguration {
         return new JsonAnswerReader();
     }
 
+    /** Also answers the agents module which models an agent may pick (AgentModels). */
     @Bean
-    StartTestRun startTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, ModelPort model,
-            RunsProperties properties, AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
-        ModelPresets presets = new ModelPresets(properties.fast().choice(), properties.balanced().choice(),
-                properties.thorough().choice());
-        return new StartTestRun(agents, library, tools, model, presets, reader, workspace, clock);
+    LlmProviders llmProviders(RunsProperties properties, List<ModelPort> ports, ModelDefaultsRepository defaults,
+            CurrentWorkspace workspace, Clock clock) {
+        return new LlmProviders(properties.catalog(), ports, defaults, workspace, clock);
+    }
+
+    @Bean
+    StartTestRun startTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
+            AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
+        return new StartTestRun(agents, library, tools, providers, reader, workspace, clock);
     }
 }

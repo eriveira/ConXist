@@ -1,6 +1,7 @@
 package com.conxist.agents.domain;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The starting points a person can build an agent from. Each fills in a sensible draft that the person then edits;
@@ -8,7 +9,7 @@ import java.util.List;
  */
 public enum AgentTemplate {
 
-    BLANK(List.of(InputKind.TRANSCRIPT), OutputKind.FREE_TEXT, ModelPolicy.BALANCED, List.of(), "", "", "", ""),
+    BLANK(List.of(InputKind.TRANSCRIPT), OutputKind.FREE_TEXT, null, List.of(), "", "", "", ""),
 
     MEETING_SUMMARIZER(List.of(InputKind.TRANSCRIPT), OutputKind.SUMMARY, ModelPolicy.FAST,
             List.of(AgentTool.GET_TRANSCRIPT),
@@ -74,7 +75,7 @@ public enum AgentTemplate {
 
     private final List<InputKind> accepts;
     private final OutputKind givesBack;
-    private final ModelPolicy model;
+    private final ModelPolicy start;
     private final List<AgentTool> tools;
     private final String purposeEn;
     private final String instructionsEn;
@@ -85,7 +86,7 @@ public enum AgentTemplate {
             String purposeEn, String instructionsEn, String purposeEs, String instructionsEs) {
         this.accepts = accepts;
         this.givesBack = givesBack;
-        this.model = model;
+        this.start = model;
         this.tools = tools;
         this.purposeEn = purposeEn;
         this.instructionsEn = instructionsEn;
@@ -93,8 +94,13 @@ public enum AgentTemplate {
         this.instructionsEs = instructionsEs;
     }
 
-    /** A first draft named as the person chose, with the brief in their language. */
-    public AgentDefinition draft(String name, Language language) {
+    /** Where the template starts an agent; empty for a blank agent, which starts on the workspace's default. */
+    public Optional<ModelPolicy> start() {
+        return Optional.ofNullable(start);
+    }
+
+    /** A first draft named as the person chose, with the brief in their language, on the model it starts on. */
+    public AgentDefinition draft(String name, Language language, AgentModel model) {
         String purpose = switch (language) {
             case EN -> purposeEn;
             case ES -> purposeEs;

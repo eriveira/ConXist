@@ -2,6 +2,7 @@ import { Icon } from '../../components/Icon';
 import { usePopover } from '../../components/usePopover';
 import { initialOf, type Workspace } from '../../domain/workspaces';
 import { useT } from '../../i18n/i18n';
+import { settingsHref } from '../../navigation';
 
 interface WorkspaceSwitcherProps {
   workspaces: readonly Workspace[];
@@ -11,10 +12,13 @@ interface WorkspaceSwitcherProps {
   onOpen?: () => void;
 }
 
-/** The current workspace in the header; opens the list of workspaces and New workspace. */
+/** The current workspace in the header; opens its Settings, the list of workspaces and New workspace. */
 export function WorkspaceSwitcher({ workspaces, current, onSwitch, onNew, onOpen }: WorkspaceSwitcherProps) {
   const t = useT();
   const popover = usePopover();
+
+  const sourcesText = (workspace: Workspace) => (workspace.sourceCount > 0
+    ? t('workspace.sources', { count: workspace.sourceCount }) : t('workspace.noSources'));
 
   function choose(workspace: Workspace) {
     popover.setOpen(false);
@@ -42,7 +46,18 @@ export function WorkspaceSwitcher({ workspaces, current, onSwitch, onNew, onOpen
       </button>
       {popover.open && (
         <div className="menu ws-menu" role="group" aria-label={t('workspace.menu')} data-popover>
-          <div className="menu-h">{t('workspace.menu')}</div>
+          <div className="ws-top">
+            <span className="ws-badge lg" aria-hidden="true">{initialOf(current.name)}</span>
+            <span className="mtext">
+              <span className="mname">{current.name}</span>
+              <span className="mdesc">{sourcesText(current)}</span>
+            </span>
+            <a className="btn sm" href={settingsHref()} onClick={() => popover.setOpen(false)}>
+              <Icon name="settings" size={18} /> {t('settings.open')}
+            </a>
+          </div>
+          <div className="menu-sep" />
+          <div className="menu-h">{t('workspace.switchTo')}</div>
           <ul className="ws-list">
             {workspaces.map((workspace) => {
               const isCurrent = workspace.id === current.id;
@@ -53,9 +68,7 @@ export function WorkspaceSwitcher({ workspaces, current, onSwitch, onNew, onOpen
                     <span className="ws-badge lg" aria-hidden="true">{initialOf(workspace.name)}</span>
                     <span className="mtext">
                       <span className="mname">{workspace.name}</span>
-                      <span className="mdesc">
-                        {workspace.sourceCount > 0 ? t('workspace.sources', { count: workspace.sourceCount }) : t('workspace.noSources')}
-                      </span>
+                      <span className="mdesc">{sourcesText(workspace)}</span>
                     </span>
                     {isCurrent && <span className="ws-check"><Icon name="check" /></span>}
                   </button>

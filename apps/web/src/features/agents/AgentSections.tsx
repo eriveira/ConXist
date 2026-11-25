@@ -3,7 +3,7 @@ import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import {
   type AgentDefinition, INPUT_KINDS, LIMIT_RANGES, limitInRange, type Limits,
-  MAX_INSTRUCTIONS_LENGTH, MAX_KNOWLEDGE_SOURCES, MAX_NAME_LENGTH, MAX_PURPOSE_LENGTH, MODEL_POLICIES, OUTPUT_KINDS,
+  MAX_INSTRUCTIONS_LENGTH, MAX_KNOWLEDGE_SOURCES, MAX_NAME_LENGTH, MAX_PURPOSE_LENGTH, OUTPUT_KINDS,
   STYLES, toggled,
 } from '../../domain/agents';
 import type { Source } from '../../domain/model';
@@ -13,6 +13,7 @@ import { type Translate, toolDescription, toolLabel, useT } from '../../i18n/i18
 import { MESSAGES, type MessageKey } from '../../i18n/messages';
 import { SOURCES_HREF } from '../../navigation';
 import type { Choices } from './AgentPage';
+import { AgentModelPicker } from './AgentModelPicker';
 import { AgentSkills } from './AgentSkills';
 import { Counter, FieldError, Section } from './FormParts';
 
@@ -147,15 +148,9 @@ export function AgentSections({ draft, pinned, onChange, disabled, choices, onRe
       </Section>
 
       <Section number={7} title={t('agent.section.model')} lead={t('agent.section.model.lead')}>
-        <fieldset className="choice segmented">
-          <legend>{t('agent.model')}</legend>
-          {MODEL_POLICIES.map((policy) => (
-            <label key={policy}>
-              <input type="radio" name="model" checked={draft.model === policy} onChange={() => onChange({ model: policy })} />
-              <span><b>{t(`agent.model.${policy}`)}</b><small>{t(`agent.model.${policy}.desc`)}</small></span>
-            </label>
-          ))}
-        </fieldset>
+        <ChoicesState choices={choices} onRetry={onRetryChoices}>
+          {({ providers }) => <AgentModelPicker value={draft.model} providers={providers} onChange={(model) => onChange({ model })} />}
+        </ChoicesState>
         <fieldset className="choice segmented">
           <legend>{t('agent.style')}</legend>
           {STYLES.map((style) => (

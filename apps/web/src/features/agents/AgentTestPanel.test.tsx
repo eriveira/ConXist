@@ -13,7 +13,7 @@ const MEETING = { id: '66666666-6666-6666-6666-666666666666', sourceId: SOURCE.i
   sizeBytes: 10, origin: 'RECORDING', textLength: 500, capturedAt: '2026-11-20T10:00:00Z', recordedAt: '2026-11-20T09:00:00Z',
   lengthSeconds: 1800 };
 const RESULT: TestRunResult = {
-  agentId: ID, outcome: 'ANSWERED', preset: 'THOROUGH', model: 'claude-opus-5-5', answer: '{}', matchesShape: true,
+  agentId: ID, outcome: 'ANSWERED', model: 'claude-opus-5-5', effort: 'HIGH', answer: '{}', matchesShape: true,
   structured: { requirements: [{ title: 'Export to CSV', type: 'FEATURE', who: 'Sales', why: 'Reports', doneWhen: 'A file downloads', quote: '' }] },
   steps: [
     { kind: 'MODEL', name: 'claude-opus-5-5', detail: 'TOOL_USE', ok: true, millis: 1200 },

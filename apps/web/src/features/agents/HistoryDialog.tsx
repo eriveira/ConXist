@@ -4,6 +4,7 @@ import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import type { AgentVersion, VersionInfo } from '../../domain/agents';
 import { dateTime } from '../../domain/time';
+import { type LlmProviders, modelLabel } from '../../domain/settings';
 import { useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 
@@ -132,14 +133,17 @@ function VersionBody<V>({ opened, render }: { opened: Opened<V>; render: (versio
 }
 
 /** What a published agent was: enough to recognize it. */
-export function AgentVersionSummary({ version }: { version: AgentVersion }) {
+export function AgentVersionSummary({ version, providers }: { version: AgentVersion; providers: LlmProviders | null }) {
   const t = useT();
   const { definition } = version;
   return (
     <dl className="summary version-summary">
       <div><dt>{t('agent.name')}</dt><dd>{definition.name}</dd></div>
       <div><dt>{t('agent.givesBack')}</dt><dd>{t(`agent.output.${definition.givesBack}`)}</dd></div>
-      <div><dt>{t('agent.model')}</dt><dd>{t(`agent.model.${definition.model}`)}</dd></div>
+      <div><dt>{t('agent.model')}</dt><dd>{definition.model
+        ? t('agent.model.summary', { model: providers
+          ? modelLabel(providers, definition.model.provider, definition.model.model) : definition.model.model, effort: t(`settings.effort.${definition.model.effort}`) })
+        : t('agent.model.none')}</dd></div>
       <div className="block"><dt>{t('agent.section.instructions')}</dt><dd><pre>{definition.instructions || '—'}</pre></dd></div>
     </dl>
   );

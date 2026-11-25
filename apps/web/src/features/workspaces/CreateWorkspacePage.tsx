@@ -3,7 +3,7 @@ import logoLight from '@brand/assets/logo/conxist-logo-horizontal-transparent.pn
 import logoDark from '@brand/assets/logo/conxist-logo-horizontal-reversed.png';
 import type { Workspace } from '../../domain/workspaces';
 import { useT } from '../../i18n/i18n';
-import { useCreateWorkspace } from './useCreateWorkspace';
+import { useCreateWorkspace } from './useWorkspaceForm';
 import { WorkspaceFields } from './WorkspaceFields';
 
 /** First run: before anything else, the person names their workspace. One step. */

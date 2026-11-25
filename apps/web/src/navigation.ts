@@ -60,6 +60,30 @@ export function useAgentsRoute(): AgentsRoute {
   return route;
 }
 
+/** The parts of a workspace's Settings, each at #/settings/{section}; #/settings opens General. */
+export const SETTINGS_SECTIONS = ['general', 'llm', 'connectors', 'topics'] as const;
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+
+export function settingsSectionOf(hash: string): SettingsSection {
+  const name = /^#\/settings\/([a-z]+)$/.exec(hash)?.[1];
+  return SETTINGS_SECTIONS.find((section) => section === name) ?? 'general';
+}
+
+export function settingsHref(section: SettingsSection = 'general'): string {
+  return section === 'general' ? '#/settings' : `#/settings/${section}`;
+}
+
+/** The part of Settings in the address, following the back button and links. */
+export function useSettingsSection(): SettingsSection {
+  const [section, setSection] = useState(() => settingsSectionOf(window.location.hash));
+  useEffect(() => {
+    const onChange = () => setSection(settingsSectionOf(window.location.hash));
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return section;
+}
+
 /** A notice a page leaves for the next one, such as "deleted", shown there once. */
 let arrivalNotice: string | null = null;
 

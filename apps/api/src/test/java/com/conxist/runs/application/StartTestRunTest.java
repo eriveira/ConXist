@@ -36,13 +36,10 @@ class StartTestRunTest {
     private static final UUID OTHER_SOURCE_ID = UUID.randomUUID();
     private static final UUID MEETING_ID = UUID.randomUUID();
     private static final UUID OTHER_MEETING_ID = UUID.randomUUID();
-    private static final ModelChoice BALANCED = new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.MEDIUM, true, 16_000);
-    private static final ModelPresets PRESETS = new ModelPresets(
-            new ModelChoice("claude-haiku-5-5", ModelChoice.Effort.LOW, false, 16_000), BALANCED,
-            new ModelChoice("claude-opus-5-5", ModelChoice.Effort.HIGH, true, 16_000));
-
     private final TestClock.Moving clock = TestClock.moving();
     private final ScriptedModel model = new ScriptedModel();
+    private final LlmProviders providers = new LlmProviders(TestModels.catalog(), List.of(model),
+            new TestModels.Defaults(), FixedWorkspace.standard(), TestClock.fixed());
     private final Map<UUID, AgentBrief> agents = new HashMap<>();
     private final Map<UUID, SourceSummary> sources = new HashMap<>();
     private final Map<UUID, List<MeetingLibrary.Text>> meetings = new HashMap<>();
@@ -62,7 +59,7 @@ class StartTestRunTest {
     };
 
     private final StartTestRun run = new StartTestRun(id -> Optional.ofNullable(agents.get(id)), library,
-            new RunTools(id -> Optional.ofNullable(sources.get(id)), library), model, PRESETS,
+            new RunTools(id -> Optional.ofNullable(sources.get(id)), library), providers,
             (answer, required) -> answer.startsWith("{") && required.stream().allMatch(answer::contains)
                     ? Optional.of(Map.of("raw", answer)) : Optional.empty(),
             FixedWorkspace.standard(), clock);
@@ -75,6 +72,22 @@ class StartTestRunTest {
         meetings.put(OTHER_SOURCE_ID, List.of(new MeetingLibrary.Text(OTHER_MEETING_ID, OTHER_SOURCE_ID, "Pricing",
                 DocumentOrigin.RECORDING, "Secret pricing talk.")));
     }
+
+    @Test
+    void a_run_uses_the_agents_own_provider_model_and_effort() {
+        agents.put(AGENT_ID, new AgentBrief(AGENT_ID, "Analyst", "Finds requirements", "Find them.", List.of(),
+                List.of(), "anthropic", "claude-opus-5-5", "LOW", "PRECISE", "REQUIREMENTS", 6, 120, 10, List.of(),
+                List.of(), false));
+        model.then(request -> answer("{\"requirements\":[]}"));
+
+        TestRunResult result = run.run(AGENT_ID, SOURCE_ID, MEETING_ID);
+
+        assertThat(result.model()).isEqualTo("claude-opus-5-5");
+        assertThat(result.effort()).isEqualTo("LOW");
+        assertThat(model.requests.get(0).model())
+                .isEqualTo(new ModelChoice("claude-opus-5-5", ModelChoice.Effort.LOW, true, 16_000));
+    }
+
 
     @Test
     void an_agent_answers_in_its_shape_and_the_person_sees_what_it_did() {
@@ -93,7 +106,7 @@ class StartTestRunTest {
         assertThat(result.steps()).extracting(TestRunResult.Step::kind).containsExactly("MODEL", "TOOL", "MODEL");
         assertThat(result.steps().get(1).ok()).isTrue();
         ModelPort.Request first = model.requests.get(0);
-        assertThat(first.model()).isEqualTo(BALANCED);
+        assertThat(first.model()).isEqualTo(new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.MEDIUM, true, 16_000));
         assertThat(first.firstMessage()).contains("<meeting title=\"Weekly sync\">").contains("guest checkout");
         assertThat(first.tools()).extracting(ModelPort.ToolSpec::name).containsExactly("list_sources", "get_transcript");
         assertThat(first.outputSchema()).containsEntry("additionalProperties", false);
@@ -180,7 +193,7 @@ class StartTestRunTest {
     @Test
     void an_archived_agent_does_not_run() {
         agents.put(AGENT_ID, new AgentBrief(AGENT_ID, "Analyst", "Finds requirements", "Find them.", List.of(),
-                List.of(), "BALANCED", "PRECISE", "REQUIREMENTS", 6, 120, 10, List.of(), List.of(), true));
+                List.of(), "anthropic", "claude-sonnet-5-5", "MEDIUM", "PRECISE", "REQUIREMENTS", 6, 120, 10, List.of(), List.of(), true));
         assertCode(() -> run.run(AGENT_ID, SOURCE_ID, MEETING_ID), "run.agent-archived");
         assertThat(model.requests).isEmpty();
     }
@@ -265,8 +278,8 @@ class StartTestRunTest {
 
     private static AgentBrief brief(List<UUID> sources, List<String> tools, int steps, int toolCalls, int seconds,
             List<String> problems) {
-        return new AgentBrief(AGENT_ID, "Analyst", "Finds requirements", "Find them.", sources, tools, "BALANCED",
-                "PRECISE", "REQUIREMENTS", steps, seconds, toolCalls, List.of(), problems, false);
+        return new AgentBrief(AGENT_ID, "Analyst", "Finds requirements", "Find them.", sources, tools, "anthropic",
+                "claude-sonnet-5-5", "MEDIUM", "PRECISE", "REQUIREMENTS", steps, seconds, toolCalls, List.of(), problems, false);
     }
 
     private void source(UUID id, String name) {
@@ -303,6 +316,11 @@ class StartTestRunTest {
 
         void always(Function<Request, Turn> turn) {
             always = turn;
+        }
+
+        @Override
+        public String provider() {
+            return "anthropic";
         }
 
         @Override

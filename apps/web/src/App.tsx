@@ -14,6 +14,7 @@ import { HomePage } from './features/shell/HomePage';
 import { useRoute } from './features/shell/useRoute';
 import { SourcePage } from './features/source/SourcePage';
 import { SourcesPage } from './features/sources/SourcesPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 import { CreateWorkspacePage } from './features/workspaces/CreateWorkspacePage';
 import { NewWorkspaceDialog } from './features/workspaces/NewWorkspaceDialog';
 import { useWorkspaces } from './features/workspaces/useWorkspaces';
@@ -59,7 +60,7 @@ interface SettingsProps {
 /** First run asks for a workspace; after that, the header, the current page and Ask ConXist. */
 function Workspaces(settings: SettingsProps) {
   const t = translator(settings.language);
-  const { state, retry, switchTo, created, refresh } = useWorkspaces();
+  const { state, retry, switchTo, created, updated, refresh } = useWorkspaces();
   const [page, go] = useRoute();
   const sourceRoute = useSourceRoute();
   const agentsRoute = useAgentsRoute();
@@ -108,6 +109,7 @@ function Workspaces(settings: SettingsProps) {
           ? <SourcePage key={sourceRoute.sourceId} sourceId={sourceRoute.sourceId} />
           : <SourcesPage />)}
         {(page === 'agents' || page === 'skills') && <AgentsArea route={agentsRoute} />}
+        {page === 'settings' && <SettingsPage workspace={state.current} onSaved={updated} />}
         {(page === 'flow' || page === 'knowledge' || page === 'memories') && <ComingSoonPage page={page} />}
       </main>
       <AskConxist />

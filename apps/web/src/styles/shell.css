@@ -16,6 +16,9 @@
 .ws-button.open .ws-badge { background: var(--cx-surface-raised); }
 .ws-badge.lg { width: 32px; height: 32px; font-size: 15px; }
 .ws-menu { width: 320px; }
+.ws-top { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
+.ws-top .mname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-top .btn { flex: none; }
 .ws-list { list-style: none; margin: 0; padding: 0; max-height: min(360px, 60vh); overflow: auto; }
 .ws-list .mitem { min-height: 52px; }
 .mitem.current { background: var(--cx-accent-soft); }

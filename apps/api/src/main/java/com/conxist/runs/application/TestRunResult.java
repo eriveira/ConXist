@@ -17,7 +17,7 @@ import com.conxist.runs.domain.RunOutcome;
 public record TestRunResult(
         UUID agentId,
         RunOutcome outcome,
-        String preset,
+        String effort,
         String model,
         String answer,
         Object structured,

@@ -4,8 +4,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import com.conxist.agents.application.AgentSummary;
-import com.conxist.agents.application.AgentView;
 import com.conxist.agents.application.AgentUse;
+import com.conxist.agents.application.AgentView;
 import com.conxist.agents.application.ArchiveAgent;
 import com.conxist.agents.application.CreateAgent;
 import com.conxist.agents.application.DeleteAgent;
@@ -15,13 +15,13 @@ import com.conxist.agents.application.ReadAgent;
 import com.conxist.agents.application.RestoreAgentVersion;
 import com.conxist.agents.application.SaveAgentDraft;
 import com.conxist.agents.domain.AgentDefinition;
+import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentTemplate;
 import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.AgentVersion;
 import com.conxist.agents.domain.InputKind;
 import com.conxist.agents.domain.Language;
 import com.conxist.agents.domain.Limits;
-import com.conxist.agents.domain.ModelPolicy;
 import com.conxist.agents.domain.OutputKind;
 import com.conxist.agents.domain.SkillPin;
 import com.conxist.agents.domain.Style;
@@ -162,7 +162,7 @@ class AgentsController {
             @Size(max = MAX_LIST_INPUT) List<UUID> knowledgeSources,
             @Size(max = MAX_LIST_INPUT) List<@Valid SkillPinBody> skills,
             @Size(max = MAX_LIST_INPUT) List<AgentTool> tools,
-            ModelPolicy model,
+            @Valid ModelBody model,
             Style style,
             @Size(max = MAX_LIST_INPUT) List<InputKind> accepts,
             OutputKind givesBack,
@@ -172,9 +172,15 @@ class AgentsController {
             List<SkillPin> pins = skills == null ? null
                     : skills.stream().map(pin -> pin == null ? null : new SkillPin(pin.skillId(), pin.version()))
                             .toList();
-            return new AgentDefinition(name, purpose, instructions, knowledgeSources, pins, tools, model, style,
+            AgentModel picked = model == null ? null : new AgentModel(model.provider(), model.model(), model.effort());
+            return new AgentDefinition(name, purpose, instructions, knowledgeSources, pins, tools, picked, style,
                     accepts, givesBack, new Limits(limits.maxSteps(), limits.timeoutSeconds(), limits.maxToolCalls()));
         }
+    }
+
+    record ModelBody(@Size(max = AgentModel.MAX_NAME_LENGTH) String provider,
+            @Size(max = AgentModel.MAX_NAME_LENGTH) String model,
+            AgentModel.Effort effort) {
     }
 
     record SkillPinBody(@NotNull UUID skillId, int version) {

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import com.conxist.agents.AgentModels;
 import com.conxist.agents.domain.Agent;
 import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentVersion;
@@ -25,22 +26,30 @@ public final class AgentBook {
     static final String SKILL_MISSING = "skill-missing";
     /** Reported when a skill the agent follows needs a tool the agent is not allowed. */
     static final String SKILL_NEEDS_TOOL = "skill-needs-tool";
+    /** Reported when the agent's provider is not connected or no longer offers its model. */
+    static final String MODEL_UNAVAILABLE = "model-unavailable";
 
     private final AgentRepository agents;
     private final CurrentWorkspace workspace;
     private final SourceCatalog sources;
     private final SkillBook skills;
+    private final AgentModels models;
     private final UnitOfWork unitOfWork;
     private final Clock clock;
 
     public AgentBook(AgentRepository agents, CurrentWorkspace workspace, SourceCatalog sources,
-            SkillBook skills, UnitOfWork unitOfWork, Clock clock) {
+            SkillBook skills, AgentModels models, UnitOfWork unitOfWork, Clock clock) {
         this.agents = agents;
         this.workspace = workspace;
         this.sources = sources;
         this.skills = skills;
+        this.models = models;
         this.unitOfWork = unitOfWork;
         this.clock = clock;
+    }
+
+    AgentModels models() {
+        return models;
     }
 
     AgentRepository agents() {
@@ -89,7 +98,7 @@ public final class AgentBook {
 
     /**
      * What stops the draft from being published: the draft's own rules, then sources it reads that are gone, then
-     * skills it follows that are gone or need a tool it is not allowed.
+     * a model that can't run, then skills it follows that are gone or need a tool it is not allowed.
      */
     List<String> problems(AgentDefinition draft) {
         return problems(draft, pinnedSkills(draft));
@@ -99,6 +108,9 @@ public final class AgentBook {
         List<String> problems = new ArrayList<>(draft.problems());
         if (draft.knowledgeSources().stream().anyMatch(id -> sources.find(id).isEmpty())) {
             problems.add(SOURCE_MISSING);
+        }
+        if (draft.model() != null && !models.available(draft.model().provider(), draft.model().model())) {
+            problems.add(MODEL_UNAVAILABLE);
         }
         if (pinned.size() < draft.skills().size()) {
             problems.add(SKILL_MISSING);

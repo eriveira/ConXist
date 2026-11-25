@@ -38,10 +38,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
   is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`, `runs`) with `domain`,
   `application`, `adapter` and `config` inside. Modules talk through their root
   package (API) and events. See `docs/adr/0002-stack.md` (accepted).
-- `apps/web/`: the web app (the Sources, Agents and Skills pages and their dialogs). `domain` and `api` stay
+- `apps/web/`: the web app (the Sources, Agents, Skills and Settings pages and their dialogs). `domain` and `api` stay
   free of React; screens live in `features`.
 
-## Current state (2026-11-21)
+## Current state (2026-11-24)
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
@@ -70,8 +70,14 @@ Sources page does not show it for now, owner decision 2026-11-17).
 - Test run (ADR 0012, step 3): a `runs` module and the Test panel on an agent's page. It runs the saved draft once on
   a picked meeting with Claude (Anthropic Java SDK), with the draft's read tools, sources and limits, and shows the
   answer, its shape check and each step. Nothing of a run is kept. Local only until sign-in (owner, 2026-11-21): the
-  API reads the owner's key from `CONXIST_ANTHROPIC_API_KEY`; without it the panel says how to add one.
+  API reads the owner's key from `CONXIST_ANTHROPIC_API_KEY`; without it the panel says how to add one, and agents
+  can't be published either, since their provider is not connected (ADR 0014).
   `mvn spring-boot:test-run` also runs a fake Claude, so the panel works without a key.
+- Workspace Settings (ADR 0014, owner 2026-11-24): a Settings button in the workspace menu opens `#/settings` with
+  General (rename, description), LLM providers (connected providers and their models, who uses each and at what
+  effort, and the default for new agents; more providers, zero retention and a monthly limit are coming soon),
+  Connectors (Storage and MCP access, both coming soon) and Topics (up to 50 per workspace, for the topic classifier).
+  Each agent picks its own provider, model and effort; the models it may pick are listed in `conxist.runs.models`.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

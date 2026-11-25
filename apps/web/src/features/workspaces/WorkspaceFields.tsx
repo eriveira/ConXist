@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { Icon } from '../../components/Icon';
 import { characterCount, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH } from '../../domain/workspaces';
 import { useT } from '../../i18n/i18n';
-import type { WorkspaceForm } from './useCreateWorkspace';
+import type { WorkspaceForm } from './useWorkspaceForm';
 
 /**
  * Name (required) and description (optional, with a live character count). After a refused Create, focus goes to

@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.conxist.agents.AgentBrief;
 import com.conxist.agents.AgentBriefs;
 import com.conxist.agents.domain.Agent;
+import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTool;
@@ -31,6 +32,7 @@ public final class ReadAgentBriefs implements AgentBriefs {
 
     private AgentBrief brief(Agent agent) {
         AgentDefinition draft = agent.draft();
+        Optional<AgentModel> model = Optional.ofNullable(draft.model());
         List<AgentBrief.Skill> followed = draft.skills().stream()
                 .flatMap(pin -> skills.pinned(pin).stream().flatMap(pinned ->
                         skills.version(pin.skillId(), pin.version()).stream().map(version -> new AgentBrief.Skill(
@@ -38,7 +40,9 @@ public final class ReadAgentBriefs implements AgentBriefs {
                                 version.definition().instructions()))))
                 .toList();
         return new AgentBrief(agent.id(), draft.name(), draft.purpose(), draft.instructions(), draft.knowledgeSources(),
-                draft.tools().stream().map(AgentTool::toolName).toList(), draft.model().name(), draft.style().name(),
+                draft.tools().stream().map(AgentTool::toolName).toList(),
+                model.map(AgentModel::provider).orElse(null), model.map(AgentModel::model).orElse(null),
+                model.map(m -> m.effort().name()).orElse(null), draft.style().name(),
                 draft.givesBack().name(), draft.limits().maxSteps(), draft.limits().timeoutSeconds(),
                 draft.limits().maxToolCalls(), followed, book.problems(draft),
                 agent.status() == AgentStatus.ARCHIVED);

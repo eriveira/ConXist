@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
 import type { Agent, AgentDefinition } from '../../domain/agents';
 import type { SkillSummary } from '../../domain/skills';
-import { stubApi } from '../../testing';
+import { LLM_PROVIDERS, stubApi } from '../../testing';
 import { AgentPage } from './AgentPage';
 
 const ID = '11111111-1111-1111-1111-111111111111';
@@ -22,7 +22,7 @@ const SKILLS: SkillSummary[] = [
 ];
 const DRAFT: AgentDefinition = {
   name: 'Summarizer', purpose: 'Summarizes meetings.', instructions: 'Summarize the meeting.', knowledgeSources: [], skills: [],
-  tools: ['GET_TRANSCRIPT'], model: 'FAST', style: 'PRECISE', accepts: ['TRANSCRIPT'], givesBack: 'SUMMARY',
+  tools: ['GET_TRANSCRIPT'], model: { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }, style: 'PRECISE', accepts: ['TRANSCRIPT'], givesBack: 'SUMMARY',
   limits: { maxSteps: 6, timeoutSeconds: 120, maxToolCalls: 10 },
 };
 const AGENT: Agent = {
@@ -36,6 +36,7 @@ function api(agent: Agent, routes: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/sources': () => ({ body: [SOURCE] }),
     'GET /api/agents/tools': () => ({ body: TOOLS }),
     'GET /api/skills': () => ({ body: SKILLS }),
+    'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
     'GET /api/test-runs/status': () => ({ body: { ready: true } }),
     [`GET /api/sources/${SOURCE.id}/documents`]: () => ({ body: [] }),
     ...routes,
@@ -61,7 +62,8 @@ describe('AgentPage', () => {
     }
     expect(screen.getByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
     expect(await screen.findByRole('checkbox', { name: /Specs/ })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: /Fast/ })).toBeChecked();
+    expect(await screen.findByRole('combobox', { name: 'Model' })).toHaveDisplayValue('Claude Haiku 5.5');
+    expect(screen.getByRole('radio', { name: /Low/ })).toBeChecked();
     expect(screen.getByRole('button', { name: 'History' })).toBeDisabled();
     expect(await accessibilityViolations(container)).toEqual([]);
   });
@@ -76,13 +78,14 @@ describe('AgentPage', () => {
     render(<AgentPage agentId={ID} />);
     await screen.findByRole('heading', { name: 'Summarizer', level: 1 });
 
-    await userEvent.click(screen.getByRole('radio', { name: /Thorough/ }));
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Model' }), 'claude-opus-5-5');
+    await userEvent.click(screen.getByRole('radio', { name: /High/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: /Specs/ }));
 
     await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
     const sent = bodyOf(calls, `PUT /api/agents/${ID}/draft`);
     expect(sent.revision).toBe(1);
-    expect(sent.draft.model).toBe('THOROUGH');
+    expect(sent.draft.model).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' });
     expect(sent.draft.knowledgeSources).toEqual([SOURCE.id]);
     expect(calls.filter((call) => call.key === `PUT /api/agents/${ID}/draft`)).toHaveLength(1);
   });
@@ -93,6 +96,25 @@ describe('AgentPage', () => {
 
     expect(await screen.findByRole('button', { name: 'Publish' })).toBeDisabled();
     expect(screen.getByText('Before you publish').parentElement).toHaveTextContent('Write the instructions.');
+  });
+
+  it('marks a model that can no longer run and clears the problem once another is picked', async () => {
+    const calls = api({ ...AGENT, draft: { ...DRAFT, model: { provider: 'anthropic', model: 'claude-retired', effort: 'LOW' } },
+      problems: ['model-unavailable'] }, {
+      [`PUT /api/agents/${ID}/draft`]: (init) => ({ body: { ...AGENT, revision: 2, draft: JSON.parse(String(init?.body)).draft } }),
+    });
+    render(<AgentPage agentId={ID} />);
+
+    const model = await screen.findByRole('combobox', { name: 'Model' });
+    expect(model).toHaveDisplayValue('claude-retired (can’t run now)');
+    expect(model).toHaveAccessibleDescription(/Its model can’t run here now/);
+    expect(screen.getByText('Before you publish').parentElement).toHaveTextContent('Its model can’t run here now.');
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+
+    await userEvent.selectOptions(model, 'claude-haiku-5-5');
+    expect(screen.queryByText('Before you publish')).not.toBeInTheDocument();
+    await waitFor(() => expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.model)
+      .toEqual({ provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }), { timeout: 3000 });
   });
 
   it('does not save an empty name, and says the draft is waiting on it', async () => {
@@ -191,8 +213,8 @@ describe('AgentPage', () => {
     });
     render(<AgentPage agentId={ID} />);
 
-    const alerts = await screen.findAllByText('We could not load your sources, skills and tools. Nothing was changed.');
-    expect(alerts).toHaveLength(3);
+    const alerts = await screen.findAllByText('We could not load your sources, skills, tools and models. Nothing was changed.');
+    expect(alerts).toHaveLength(4);
     expect(screen.queryByText('A source it reads was removed from the workspace.')).not.toBeInTheDocument();
     fail = false;
     await userEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0]);

@@ -8,7 +8,7 @@ import { AgentsPage } from './AgentsPage';
 
 const LIVE: AgentSummary = {
   id: '11111111-1111-1111-1111-111111111111', name: 'Requirements analyst', purpose: 'Finds requirements.',
-  status: 'ACTIVE', publishedVersion: 2, draftPublished: false, givesBack: 'REQUIREMENTS', skills: [], updatedAt: '2026-11-20T10:00:00Z',
+  status: 'ACTIVE', publishedVersion: 2, draftPublished: false, givesBack: 'REQUIREMENTS', model: { provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' }, skills: [], updatedAt: '2026-11-20T10:00:00Z',
 };
 const OLD: AgentSummary = { ...LIVE, id: '22222222-2222-2222-2222-222222222222', name: 'Old summarizer', status: 'ARCHIVED', givesBack: 'SUMMARY' };
 
