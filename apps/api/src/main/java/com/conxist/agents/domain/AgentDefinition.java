@@ -57,6 +57,15 @@ public record AgentDefinition(
         limits = Objects.requireNonNullElse(limits, Limits.DEFAULT);
     }
 
+    /**
+     * A new agent's first draft: only its name and model. It takes a transcript and gives back free text until the
+     * person says otherwise, and it needs instructions before it can be published.
+     */
+    public static AgentDefinition empty(String name, AgentModel model) {
+        return new AgentDefinition(name, "", "", List.of(), List.of(), List.of(), model, Style.PRECISE,
+                List.of(InputKind.TRANSCRIPT), OutputKind.FREE_TEXT, Limits.DEFAULT);
+    }
+
     /** What still stops this draft from being published, in the order the page shows its sections. */
     public List<String> problems() {
         List<String> problems = new ArrayList<>();

@@ -22,9 +22,7 @@ final class TestModels {
         return new ModelCatalog(List.of(new ModelOption(ANTHROPIC, HAIKU, "Claude Haiku 5.5", false, 8_000),
                 new ModelOption(ANTHROPIC, SONNET, "Claude Sonnet 5.5", true, 16_000),
                 new ModelOption(ANTHROPIC, OPUS, "Claude Opus 5.5", true, 16_000)),
-                Map.of(Preset.FAST, new ModelStart(ANTHROPIC, HAIKU, ModelChoice.Effort.LOW),
-                        Preset.BALANCED, new ModelStart(ANTHROPIC, SONNET, ModelChoice.Effort.MEDIUM),
-                        Preset.THOROUGH, new ModelStart(ANTHROPIC, OPUS, ModelChoice.Effort.HIGH)));
+                new ModelStart(ANTHROPIC, SONNET, ModelChoice.Effort.MEDIUM));
     }
 
     /** Defaults kept in memory, one per workspace. */

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
-import java.util.Optional;
 import com.conxist.agents.AgentBrief;
 import com.conxist.agents.AgentModels;
 import com.conxist.platform.RuleViolation;
@@ -37,17 +36,14 @@ class LlmProvidersTest {
     }
 
     @Test
-    void a_template_starts_on_its_tier_and_a_blank_agent_on_the_workspace_default() {
-        assertThat(providers.start(Optional.of("FAST")))
-                .isEqualTo(new AgentModels.Start("anthropic", TestModels.HAIKU, "LOW"));
-        assertThat(providers.start(Optional.empty()))
+    void a_new_agent_starts_on_the_settings_start_until_the_workspace_picks_a_default() {
+        assertThat(providers.start())
                 .isEqualTo(new AgentModels.Start("anthropic", TestModels.SONNET, "MEDIUM"));
 
         providers.setDefault("anthropic", TestModels.OPUS, "HIGH");
 
-        assertThat(providers.start(Optional.empty()))
+        assertThat(providers.start())
                 .isEqualTo(new AgentModels.Start("anthropic", TestModels.OPUS, "HIGH"));
-        assertThat(providers.start(Optional.of("FAST")).model()).isEqualTo(TestModels.HAIKU);
         assertThat(providers.view().defaultForNewAgents().model()).isEqualTo(TestModels.OPUS);
     }
 
@@ -85,11 +81,11 @@ class LlmProvidersTest {
     }
 
     @Test
-    void a_saved_default_that_can_no_longer_run_falls_back_to_the_balanced_tier() {
+    void a_saved_default_that_can_no_longer_run_falls_back_to_where_the_settings_start_new_agents() {
         defaults.saved.put(FixedWorkspace.standard().id(),
                 new ModelStart("anthropic", "claude-retired", ModelChoice.Effort.LOW));
 
-        assertThat(providers.start(Optional.empty()).model()).isEqualTo(TestModels.SONNET);
+        assertThat(providers.start().model()).isEqualTo(TestModels.SONNET);
     }
 
     private static AgentBrief brief(String provider, String model, String effort) {

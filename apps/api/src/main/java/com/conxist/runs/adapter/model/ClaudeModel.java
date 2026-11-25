@@ -32,7 +32,7 @@ import com.conxist.runs.application.ModelPort;
 
 /**
  * Claude through the official Anthropic Java SDK (ADR 0012). Each turn is one Messages call: adaptive thinking (the
- * models' default), the preset's effort, strict tools, and structured output when the agent gives back a shape. Earlier
+ * models' default), the agent's effort, strict tools, and structured output when the agent gives back a shape. Earlier
  * turns go back exactly as Claude sent them, thinking included. The key comes from settings and is never logged.
  */
 public final class ClaudeModel implements ModelPort {

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { setRequestLanguage } from './api/client';
 import { Icon } from './components/Icon';
 import { AgentPage } from './features/agents/AgentPage';
 import { AgentsPage } from './features/agents/AgentsPage';
@@ -29,9 +28,6 @@ const CREATED_NOTICE_MS = 8_000;
 export function App() {
   const [language, setLanguage] = useState<Language>(() => readPreference('language', LANGUAGES, 'en'));
   const [theme, setTheme] = useState<Theme>(() => readPreference('theme', THEMES, 'system'));
-  // Set while rendering, so the requests the pages below make on their first render already carry it.
-  setRequestLanguage(language);
-
   useEffect(() => {
     document.documentElement.lang = language;
     savePreference('language', language);

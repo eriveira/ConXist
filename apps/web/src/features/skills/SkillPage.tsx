@@ -4,9 +4,9 @@ import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import type { AgentSummary, AgentToolInfo } from '../../domain/agents';
 import { localSkillProblems, type SkillVersion } from '../../domain/skills';
-import { useLanguage, useT } from '../../i18n/i18n';
+import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
-import { SKILLS_HREF, goWithNotice, skillHref } from '../../navigation';
+import { SKILLS_HREF, goWithNotice } from '../../navigation';
 import { AgentStatePill } from '../agents/AgentStatePill';
 import { DeleteDialog } from '../agents/DeleteDialog';
 import { HistoryDialog } from '../agents/HistoryDialog';
@@ -23,16 +23,14 @@ export type SkillContext =
   | { status: 'error' }
   | { status: 'ready'; tools: AgentToolInfo[]; agents: AgentSummary[] };
 
-type Busy = 'archive' | 'copy' | null;
+type Busy = 'archive' | null;
 
 /**
  * One skill on one page: when to use it, its steps and the tools it expects. Changes save as a draft on their own;
- * Publish makes the next numbered version, which agents take when someone updates them. A built-in skill is read only
- * and can be copied.
+ * Publish makes the next numbered version, which agents take when someone updates them.
  */
 export function SkillPage({ skillId }: { skillId: string }) {
   const t = useT();
-  const language = useLanguage();
   const editor = useSkillEditor(skillId);
   const { state } = editor;
   const [context, setContext] = useState<SkillContext>({ status: 'loading' });
@@ -44,7 +42,6 @@ export function SkillPage({ skillId }: { skillId: string }) {
   const [busy, setBusy] = useState<Busy>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const ready = state.status === 'ready';
-  const { reload } = editor;
 
   const loadContext = useCallback(() => {
     setContext({ status: 'loading' });
@@ -54,12 +51,6 @@ export function SkillPage({ skillId }: { skillId: string }) {
   }, []);
 
   useEffect(loadContext, [loadContext]);
-
-  // A built-in skill is written in the person's language; read it again when the language changes.
-  const firstLanguage = useRef(language);
-  useEffect(() => {
-    if (language !== firstLanguage.current) void reload();
-  }, [language, reload]);
 
   useEffect(() => {
     if (ready) headingRef.current?.focus();
@@ -85,12 +76,11 @@ export function SkillPage({ skillId }: { skillId: string }) {
   }
 
   const { item: skill, draft, save, problem } = state;
-  const builtIn = skill.source === 'BUILT_IN';
   const archived = skill.status === 'ARCHIVED';
-  const problems = builtIn ? [] : Array.from(new Set([...localSkillProblems(draft), ...skill.problems]));
+  const problems = Array.from(new Set([...localSkillProblems(draft), ...skill.problems]));
   const blocked = skillBlockedBy(draft);
   const stuck = blocked !== null || save === 'conflict';
-  const canPublish = !builtIn && !archived && problems.length === 0 && !stuck && save !== 'failed'
+  const canPublish = !archived && problems.length === 0 && !stuck && save !== 'failed'
     && !(skill.draftPublished && save === 'saved');
 
   /** Runs an action and says what happened; a refused action leaves everything as it was. */
@@ -103,17 +93,6 @@ export function SkillPage({ skillId }: { skillId: string }) {
     if (result === 'ok') setNotice(done);
     else if (result === 'blocked') setActionProblem(t('agent.action.blocked'));
     return result === 'ok';
-  }
-
-  async function copy() {
-    setBusy('copy');
-    setActionProblem(null);
-    try {
-      window.location.hash = skillHref((await api.copySkill(skill.id)).id);
-    } catch (error) {
-      setActionProblem(problemMessage(error, t));
-      setBusy(null);
-    }
   }
 
   /** Whatever happens, the dialog closes, so the result or the reason shows on the page. */
@@ -134,48 +113,37 @@ export function SkillPage({ skillId }: { skillId: string }) {
         <div className="agent-head-text">
           <h1 id="skill-title" ref={headingRef} tabIndex={-1}>{draft.name.trim() || skill.draft.name}</h1>
           <div className="agent-head-meta">
-            <Pill tone={builtIn ? 'soon' : 'info'}>{t(`skill.source.${skill.source}`)}</Pill>
-            {builtIn ? <Pill tone="live">v{skill.publishedVersion}</Pill> : <AgentStatePill agent={skill} kind="skill" />}
-            {!builtIn && (
-              <SaveStatus save={save} problem={problem} blocked={blocked !== null} onRetry={editor.retry}
-                onReload={() => void editor.reload()} />
-            )}
+            <Pill tone="info">{t(`skill.source.${skill.source}`)}</Pill>
+            <AgentStatePill agent={skill} kind="skill" />
+            <SaveStatus save={save} problem={problem} blocked={blocked !== null} onRetry={editor.retry}
+              onReload={() => void editor.reload()} />
           </div>
         </div>
         <div className="agent-actions">
-          {builtIn ? (
-            <button type="button" className="btn primary" onClick={() => void copy()} disabled={busy !== null}>
-              {busy === 'copy' ? <><span className="spin" aria-hidden="true" /> {t('skill.copying')}</> : t('skill.copy')}
+          <button type="button" className="btn ghost danger-text" disabled={!canDelete} onClick={() => setDeleting(true)}>
+            <Icon name="trash" size={16} /> {t('delete.button')}
+          </button>
+          {archived ? (
+            <button type="button" className="btn" disabled={busy !== null}
+              onClick={() => void run('archive', editor.unarchive, t('skill.unarchived'))}>
+              {busy === 'archive' ? <><span className="spin" aria-hidden="true" /> {t('agent.unarchiving')}</> : t('agent.unarchive')}
             </button>
           ) : (
-            <>
-              <button type="button" className="btn ghost danger-text" disabled={!canDelete} onClick={() => setDeleting(true)}>
-                <Icon name="trash" size={16} /> {t('delete.button')}
-              </button>
-              {archived ? (
-                <button type="button" className="btn" disabled={busy !== null}
-                  onClick={() => void run('archive', editor.unarchive, t('skill.unarchived'))}>
-                  {busy === 'archive' ? <><span className="spin" aria-hidden="true" /> {t('agent.unarchiving')}</> : t('agent.unarchive')}
-                </button>
-              ) : (
-                <button type="button" className="btn ghost" disabled={busy !== null || stuck}
-                  onClick={() => void run('archive', editor.archive, t('skill.archivedNotice'))}>
-                  {busy === 'archive' ? <><span className="spin" aria-hidden="true" /> {t('agent.archiving')}</> : t('agent.archive')}
-                </button>
-              )}
-              <button type="button" className="btn" onClick={() => setHistoryOpen(true)} disabled={skill.versions.length === 0}>
-                {t('agent.history')}{skill.versions.length > 0 && ` (${skill.versions.length})`}
-              </button>
-              <button type="button" className="btn primary" onClick={() => setPublishing(true)}
-                disabled={!canPublish || busy !== null} aria-describedby={problems.length ? 'skill-problems' : undefined}>
-                {t('agent.publish')}
-              </button>
-            </>
+            <button type="button" className="btn ghost" disabled={busy !== null || stuck}
+              onClick={() => void run('archive', editor.archive, t('skill.archivedNotice'))}>
+              {busy === 'archive' ? <><span className="spin" aria-hidden="true" /> {t('agent.archiving')}</> : t('agent.archive')}
+            </button>
           )}
+          <button type="button" className="btn" onClick={() => setHistoryOpen(true)} disabled={skill.versions.length === 0}>
+            {t('agent.history')}{skill.versions.length > 0 && ` (${skill.versions.length})`}
+          </button>
+          <button type="button" className="btn primary" onClick={() => setPublishing(true)}
+            disabled={!canPublish || busy !== null} aria-describedby={problems.length ? 'skill-problems' : undefined}>
+            {t('agent.publish')}
+          </button>
         </div>
       </div>
       <p className="notice" role="status">{notice && <><Icon name="check" size={16} /> {notice}</>}</p>
-      {builtIn && <p className="alert info"><Icon name="info" /> {t('skill.builtIn.note')}</p>}
       {archived && <p className="alert info"><Icon name="info" /> {t('skill.archived.note')}</p>}
       {(actionProblem ?? (problem !== null && save !== 'conflict' && save !== 'failed')) && (
         <p className="alert error" role="alert"><Icon name="alert" /> {actionProblem ?? problemMessage(problem, t)}</p>
@@ -190,7 +158,7 @@ export function SkillPage({ skillId }: { skillId: string }) {
         </div>
       )}
       <div className="agent-layout">
-        <SkillSections draft={draft} onChange={editor.edit} readOnly={builtIn}
+        <SkillSections draft={draft} onChange={editor.edit}
           disabled={archived || save === 'conflict'} context={context} onRetryContext={loadContext} />
         <SkillSide skill={skill} draft={draft} context={context} />
       </div>

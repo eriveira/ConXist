@@ -4,6 +4,7 @@
 - Date: 2026-11-24
 - Deciders: owner, Claude
 - Changes: ADR 0010's "agents name a setting (Fast, Balanced, Thorough), never a model"
+- Changed by: ADR 0015 (2026-11-25): template tiers removed; `conxist.runs.new-agents` is where new agents start.
 
 ## Context
 

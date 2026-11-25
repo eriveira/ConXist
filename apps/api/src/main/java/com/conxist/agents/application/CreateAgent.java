@@ -3,11 +3,13 @@ package com.conxist.agents.application;
 import java.util.UUID;
 import com.conxist.agents.AgentModels;
 import com.conxist.agents.domain.Agent;
+import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentModel;
-import com.conxist.agents.domain.AgentTemplate;
-import com.conxist.agents.domain.Language;
 
-/** Starts an agent from a template, as a draft that is not published yet, on the model the template starts on. */
+/**
+ * Starts an empty agent with the name the person chose, as a draft that is not published yet, on the workspace's
+ * default model. The person writes its purpose, instructions and tools.
+ */
 public final class CreateAgent {
 
     private final AgentBook book;
@@ -16,11 +18,10 @@ public final class CreateAgent {
         this.book = book;
     }
 
-    /** @param language the person's language, for the template's brief */
-    public AgentView create(AgentTemplate template, String name, Language language) {
-        AgentModels.Start start = book.models().start(template.start().map(Enum::name));
+    public AgentView create(String name) {
+        AgentModels.Start start = book.models().start();
         AgentModel model = new AgentModel(start.provider(), start.model(), AgentModel.Effort.valueOf(start.effort()));
-        Agent agent = Agent.create(UUID.randomUUID(), book.workspaceId(), template.draft(name, language, model),
+        Agent agent = Agent.create(UUID.randomUUID(), book.workspaceId(), AgentDefinition.empty(name, model),
                 book.clock().instant());
         return book.inTransaction(() -> {
             String chosen = agent.draft().name();

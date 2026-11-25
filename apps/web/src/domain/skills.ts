@@ -1,7 +1,7 @@
 import type { AgentStatus, AgentSummary, VersionInfo } from './agents';
 
-/** Built-in skills are kept by ConXist and cannot be edited; the others belong to the team. */
-export const SKILL_SOURCES = ['BUILT_IN', 'YOURS', 'IMPORTED'] as const;
+/** Where a skill comes from: written in ConXist, or imported from a SKILL.md. Both belong to the team. */
+export const SKILL_SOURCES = ['YOURS', 'IMPORTED'] as const;
 export type SkillSource = (typeof SKILL_SOURCES)[number];
 
 /** A way of working written once: when to use it, the steps, and the tools it expects the agent to have. */
@@ -18,7 +18,7 @@ export interface SkillVersionInfo extends VersionInfo {
   note: string;
 }
 
-/** A skill as its page shows it. A built-in skill is published at revision 0 and cannot be changed. */
+/** A skill as its page shows it. */
 export interface Skill {
   id: string;
   source: SkillSource;
@@ -116,11 +116,10 @@ export function slug(name: string): string {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64);
 }
 
-/** Built-in skills first, then active ones before archived, each group most recently changed first. */
+/** Active skills before archived ones, each group most recently changed first. */
 export function sortSkills(skills: readonly SkillSummary[]): SkillSummary[] {
   return [...skills].sort((a, b) =>
-    Number(a.source !== 'BUILT_IN') - Number(b.source !== 'BUILT_IN')
-    || Number(a.status === 'ARCHIVED') - Number(b.status === 'ARCHIVED')
+    Number(a.status === 'ARCHIVED') - Number(b.status === 'ARCHIVED')
     || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 

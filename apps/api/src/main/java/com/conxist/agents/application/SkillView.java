@@ -8,7 +8,7 @@ import com.conxist.agents.domain.SkillDefinition;
 import com.conxist.agents.domain.SkillSource;
 
 /**
- * A skill as its page shows it. A built-in skill shows as published at revision 0 and cannot be changed.
+ * A skill as its page shows it.
  *
  * @param problems what stops the draft from being published, as stable codes; empty when it is ready
  * @param versions every published version, the newest first

@@ -6,14 +6,14 @@ import type { SkillSummary } from '../../domain/skills';
 import { stubApi } from '../../testing';
 import { SkillsPage } from './SkillsPage';
 
-const BUILT_IN: SkillSummary = {
+const SUMMARY: SkillSummary = {
   id: '11111111-1111-1111-1111-111111111111', name: 'Meeting summary', description: 'When summarizing a meeting.',
-  source: 'BUILT_IN', status: 'ACTIVE', publishedVersion: 1, draftPublished: true, needs: ['GET_TRANSCRIPT'],
-  updatedAt: '2026-11-21T00:00:00Z',
+  source: 'YOURS', status: 'ACTIVE', publishedVersion: 1, draftPublished: true, needs: ['GET_TRANSCRIPT'],
+  updatedAt: '2026-11-22T00:00:00Z',
 };
 const OURS: SkillSummary = {
-  ...BUILT_IN, id: '22222222-2222-2222-2222-222222222222', name: 'Acme style', description: 'When writing for customers.',
-  source: 'YOURS', publishedVersion: 3, draftPublished: false, needs: [],
+  ...SUMMARY, id: '22222222-2222-2222-2222-222222222222', name: 'Acme style', description: 'When writing for customers.',
+  publishedVersion: 3, draftPublished: false, needs: [], updatedAt: '2026-11-21T00:00:00Z',
 };
 const IMPORTED: SkillSummary = {
   ...OURS, id: '33333333-3333-3333-3333-333333333333', name: 'Release notes', source: 'IMPORTED', publishedVersion: 0,
@@ -25,7 +25,7 @@ const AGENT = {
 
 function api(routes: Parameters<typeof stubApi>[0] = {}) {
   return stubApi({
-    'GET /api/skills': () => ({ body: [OURS, IMPORTED, BUILT_IN] }),
+    'GET /api/skills': () => ({ body: [OURS, IMPORTED, SUMMARY] }),
     'GET /api/agents': () => ({ body: [AGENT] }),
     ...routes,
   });
@@ -35,13 +35,14 @@ describe('SkillsPage', () => {
   beforeEach(() => { window.location.hash = '#/skills'; });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('lists built-in skills first, with where each stands and who uses it, accessibly', async () => {
+  it('lists the newest skills first, with where each stands and who uses it, accessibly', async () => {
     api();
     const { container } = render(<SkillsPage creating={false} />);
 
     const cards = await screen.findAllByRole('link', { name: /Meeting summary|Acme style/ });
     expect(cards.map((card) => within(card).getByText(/Meeting summary|Acme style/).textContent)).toEqual(['Meeting summary', 'Acme style']);
-    expect(cards[0]).toHaveTextContent('Built-in');
+    expect(cards[0]).toHaveTextContent('Yours');
+    expect(cards[0]).toHaveTextContent('Live v1');
     expect(cards[0]).toHaveTextContent('Needs Read a transcript');
     expect(cards[1]).toHaveTextContent('v3 live · edited');
     expect(cards[1]).toHaveTextContent('Used by 1 agent');
@@ -54,13 +55,23 @@ describe('SkillsPage', () => {
     render(<SkillsPage creating={false} />);
     await screen.findByText('Acme style');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Built-in' }));
-    expect(screen.getByRole('button', { name: 'Built-in' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByText('Acme style')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Built-in' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Imported' }));
+    expect(screen.getByRole('button', { name: 'Imported' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Acme style')).not.toBeInTheDocument();
     expect(screen.getByText('No skills here yet.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Show 1 archived' }));
     expect(screen.getByText('Release notes')).toBeInTheDocument();
+  });
+
+  it('invites the first skill when there are none, accessibly', async () => {
+    api({ 'GET /api/skills': () => ({ body: [] }) });
+    const { container } = render(<SkillsPage creating={false} />);
+
+    const invite = await screen.findByRole('link', { name: /Write your first skill/ });
+    expect(invite).toHaveAttribute('href', '#/skills/new');
+    expect(screen.queryByRole('group', { name: 'Show' })).not.toBeInTheDocument();
+    expect(await accessibilityViolations(container)).toEqual([]);
   });
 
   it('names a new skill and opens it', async () => {

@@ -9,8 +9,6 @@ export const EFFORTS = ['LOW', 'MEDIUM', 'HIGH'] as const;
 export type Effort = (typeof EFFORTS)[number];
 export const STYLES = ['PRECISE', 'CREATIVE'] as const;
 export type Style = (typeof STYLES)[number];
-export const TEMPLATES = ['MEETING_SUMMARIZER', 'REQUIREMENTS_ANALYST', 'DECISION_LOGGER', 'TOPIC_CLASSIFIER', 'BLANK'] as const;
-export type AgentTemplate = (typeof TEMPLATES)[number];
 export type AgentStatus = 'ACTIVE' | 'ARCHIVED';
 
 /** What an agent runs on (ADR 0014): a provider connected in Settings, one of its models, and how hard it thinks. */

@@ -1,12 +1,9 @@
 package com.conxist.agents.application;
 
 import java.time.Clock;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
-import com.conxist.agents.domain.AgentStatus;
-import com.conxist.agents.domain.BuiltInSkill;
 import com.conxist.agents.domain.InvalidSkill;
 import com.conxist.agents.domain.Skill;
 import com.conxist.agents.domain.SkillDefinition;
@@ -19,22 +16,19 @@ import com.conxist.platform.NotFound;
 import com.conxist.platform.UnitOfWork;
 
 /**
- * What every skill use case shares: finding a skill of the current workspace or a built-in one, saving it safely, its
- * view, and the version an agent is pinned to.
+ * What every skill use case shares: finding a skill of the current workspace, saving it safely, its view, and the
+ * version an agent is pinned to.
  */
 public final class SkillBook {
 
     private final SkillRepository skills;
     private final CurrentWorkspace workspace;
-    private final PersonLanguage language;
     private final UnitOfWork unitOfWork;
     private final Clock clock;
 
-    public SkillBook(SkillRepository skills, CurrentWorkspace workspace, PersonLanguage language,
-            UnitOfWork unitOfWork, Clock clock) {
+    public SkillBook(SkillRepository skills, CurrentWorkspace workspace, UnitOfWork unitOfWork, Clock clock) {
         this.skills = skills;
         this.workspace = workspace;
-        this.language = language;
         this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
@@ -55,16 +49,8 @@ public final class SkillBook {
         return unitOfWork.inTransaction(work);
     }
 
-    /** A built-in skill as the person reads it, in their language. */
-    SkillDefinition builtIn(BuiltInSkill skill) {
-        return skill.definition(language.language());
-    }
-
-    /** A skill the team keeps. A built-in skill cannot be changed, so it is refused here with a clear reason. */
+    /** A skill the team keeps. */
     Skill load(UUID skillId) {
-        if (BuiltInSkill.byId(skillId).isPresent()) {
-            throw new InvalidSkill("built-in", "Built-in skills can't be changed. Copy it to make your own.");
-        }
         return skills.find(workspace.id(), skillId).orElseThrow(SkillBook::notFound);
     }
 
@@ -78,11 +64,11 @@ public final class SkillBook {
         return skill;
     }
 
-    /** Adds a new skill, keeping names unique in the workspace and apart from the built-in ones. */
+    /** Adds a new skill, keeping names unique in the workspace. */
     SkillView insert(Skill skill) {
         return inTransaction(() -> {
             String name = skill.draft().name();
-            if (BuiltInSkill.nameTaken(name) || !skills.insertIfNameFree(skill)) {
+            if (!skills.insertIfNameFree(skill)) {
                 throw nameTaken(name);
             }
             return view(skill);
@@ -95,7 +81,7 @@ public final class SkillBook {
             return;
         }
         String name = after.draft().name();
-        if (BuiltInSkill.nameTaken(name) || skills.nameTaken(after.workspaceId(), name, after.id())) {
+        if (skills.nameTaken(after.workspaceId(), name, after.id())) {
             throw nameTaken(name);
         }
         if (!skills.update(after, before.revision())) {
@@ -110,22 +96,8 @@ public final class SkillBook {
                 skills.versionInfos(skill.workspaceId(), skill.id()), skill.createdAt(), skill.updatedAt());
     }
 
-    SkillView view(BuiltInSkill skill) {
-        return new SkillView(skill.id(), SkillSource.BUILT_IN, AgentStatus.ACTIVE, 0, builtIn(skill),
-                BuiltInSkill.VERSION, true, List.of(),
-                List.of(new SkillView.VersionInfo(BuiltInSkill.VERSION, "", BuiltInSkill.PUBLISHED_AT)),
-                BuiltInSkill.PUBLISHED_AT, BuiltInSkill.PUBLISHED_AT);
-    }
-
-    /** A version of a built-in skill or of a skill of this workspace. */
+    /** A version of a skill of this workspace. */
     Optional<SkillVersion> version(UUID skillId, int number) {
-        Optional<BuiltInSkill> builtIn = BuiltInSkill.byId(skillId);
-        if (builtIn.isPresent()) {
-            return number == BuiltInSkill.VERSION
-                    ? Optional.of(new SkillVersion(skillId, number, builtIn(builtIn.get()), "",
-                            BuiltInSkill.PUBLISHED_AT))
-                    : Optional.empty();
-        }
         return skills.version(workspace.id(), skillId, number);
     }
 
@@ -136,11 +108,6 @@ public final class SkillBook {
 
     /** The skill an agent of this workspace is pinned to; empty when it is not a skill this workspace can use. */
     Optional<PinnedSkill> pinned(SkillPin pin) {
-        Optional<BuiltInSkill> builtIn = BuiltInSkill.byId(pin.skillId());
-        if (builtIn.isPresent()) {
-            return version(pin.skillId(), pin.version()).map(version ->
-                    pinned(pin, version, SkillSource.BUILT_IN, BuiltInSkill.VERSION));
-        }
         return skills.find(workspace.id(), pin.skillId()).flatMap(skill ->
                 skills.version(workspace.id(), skill.id(), pin.version()).map(version ->
                         pinned(pin, version, skill.source(), skill.publishedVersion())));

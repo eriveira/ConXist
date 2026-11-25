@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Skills of the workspace the request names, and the built-in ones: list, add, edit, publish, restore, archive, delete. */
+/** Skills of the workspace the request names: list, add, edit, publish, restore, archive, delete. */
 @RestController
 @RequestMapping("/api/skills")
 class SkillsController {
@@ -80,12 +80,6 @@ class SkillsController {
     @ResponseStatus(HttpStatus.CREATED)
     SkillView importMarkdown(@Valid @RequestBody ImportRequest request) {
         return addSkill.importMarkdown(request.markdown());
-    }
-
-    @PostMapping("/{skillId}/copy")
-    @ResponseStatus(HttpStatus.CREATED)
-    SkillView copy(@PathVariable UUID skillId) {
-        return addSkill.copy(skillId);
     }
 
     @GetMapping("/{skillId}")

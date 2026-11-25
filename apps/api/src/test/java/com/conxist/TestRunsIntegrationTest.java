@@ -72,13 +72,9 @@ class TestRunsIntegrationTest {
                 .andExpect(jsonPath("$.defaultForNewAgents.model").value("claude-sonnet-5-5"));
 
         mvc.perform(post("/api/agents").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"BLANK\",\"name\":\"Mine\",\"language\":\"EN\"}"))
+                        .content("{\"name\":\"Mine\"}"))
                 .andExpect(jsonPath("$.draft.model.model").value("claude-opus-5-5"))
                 .andExpect(jsonPath("$.draft.model.effort").value("HIGH"));
-        mvc.perform(post("/api/agents").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"TOPIC_CLASSIFIER\",\"name\":\"Topics\",\"language\":\"EN\"}"))
-                .andExpect(jsonPath("$.draft.model.model").value("claude-haiku-5-5"))
-                .andExpect(jsonPath("$.draft.model.effort").value("LOW"));
     }
 
     @Test
@@ -86,7 +82,7 @@ class TestRunsIntegrationTest {
         String workspace = workspace("Own model");
         String source = source(workspace, "Specs");
         String meeting = upload(workspace, source, "# Kickoff\nAna: we need guest checkout.");
-        String agent = agent(workspace, "{\"template\":\"MEETING_SUMMARIZER\",\"name\":\"Summary\",\"language\":\"EN\"}");
+        String agent = agent(workspace, "Summary");
         String run = "{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}";
 
         mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
@@ -127,7 +123,16 @@ class TestRunsIntegrationTest {
         String workspace = workspace("Runs");
         String source = source(workspace, "Specs");
         String meeting = upload(workspace, source, "# Kickoff\nAna: we need guest checkout.");
-        String agent = agent(workspace, "{\"template\":\"REQUIREMENTS_ANALYST\",\"name\":\"Analyst\",\"language\":\"EN\"}");
+        String agent = agent(workspace, "Analyst");
+        mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"revision":1,"draft":{"name":"Analyst","purpose":"","instructions":"Find the requirements.",
+                                "knowledgeSources":[],"skills":[],"tools":["GET_TRANSCRIPT"],
+                                "model":{"provider":"anthropic","model":"claude-opus-5-5","effort":"HIGH"},
+                                "style":"PRECISE","accepts":["TRANSCRIPT"],"givesBack":"REQUIREMENTS",
+                                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                                """))
+                .andExpect(jsonPath("$.problems").isEmpty());
 
         mvc.perform(get("/api/test-runs/status").header(HEADER, workspace)).andExpect(jsonPath("$.ready").value(true));
         mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
@@ -153,8 +158,13 @@ class TestRunsIntegrationTest {
         String other = workspace("Someone else's runs");
         String source = source(owner, "Calls");
         String meeting = upload(owner, source, "Private notes.");
-        String theirAgent = agent(other, "{\"template\":\"MEETING_SUMMARIZER\",\"name\":\"Summary\",\"language\":\"EN\"}");
-        String ownAgent = agent(owner, "{\"template\":\"MEETING_SUMMARIZER\",\"name\":\"Summary\",\"language\":\"EN\"}");
+        String theirAgent = agent(other, "Summary");
+        String ownAgent = agent(owner, "Summary");
+        for (String[] agent : new String[][] {{other, theirAgent}, {owner, ownAgent}}) {
+            mvc.perform(put("/api/agents/{id}/draft", agent[1]).header(HEADER, agent[0])
+                            .contentType(MediaType.APPLICATION_JSON).content(summaryDraft(1, "claude-sonnet-5-5")))
+                    .andExpect(jsonPath("$.problems").isEmpty());
+        }
         int before = claude.requests().size();
 
         mvc.perform(post("/api/agents/{id}/test-runs", theirAgent).header(HEADER, other)
@@ -175,7 +185,7 @@ class TestRunsIntegrationTest {
         String workspace = workspace("Not ready");
         String source = source(workspace, "Notes");
         String meeting = upload(workspace, source, "Notes.");
-        String agent = agent(workspace, "{\"template\":\"BLANK\",\"name\":\"Empty\",\"language\":\"EN\"}");
+        String agent = agent(workspace, "Empty");
 
         mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -199,9 +209,10 @@ class TestRunsIntegrationTest {
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
     }
 
-    private String agent(String workspace, String body) throws Exception {
+    /** A new, empty agent. */
+    private String agent(String workspace, String name) throws Exception {
         return JsonPath.read(mvc.perform(post("/api/agents").header(HEADER, workspace)
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"" + name + "\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
     }
 

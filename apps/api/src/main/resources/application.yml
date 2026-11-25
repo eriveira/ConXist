@@ -74,16 +74,10 @@ conxist:
         fallbacks: true
         # A call that does not stream; more room than this needs streaming (ADR 0012, later).
         max-tokens: 16000
-    # Where a template starts an agent; balanced is also where a workspace's new blank agents start until it picks.
-    fast:
-      model: claude-haiku-5-5
-      effort: LOW
-    balanced:
+    # Where a workspace's new agents start until it picks its own default in Settings.
+    new-agents:
       model: claude-sonnet-5-5
       effort: MEDIUM
-    thorough:
-      model: claude-opus-5-5
-      effort: HIGH
   secrets:
     # 32 random bytes, base64: openssl rand -base64 32. Required; there is no default on purpose.
     encryption-key: ${CONXIST_SECRETS_KEY:}

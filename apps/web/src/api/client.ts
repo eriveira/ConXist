@@ -5,7 +5,7 @@ import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
 import type { LlmProviders, Topic } from '../domain/settings';
-import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentTemplate, AgentToolInfo, AgentVersion } from '../domain/agents';
+import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
 import type { TestRunResult, TestRunStatus } from '../domain/testRuns';
 
@@ -25,17 +25,9 @@ export function setRequestWorkspace(workspaceId: string | null): void {
   currentWorkspace = workspaceId;
 }
 
-/** The person's language, for what ConXist writes itself, such as built-in skills. */
-let currentLanguage: string | null = null;
-
-export function setRequestLanguage(language: string | null): void {
-  currentLanguage = language;
-}
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (currentWorkspace) headers.set(WORKSPACE_HEADER, currentWorkspace);
-  if (currentLanguage) headers.set('Accept-Language', currentLanguage);
   const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     const problem = await problemOf(response);
@@ -100,10 +92,7 @@ function putJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 export interface NewAgent {
-  template: AgentTemplate;
   name: string;
-  /** The language the template's brief is written in. */
-  language: 'EN' | 'ES';
 }
 
 const agentPath = (agentId: string) => `/api/agents/${encodeURIComponent(agentId)}`;
@@ -182,8 +171,6 @@ export const api = {
   createSkill: (name: string) => postJson<Skill>('/api/skills', { name }),
   /** Reads a SKILL.md into a new draft to check before publishing. */
   importSkill: (markdown: string) => postJson<Skill>('/api/skills/import', { markdown }),
-  /** Copies a built-in skill into one the team can change. */
-  copySkill: (skillId: string) => request<Skill>(`${skillPath(skillId)}/copy`, { method: 'POST' }),
   skill: (skillId: string) => request<Skill>(skillPath(skillId)),
   saveSkillDraft: (skillId: string, revision: number, draft: SkillDefinition) =>
     putJson<Skill>(`${skillPath(skillId)}/draft`, { revision, draft }),

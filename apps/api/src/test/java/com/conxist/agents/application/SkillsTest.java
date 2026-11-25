@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.UUID;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTool;
-import com.conxist.agents.domain.BuiltInSkill;
-import com.conxist.agents.domain.Language;
 import com.conxist.agents.domain.SkillDefinition;
 import com.conxist.agents.domain.SkillSource;
 import com.conxist.platform.Conflict;
@@ -24,8 +22,7 @@ class SkillsTest {
 
     private final TestClock.Moving clock = TestClock.moving();
     private FixedWorkspace workspace = FixedWorkspace.standard();
-    private Language language = Language.EN;
-    private final SkillBook book = new SkillBook(new InMemorySkills(), () -> workspace.id(), () -> language,
+    private final SkillBook book = new SkillBook(new InMemorySkills(), () -> workspace.id(),
             new ImmediateUnitOfWork(), clock);
     private final AddSkill add = new AddSkill(book);
     private final ListSkills list = new ListSkills(book);
@@ -36,16 +33,8 @@ class SkillsTest {
     private final ArchiveSkill archive = new ArchiveSkill(book);
 
     @Test
-    void every_workspace_starts_with_the_built_in_skills_in_its_language() {
-        assertThat(list.list()).extracting(SkillSummary::source).containsOnly(SkillSource.BUILT_IN);
-        assertThat(list.list()).extracting(SkillSummary::name).contains("Meeting summary");
-        language = Language.ES;
-        assertThat(list.list()).extracting(SkillSummary::name).contains("Resumen de reunión");
-
-        SkillView builtIn = read.get(BuiltInSkill.MEETING_SUMMARY.id());
-        assertThat(builtIn.publishedVersion()).isEqualTo(1);
-        assertThat(builtIn.draft().needs()).containsExactly(AgentTool.GET_TRANSCRIPT);
-        assertCode(() -> save.save(builtIn.id(), 0, builtIn.draft()), "skill.built-in");
+    void a_workspace_starts_with_no_skills() {
+        assertThat(list.list()).isEmpty();
     }
 
     @Test
@@ -84,24 +73,10 @@ class SkillsTest {
     }
 
     @Test
-    void names_are_unique_and_never_those_of_a_built_in_skill() {
+    void names_are_unique_in_a_workspace_ignoring_case() {
         add.create("Acme style");
 
         assertCode(() -> add.create("ACME STYLE"), "skill.name-taken");
-        assertCode(() -> add.create("meeting summary"), "skill.name-taken");
-        assertCode(() -> add.create("Resumen de reunión"), "skill.name-taken");
-    }
-
-    @Test
-    void a_built_in_skill_is_copied_into_one_the_team_can_change() {
-        SkillView first = add.copy(BuiltInSkill.MEETING_SUMMARY.id());
-        SkillView second = add.copy(BuiltInSkill.MEETING_SUMMARY.id());
-
-        assertThat(first.draft().name()).isEqualTo("Meeting summary (copy)");
-        assertThat(second.draft().name()).isEqualTo("Meeting summary (copy 2)");
-        assertThat(first.draft().needs()).containsExactly(AgentTool.GET_TRANSCRIPT);
-        assertThat(first.problems()).isEmpty();
-        assertCode(() -> add.copy(first.id()), "skill.copy-built-in-only");
     }
 
     @Test
@@ -152,7 +127,7 @@ class SkillsTest {
 
         assertThatThrownBy(() -> read.get(created.id())).isInstanceOf(NotFound.class);
         assertThatThrownBy(() -> read.version(created.id(), 1)).isInstanceOf(NotFound.class);
-        assertThat(list.list()).extracting(SkillSummary::source).containsOnly(SkillSource.BUILT_IN);
+        assertThat(list.list()).isEmpty();
     }
 
     /** A new skill with a description and instructions, saved once, so it is at revision 2. */

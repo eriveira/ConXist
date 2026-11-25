@@ -14,7 +14,6 @@ import com.conxist.agents.application.DeleteAgent;
 import com.conxist.agents.application.DeleteSkill;
 import com.conxist.agents.application.ListAgents;
 import com.conxist.agents.application.ListSkills;
-import com.conxist.agents.application.PersonLanguage;
 import com.conxist.agents.application.PublishAgent;
 import com.conxist.agents.application.PublishSkill;
 import com.conxist.agents.application.ReadAgent;
@@ -37,9 +36,8 @@ import org.springframework.context.annotation.Configuration;
 class AgentsConfiguration {
 
     @Bean
-    SkillBook skillBook(SkillRepository skills, CurrentWorkspace workspace, PersonLanguage language,
-            UnitOfWork unitOfWork, Clock clock) {
-        return new SkillBook(skills, workspace, language, unitOfWork, clock);
+    SkillBook skillBook(SkillRepository skills, CurrentWorkspace workspace, UnitOfWork unitOfWork, Clock clock) {
+        return new SkillBook(skills, workspace, unitOfWork, clock);
     }
 
     @Bean

@@ -7,7 +7,7 @@ import com.conxist.agents.application.SkillView.VersionInfo;
 import com.conxist.agents.domain.Skill;
 import com.conxist.agents.domain.SkillVersion;
 
-/** The skills a team keeps; built-in skills are not stored here. */
+/** The skills a team keeps. */
 public interface SkillRepository {
 
     /** Saves a new skill unless its workspace has another skill with the name (ignoring case). */

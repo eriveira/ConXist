@@ -17,11 +17,9 @@ import com.conxist.agents.AgentModels;
 import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentStatus;
-import com.conxist.agents.domain.AgentTemplate;
+import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.AgentVersion;
-import com.conxist.agents.domain.BuiltInSkill;
 import com.conxist.agents.domain.InputKind;
-import com.conxist.agents.domain.Language;
 import com.conxist.agents.domain.SkillDefinition;
 import com.conxist.agents.domain.SkillPin;
 import com.conxist.agents.domain.SkillSource;
@@ -42,7 +40,7 @@ class AgentsTest {
     private final Map<UUID, SourceSummary> sources = new HashMap<>();
     private final TestClock.Moving clock = TestClock.moving();
     private FixedWorkspace workspace = FixedWorkspace.standard();
-    private final SkillBook skills = new SkillBook(new InMemorySkills(), () -> workspace.id(), () -> Language.EN,
+    private final SkillBook skills = new SkillBook(new InMemorySkills(), () -> workspace.id(),
             new ImmediateUnitOfWork(), clock);
     private final Models models = new Models();
     private final AgentBook book = new AgentBook(repository, () -> workspace.id(),
@@ -62,30 +60,27 @@ class AgentsTest {
     private final DeleteSkill deleteSkill = new DeleteSkill(skills, book);
 
     @Test
-    void an_agent_starts_from_a_template_as_a_ready_draft() {
-        AgentView created = create.create(AgentTemplate.REQUIREMENTS_ANALYST, " Requirements analyst ", Language.EN);
+    void an_agent_starts_empty_on_the_workspace_default_and_needs_instructions_to_publish() {
+        AgentView created = create.create(" Requirements analyst ");
 
         assertThat(created.draft().name()).isEqualTo("Requirements analyst");
-        assertThat(created.problems()).isEmpty();
+        assertThat(created.draft().purpose()).isEmpty();
+        assertThat(created.draft().instructions()).isEmpty();
+        assertThat(created.draft().tools()).isEmpty();
+        assertThat(created.draft().model())
+                .isEqualTo(new AgentModel("anthropic", "default-model", AgentModel.Effort.HIGH));
+        assertThat(created.problems()).containsExactly("instructions-required");
         assertThat(created.versions()).isEmpty();
         assertThat(list.list()).singleElement().satisfies(summary -> {
             assertThat(summary.name()).isEqualTo("Requirements analyst");
             assertThat(summary.publishedVersion()).isZero();
         });
-    }
-
-    @Test
-    void a_template_starts_on_its_tier_and_a_blank_agent_on_the_workspace_default() {
-        assertThat(create.create(AgentTemplate.TOPIC_CLASSIFIER, "Topics", Language.EN).draft().model())
-                .isEqualTo(new AgentModel("anthropic", "claude-haiku-5-5", AgentModel.Effort.LOW));
-        assertThat(create.create(AgentTemplate.BLANK, "Mine", Language.EN).draft().model())
-                .isEqualTo(new AgentModel("anthropic", "default-model", AgentModel.Effort.HIGH));
-        assertThat(models.asked).containsExactly(Optional.of("FAST"), Optional.empty());
+        assertCode(() -> publish.publish(created.id(), created.revision()), "agent.not-ready");
     }
 
     @Test
     void an_agent_without_a_model_or_on_a_model_that_cannot_run_is_not_published() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         AgentDefinition d = created.draft();
 
         AgentView none = save.save(created.id(), created.revision(), withModel(d, null));
@@ -104,19 +99,19 @@ class AgentsTest {
 
     @Test
     void names_are_unique_in_a_workspace_ignoring_case() {
-        AgentView first = create.create(AgentTemplate.BLANK, "Triage", Language.EN);
-        AgentView second = create.create(AgentTemplate.BLANK, "Other", Language.EN);
+        AgentView first = create.create("Triage");
+        AgentView second = create.create("Other");
 
-        assertCode(() -> create.create(AgentTemplate.BLANK, "TRIAGE", Language.EN), "agent.name-taken");
+        assertCode(() -> create.create("TRIAGE"), "agent.name-taken");
         assertCode(() -> save.save(second.id(), second.revision(), renamed(second.draft(), "triage")),
                 "agent.name-taken");
         workspace = new FixedWorkspace(UUID.randomUUID());
-        assertThat(create.create(AgentTemplate.BLANK, "Triage", Language.EN).id()).isNotEqualTo(first.id());
+        assertThat(create.create("Triage").id()).isNotEqualTo(first.id());
     }
 
     @Test
     void edits_go_to_the_draft_and_publishing_makes_numbered_versions() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         AgentView v1 = publish.publish(created.id(), created.revision());
         clock.advance(Duration.ofMinutes(1));
         AgentView edited = save.save(v1.id(), v1.revision(), renamed(v1.draft(), "Weekly summary"));
@@ -134,7 +129,7 @@ class AgentsTest {
 
     @Test
     void a_stale_editor_cannot_overwrite_a_newer_draft() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         save.save(created.id(), created.revision(), renamed(created.draft(), "From tab one"));
 
         assertThatThrownBy(() -> save.save(created.id(), created.revision(), renamed(created.draft(), "Tab two")))
@@ -144,7 +139,7 @@ class AgentsTest {
 
     @Test
     void saving_an_unchanged_draft_keeps_its_revision() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
 
         assertThat(save.save(created.id(), created.revision(), created.draft()).revision())
                 .isEqualTo(created.revision());
@@ -152,7 +147,7 @@ class AgentsTest {
 
     @Test
     void restoring_copies_a_version_into_the_draft() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         AgentView v1 = publish.publish(created.id(), created.revision());
         AgentView edited = save.save(v1.id(), v1.revision(), renamed(v1.draft(), "Changed"));
         AgentView v2 = publish.publish(edited.id(), edited.revision());
@@ -171,7 +166,7 @@ class AgentsTest {
         sources.put(kept, new SourceSummary(kept, SourceCategory.CAPTURE, Provider.UPLOAD, "Specs", null,
                 Instant.EPOCH));
         UUID removed = UUID.randomUUID();
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         AgentView reading = save.save(created.id(), created.revision(),
                 withSources(created.draft(), List.of(kept, removed)));
 
@@ -188,7 +183,7 @@ class AgentsTest {
         SkillView drafted = saveSkill.save(skill.id(), skill.revision(), new SkillDefinition("Acme style",
                 "When writing for customers.", "Say customer, never user.", List.of()));
         SkillView v1 = publishSkill.publish(drafted.id(), drafted.revision(), "First version");
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
 
         AgentView following = save.save(created.id(), created.revision(),
                 withSkills(created.draft(), List.of(new SkillPin(skill.id(), 1))));
@@ -208,11 +203,11 @@ class AgentsTest {
 
     @Test
     void a_skill_that_needs_a_tool_the_agent_lacks_blocks_publishing() {
-        AgentView created = create.create(AgentTemplate.BLANK, "Writer", Language.EN);
+        AgentView created = create.create("Writer");
         AgentView ready = save.save(created.id(), created.revision(), withSkills(
                 new AgentDefinition("Writer", "", "Write.", List.of(), List.of(), List.of(), SONNET, null,
                         List.of(InputKind.TOPIC), null, null),
-                List.of(new SkillPin(BuiltInSkill.MEETING_SUMMARY.id(), 1))));
+                List.of(new SkillPin(summarySkill().id(), 1))));
 
         assertThat(ready.problems()).containsExactly("skill-needs-tool");
         assertThat(ready.skills()).singleElement().extracting(PinnedSkill::name).isEqualTo("Meeting summary");
@@ -226,10 +221,10 @@ class AgentsTest {
                 new SkillDefinition("Elsewhere", "When in another workspace.", "Do it.", List.of()));
         publishSkill.publish(drafted.id(), drafted.revision(), "");
         workspace = new FixedWorkspace(UUID.randomUUID());
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
 
         AgentView pinned = save.save(created.id(), created.revision(), withSkills(created.draft(), List.of(
-                new SkillPin(other.id(), 1), new SkillPin(BuiltInSkill.PLAIN_WRITING.id(), 9))));
+                new SkillPin(other.id(), 1), new SkillPin(UUID.randomUUID(), 9))));
 
         assertThat(pinned.skills()).isEmpty();
         assertThat(pinned.problems()).containsExactly("skill-missing");
@@ -238,7 +233,7 @@ class AgentsTest {
 
     @Test
     void archived_agents_stay_listed_and_can_come_back() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         AgentView archived = archive.archive(created.id(), created.revision());
 
         assertThat(list.list()).singleElement().extracting(AgentSummary::status).isEqualTo(AgentStatus.ARCHIVED);
@@ -248,7 +243,7 @@ class AgentsTest {
 
     @Test
     void an_agent_is_deleted_with_its_versions_unless_something_uses_it_or_it_changed() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         AgentView published = publish.publish(created.id(), created.revision());
 
         assertCode(() -> deleteAgent.delete(published.id(), created.revision()), "agent.changed");
@@ -270,7 +265,7 @@ class AgentsTest {
         SkillView drafted = saveSkill.save(skill.id(), skill.revision(), new SkillDefinition("Acme style",
                 "When writing for customers.", "Say customer, never user.", List.of()));
         SkillView v1 = publishSkill.publish(drafted.id(), drafted.revision(), "");
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         AgentView following = save.save(created.id(), created.revision(),
                 withSkills(created.draft(), List.of(new SkillPin(skill.id(), 1))));
         AgentView live = publish.publish(following.id(), following.revision());
@@ -297,17 +292,29 @@ class AgentsTest {
     }
 
     @Test
-    void a_built_in_skill_is_not_deleted() {
-        assertCode(() -> deleteSkill.delete(BuiltInSkill.PLAIN_WRITING.id(), 1), "skill.built-in");
-    }
-
-    @Test
     void another_workspaces_agent_is_not_found() {
-        AgentView created = create.create(AgentTemplate.MEETING_SUMMARIZER, "Summarizer", Language.EN);
+        AgentView created = ready("Summarizer");
         workspace = new FixedWorkspace(UUID.randomUUID());
 
         assertThatThrownBy(() -> read.get(created.id())).isInstanceOf(NotFound.class);
         assertThat(list.list()).isEmpty();
+    }
+
+    /** An agent with a name, instructions and the transcript tool: ready to publish. */
+    private AgentView ready(String name) {
+        AgentView created = create.create(name);
+        AgentDefinition d = created.draft();
+        return save.save(created.id(), created.revision(), new AgentDefinition(d.name(), "Summarizes a meeting.",
+                "Summarize the meeting.", d.knowledgeSources(), d.skills(), List.of(AgentTool.GET_TRANSCRIPT), SONNET,
+                d.style(), d.accepts(), d.givesBack(), d.limits()));
+    }
+
+    /** A published skill that needs the transcript tool. */
+    private SkillView summarySkill() {
+        SkillView added = addSkill.create("Meeting summary");
+        SkillView drafted = saveSkill.save(added.id(), added.revision(), new SkillDefinition("Meeting summary",
+                "When summarizing a meeting.", "Keep it short.", List.of(AgentTool.GET_TRANSCRIPT)));
+        return publishSkill.publish(drafted.id(), drafted.revision(), "");
     }
 
     private static AgentDefinition renamed(AgentDefinition d, String name) {
@@ -332,19 +339,13 @@ class AgentsTest {
 
     private static final AgentModel SONNET = new AgentModel("anthropic", "claude-sonnet-5-5", AgentModel.Effort.MEDIUM);
 
-    /** Anthropic with its three models; a blank agent starts on a made-up workspace default. */
+    /** Anthropic with its three models; a new agent starts on a made-up workspace default. */
     private static final class Models implements AgentModels {
-        private final List<Optional<String>> asked = new ArrayList<>();
         private boolean connected = true;
 
         @Override
-        public Start start(Optional<String> tier) {
-            asked.add(tier);
-            return tier.map(name -> switch (name) {
-                case "FAST" -> new Start("anthropic", "claude-haiku-5-5", "LOW");
-                case "THOROUGH" -> new Start("anthropic", "claude-opus-5-5", "HIGH");
-                default -> new Start("anthropic", "claude-sonnet-5-5", "MEDIUM");
-            }).orElse(new Start("anthropic", "default-model", "HIGH"));
+        public Start start() {
+            return new Start("anthropic", "default-model", "HIGH");
         }
 
         @Override

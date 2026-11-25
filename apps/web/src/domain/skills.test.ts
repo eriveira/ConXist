@@ -36,14 +36,13 @@ describe('skills', () => {
     expect(slug('  ')).toBe('');
   });
 
-  it('lists built-in skills first, then active ones, newest first', () => {
+  it('lists active skills first, newest first, then archived ones', () => {
     const sorted = sortSkills([
       summary({ id: 'old', updatedAt: '2026-11-19T10:00:00Z' }),
       summary({ id: 'archived', status: 'ARCHIVED', updatedAt: '2026-11-21T10:00:00Z' }),
       summary({ id: 'new' }),
-      summary({ id: 'built', source: 'BUILT_IN', updatedAt: '2026-11-01T00:00:00Z' }),
     ]);
-    expect(sorted.map((skill) => skill.id)).toEqual(['built', 'new', 'old', 'archived']);
+    expect(sorted.map((skill) => skill.id)).toEqual(['new', 'old', 'archived']);
   });
 
   it('finds the agents that follow a skill', () => {

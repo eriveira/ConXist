@@ -4,7 +4,7 @@ import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import type { AgentSummary } from '../../domain/agents';
 import { SKILL_FILTERS, type SkillFilter, type SkillSummary, sortSkills, usersOf } from '../../domain/skills';
-import { useLanguage, toolLabel, useT } from '../../i18n/i18n';
+import { toolLabel, useT } from '../../i18n/i18n';
 import { NEW_SKILL_HREF, SKILLS_HREF, skillHref, useArrivalNotice } from '../../navigation';
 import { AgentStatePill } from '../agents/AgentStatePill';
 import { ImportSkillDialog } from './ImportSkillDialog';
@@ -16,13 +16,11 @@ type ListState =
   | { status: 'ready'; skills: SkillSummary[]; agents: AgentSummary[] };
 
 /**
- * Every skill the workspace can use: the built-in ones, the team's own and imported ones. New writes one; Import
- * brings in a SKILL.md.
+ * Every skill the workspace keeps: written here or imported. New writes one; Import brings in a SKILL.md.
  */
 export function SkillsPage({ creating }: { creating: boolean }) {
   const t = useT();
   const notice = useArrivalNotice();
-  const language = useLanguage();
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [importing, setImporting] = useState(false);
   const [filter, setFilter] = useState<SkillFilter>('ALL');
@@ -38,8 +36,7 @@ export function SkillsPage({ creating }: { creating: boolean }) {
     }
   }, []);
 
-  // Built-in skills come in the person's language, so a new language reloads them.
-  useEffect(() => { void load(); }, [load, language]);
+  useEffect(() => { void load(); }, [load]);
 
   const open = (skillId: string) => { window.location.hash = skillHref(skillId); };
 
@@ -91,6 +88,16 @@ function SkillList({ skills, agents, filter, onFilter, showArchived, onShowArchi
   const shown = sortSkills(skills).filter((skill) =>
     (filter === 'ALL' || skill.source === filter) && (showArchived || skill.status !== 'ARCHIVED'));
 
+  if (skills.length === 0) {
+    return (
+      <a className="empty empty-action" href={NEW_SKILL_HREF}>
+        <span className="nico"><Icon name="skill" /></span>
+        <span className="empty-title">{t('skills.empty.title')}</span>
+        <span className="empty-body">{t('skills.empty.body')}</span>
+      </a>
+    );
+  }
+
   return (
     <>
       <div className="list-tools">
@@ -119,8 +126,8 @@ function SkillList({ skills, agents, filter, onFilter, showArchived, onShowArchi
                 <span className="agent-card-text">
                   <span className="agent-card-top">
                     <b>{skill.name}</b>
-                    <Pill tone={skill.source === 'BUILT_IN' ? 'soon' : 'info'}>{t(`skill.source.${skill.source}`)}</Pill>
-                    {skill.source === 'BUILT_IN' ? <Pill tone="live">v{skill.publishedVersion}</Pill> : <AgentStatePill agent={skill} kind="skill" />}
+                    <Pill tone="info">{t(`skill.source.${skill.source}`)}</Pill>
+                    <AgentStatePill agent={skill} kind="skill" />
                   </span>
                   {skill.description && <span className="agent-card-purpose">{skill.description}</span>}
                   <span className="agent-card-meta">
