@@ -41,7 +41,7 @@ public record AgentBrief(
         problems = List.copyOf(problems);
     }
 
-    /** @param source BUILT_IN, YOURS or IMPORTED */
+    /** @param source YOURS or IMPORTED */
     public record Skill(UUID id, int version, String name, String source, String instructions) {
     }
 }

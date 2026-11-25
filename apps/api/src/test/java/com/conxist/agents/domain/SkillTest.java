@@ -57,26 +57,6 @@ class SkillTest {
     }
 
     @Test
-    void a_built_in_skill_is_not_stored_per_workspace() {
-        assertThatThrownBy(() -> Skill.create(UUID.randomUUID(), UUID.randomUUID(), SkillSource.BUILT_IN,
-                new SkillDefinition("Style", "", "", null), NOW)).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void built_in_skills_have_fixed_ids_and_both_languages() {
-        for (BuiltInSkill skill : BuiltInSkill.values()) {
-            assertThat(BuiltInSkill.byId(skill.id())).contains(skill);
-            for (Language language : Language.values()) {
-                SkillDefinition definition = skill.definition(language);
-                assertThat(definition.problems()).isEmpty();
-                assertThat(AgentTool.mentionedIn(definition.instructions())).isEqualTo(definition.needs());
-            }
-        }
-        assertThat(BuiltInSkill.MEETING_SUMMARY.id())
-                .isEqualTo(UUID.nameUUIDFromBytes("conxist.skill.MEETING_SUMMARY".getBytes()));
-    }
-
-    @Test
     void a_skill_md_is_read_from_its_front_matter_and_body() {
         SkillDefinition skill = SkillMarkdown.read("﻿---\r\nname: 'Weekly digest'\r\ndescription: When "
                 + "summing up a week.\r\nmetadata:\r\n  name: ignored\r\n---\r\n\r\nUse get_transcript.\r\n");
@@ -126,7 +106,6 @@ class SkillTest {
         assertThat(skill.description()).isEqualTo("When writing.");
         assertThat(skill.instructions()).isEqualTo("Be short.");
         assertThat(new SkillDefinition("Team 👩‍💻", "", "", null).name()).isEqualTo("Team 👩‍💻");
-        assertThat(BuiltInSkill.nameTaken(skill.name())).isTrue();
     }
 
     @Test

@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.file.Path;
 import java.util.Map;
-import com.conxist.agents.domain.BuiltInSkill;
 import com.conxist.testing.FakePlaudConfiguration;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -82,7 +80,7 @@ class SkillsIntegrationTest {
 
         String agent = mvc.perform(post("/api/agents").header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"BLANK\",\"name\":\"Notes\",\"language\":\"EN\"}"))
+                        .content("{\"name\":\"Notes\"}"))
                 .andReturn().getResponse().getContentAsString();
         String agentId = JsonPath.read(agent, "$.id");
         mvc.perform(put("/api/agents/{id}/draft", agentId).header(HEADER, workspace)
@@ -107,25 +105,9 @@ class SkillsIntegrationTest {
     }
 
     @Test
-    void built_in_skills_come_in_the_persons_language_and_can_only_be_copied() throws Exception {
-        String workspace = workspace("Built in");
-        String builtIn = BuiltInSkill.MEETING_SUMMARY.id().toString();
-
-        mvc.perform(get("/api/skills/{id}", builtIn).header(HEADER, workspace)
-                        .header(HttpHeaders.ACCEPT_LANGUAGE, "es-MX,es;q=0.9"))
-                .andExpect(jsonPath("$.source").value("BUILT_IN"))
-                .andExpect(jsonPath("$.draft.name").value("Resumen de reunión"));
-        mvc.perform(put("/api/skills/{id}/draft", builtIn).header(HEADER, workspace)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"revision\":0,\"draft\":{\"name\":\"Mine\"}}"))
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("skill.built-in"));
-        mvc.perform(post("/api/skills/{id}/copy", builtIn).header(HEADER, workspace))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.source").value("YOURS"))
-                .andExpect(jsonPath("$.draft.name").value("Meeting summary (copy)"));
-        mvc.perform(get("/api/skills").header(HEADER, workspace))
-                .andExpect(jsonPath("$.length()").value(BuiltInSkill.values().length + 1));
+    void a_new_workspace_has_no_skills() throws Exception {
+        mvc.perform(get("/api/skills").header(HEADER, workspace("Fresh")))
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test
@@ -159,12 +141,11 @@ class SkillsIntegrationTest {
         }
 
         mvc.perform(get("/api/skills").header(HEADER, other))
-                .andExpect(jsonPath("$.length()").value(BuiltInSkill.values().length))
-                .andExpect(jsonPath("$[?(@.id == '" + id + "')]").isEmpty());
+                .andExpect(jsonPath("$").isEmpty());
 
         String agent = mvc.perform(post("/api/agents").header(HEADER, other)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"BLANK\",\"name\":\"Borrower\",\"language\":\"EN\"}"))
+                        .content("{\"name\":\"Borrower\"}"))
                 .andReturn().getResponse().getContentAsString();
         String agentId = JsonPath.read(agent, "$.id");
         mvc.perform(put("/api/agents/{id}/draft", agentId).header(HEADER, other)
@@ -195,7 +176,7 @@ class SkillsIntegrationTest {
                 .andExpect(jsonPath("$.revision").value(2));
         String agentId = JsonPath.read(mvc.perform(post("/api/agents").header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"template\":\"BLANK\",\"name\":\"Notes\",\"language\":\"EN\"}"))
+                        .content("{\"name\":\"Notes\"}"))
                 .andReturn().getResponse().getContentAsString(), "$.id");
         mvc.perform(put("/api/agents/{id}/draft", agentId).header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -214,10 +195,6 @@ class SkillsIntegrationTest {
         mvc.perform(delete("/api/skills/{id}", skillId).param("revision", "2").header(HEADER, workspace))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("skill.in-use"));
-        mvc.perform(delete("/api/skills/{id}", BuiltInSkill.MEETING_SUMMARY.id()).param("revision", "0")
-                        .header(HEADER, workspace))
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("skill.built-in"));
 
         mvc.perform(delete("/api/agents/{id}", agentId).param("revision", "3").header(HEADER, other))
                 .andExpect(status().isNotFound());
@@ -240,7 +217,7 @@ class SkillsIntegrationTest {
         mvc.perform(get("/api/skills/{id}", skillId).header(HEADER, workspace))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/skills").header(HEADER, workspace))
-                .andExpect(jsonPath("$.length()").value(BuiltInSkill.values().length));
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     private static String agentDraft(int revision, String skills, String tools) {

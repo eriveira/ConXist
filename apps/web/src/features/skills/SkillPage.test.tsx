@@ -100,24 +100,6 @@ describe('SkillPage', () => {
     expect(screen.getByText('Before you publish').parentElement).toHaveTextContent('Say when to use it');
   });
 
-  it('shows a built-in skill read-only and copies it into one the team can change', async () => {
-    const copyId = '33333333-3333-3333-3333-333333333333';
-    const calls = api({ ...SKILL, source: 'BUILT_IN', revision: 0, draftPublished: true, needs: undefined } as unknown as Skill, {
-      [`POST /api/skills/${ID}/copy`]: () => ({ status: 201, body: { id: copyId } }),
-    });
-    render(<SkillPage skillId={ID} />);
-
-    expect(await screen.findByLabelText('Name')).toHaveAttribute('readonly');
-    expect(screen.getByRole('textbox', { name: 'Instructions' })).not.toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-    expect(screen.getByText(/can’t be changed/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
-
-    await waitFor(() => expect(window.location.hash).toBe(`#/skills/${copyId}`));
-    expect(calls.some((call) => call.key.startsWith('PUT'))).toBe(false);
-  });
-
   it('does not delete a skill an agent follows: it names the agent and links there, accessibly', async () => {
     const calls = api(SKILL, {
       [`GET /api/skills/${ID}/uses`]: () => ({ body: [

@@ -15,7 +15,7 @@ const TOOLS = [
 const STYLE_ID = '44444444-4444-4444-4444-444444444444';
 const SUMMARY_ID = '55555555-5555-5555-5555-555555555555';
 const SKILLS: SkillSummary[] = [
-  { id: SUMMARY_ID, name: 'Meeting summary', description: 'When summarizing a meeting.', source: 'BUILT_IN', status: 'ACTIVE',
+  { id: SUMMARY_ID, name: 'Meeting summary', description: 'When summarizing a meeting.', source: 'YOURS', status: 'ACTIVE',
     publishedVersion: 1, draftPublished: true, needs: ['LIST_MEETINGS'], updatedAt: '2026-11-21T00:00:00Z' },
   { id: STYLE_ID, name: 'Acme style', description: 'When writing for customers.', source: 'YOURS', status: 'ACTIVE',
     publishedVersion: 3, draftPublished: true, needs: [], updatedAt: '2026-11-21T00:00:00Z' },
@@ -263,7 +263,7 @@ describe('AgentPage', () => {
   it('blocks publishing while a skill needs a tool that is off, and offers to turn it on', async () => {
     api({
       ...AGENT, draft: { ...DRAFT, skills: [{ skillId: SUMMARY_ID, version: 1 }] }, problems: ['skill-needs-tool'],
-      skills: [{ skillId: SUMMARY_ID, version: 1, name: 'Meeting summary', description: 'When summarizing.', source: 'BUILT_IN', needs: ['LIST_MEETINGS'], newestVersion: 1 }],
+      skills: [{ skillId: SUMMARY_ID, version: 1, name: 'Meeting summary', description: 'When summarizing.', source: 'YOURS', needs: ['LIST_MEETINGS'], newestVersion: 1 }],
     });
     render(<AgentPage agentId={ID} />);
 

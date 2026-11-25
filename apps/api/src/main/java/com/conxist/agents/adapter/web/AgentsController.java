@@ -16,11 +16,9 @@ import com.conxist.agents.application.RestoreAgentVersion;
 import com.conxist.agents.application.SaveAgentDraft;
 import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentModel;
-import com.conxist.agents.domain.AgentTemplate;
 import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.AgentVersion;
 import com.conxist.agents.domain.InputKind;
-import com.conxist.agents.domain.Language;
 import com.conxist.agents.domain.Limits;
 import com.conxist.agents.domain.OutputKind;
 import com.conxist.agents.domain.SkillPin;
@@ -88,7 +86,7 @@ class AgentsController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     AgentView create(@Valid @RequestBody CreateRequest request) {
-        return createAgent.create(request.template(), request.name(), request.language());
+        return createAgent.create(request.name());
     }
 
     @GetMapping("/{agentId}")
@@ -143,10 +141,7 @@ class AgentsController {
     record ToolInfo(String id, String toolName, boolean readOnly) {
     }
 
-    record CreateRequest(
-            @NotNull AgentTemplate template,
-            @Size(max = MAX_LINE_INPUT) String name,
-            @NotNull Language language) {
+    record CreateRequest(@Size(max = MAX_LINE_INPUT) String name) {
     }
 
     record RevisionRequest(@NotNull Long revision) {

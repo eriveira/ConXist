@@ -49,10 +49,8 @@ public final class LlmProviders implements AgentModels {
     }
 
     @Override
-    public Start start(Optional<String> tier) {
-        ModelStart start = tier.flatMap(Preset::named).map(catalog::tier)
-                .filter(s -> available(s.provider(), s.model()))
-                .orElseGet(this::defaultStart);
+    public Start start() {
+        ModelStart start = defaultStart();
         return new Start(start.provider(), start.model(), start.effort().name());
     }
 
@@ -76,10 +74,10 @@ public final class LlmProviders implements AgentModels {
                 ModelChoice.Effort.valueOf(agent.effort()), option.fallbacks(), option.maxTokens())));
     }
 
-    /** The workspace's saved default while it can still run; else the balanced tier. */
+    /** The workspace's saved default while it can still run; else where the settings start new agents. */
     private ModelStart defaultStart() {
         return defaults.find(workspace.id()).filter(s -> available(s.provider(), s.model()))
-                .orElseGet(() -> catalog.tier(Preset.BALANCED));
+                .orElseGet(catalog::newAgents);
     }
 
     private boolean connected(String provider) {

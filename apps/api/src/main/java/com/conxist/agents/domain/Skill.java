@@ -6,7 +6,6 @@ import java.util.UUID;
 
 /**
  * A skill the team keeps in one workspace: the draft a person edits at any time, and how far it has been published.
- * Built-in skills are not kept this way; see {@link BuiltInSkill}.
  *
  * @param revision         goes up by one on every change, so a stale editor cannot overwrite a newer draft
  * @param publishedVersion the newest version number, or 0 when it was never published
@@ -27,9 +26,6 @@ public record Skill(
     public static final int MAX_NOTE_LENGTH = 140;
 
     public static Skill create(UUID id, UUID workspaceId, SkillSource source, SkillDefinition draft, Instant now) {
-        if (source == SkillSource.BUILT_IN) {
-            throw new IllegalArgumentException("Built-in skills are kept by ConXist, not stored per workspace");
-        }
         return new Skill(id, workspaceId, source, draft, 1, AgentStatus.ACTIVE, 0, false, now, now);
     }
 

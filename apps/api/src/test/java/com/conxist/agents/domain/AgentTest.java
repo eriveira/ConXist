@@ -18,7 +18,9 @@ class AgentTest {
     private static final Instant LATER = NOW.plus(Duration.ofMinutes(5));
 
     private final Agent agent = Agent.create(UUID.randomUUID(), UUID.randomUUID(),
-            AgentTemplate.MEETING_SUMMARIZER.draft("Summarizer", Language.EN, MODEL), NOW);
+            new AgentDefinition("Summarizer", "Summarizes a meeting.", "Summarize the meeting.", List.of(), List.of(),
+                    List.of(AgentTool.GET_TRANSCRIPT), MODEL, Style.PRECISE, List.of(InputKind.TRANSCRIPT),
+                    OutputKind.SUMMARY, Limits.DEFAULT), NOW);
 
     @Test
     void a_new_agent_is_an_unpublished_draft() {
@@ -120,15 +122,6 @@ class AgentTest {
         assertCode(() -> new Limits(0, 120, 10), "agent.limits-steps");
         assertCode(() -> new Limits(6, 5, 10), "agent.limits-time");
         assertCode(() -> new Limits(6, 120, 51), "agent.limits-tool-calls");
-    }
-
-    @Test
-    void templates_write_the_brief_in_the_persons_language() {
-        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analista", Language.ES, MODEL).instructions())
-                .startsWith("Encuentra los requisitos");
-        assertThat(AgentTemplate.REQUIREMENTS_ANALYST.draft("Analyst", Language.EN, MODEL).givesBack())
-                .isEqualTo(OutputKind.REQUIREMENTS);
-        assertThat(AgentTemplate.BLANK.draft("Mine", Language.EN, MODEL).problems()).containsExactly("instructions-required");
     }
 
     @Test

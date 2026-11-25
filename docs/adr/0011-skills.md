@@ -4,6 +4,7 @@
 - Date: 2026-11-21
 - Decided by: Eugenio Riviera (agents plan and mock approved; "build a real flow step by step", Skills under Agents
   accepted on the decision card, project thread, 2026-11-20)
+- Changed by: ADR 0015 (2026-11-25): built-in skills and copying them removed.
 
 ## Context
 

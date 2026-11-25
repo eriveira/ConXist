@@ -2,6 +2,7 @@
 
 - Status: **Proposed** (needs the owner's go before migration V11 is applied anywhere shared)
 - Date: 2026-11-20
+- Changed by: ADR 0015 (2026-11-25): templates removed; New agent starts an empty draft.
 - Decided by: Eugenio Riviera (agents plan and mock approved; "build a real flow step by step", defaults accepted on
   the decision card, project thread, 2026-11-20)
 

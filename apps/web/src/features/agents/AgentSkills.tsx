@@ -79,7 +79,7 @@ export function AgentSkills({ draft, pinned, skills, tools, onChange }: AgentSki
                 <span className="grow">
                   <span className="skill-row-top">
                     <b>{row.skill.name}</b>
-                    <Pill tone={row.skill.source === 'BUILT_IN' ? 'soon' : 'info'}>
+                    <Pill tone="info">
                       {t(`skill.source.${row.skill.source}`)} · v{row.pin.version}
                     </Pill>
                   </span>
