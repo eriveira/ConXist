@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import com.conxist.agents.AgentBrief;
+import com.conxist.agents.AgentBriefs;
 import com.conxist.capture.DocumentOrigin;
 import com.conxist.capture.MeetingLibrary;
 import com.conxist.platform.NotFound;
@@ -39,7 +40,8 @@ class StartTestRunTest {
     private final TestClock.Moving clock = TestClock.moving();
     private final ScriptedModel model = new ScriptedModel();
     private final LlmProviders providers = new LlmProviders(TestModels.catalog(), List.of(model),
-            new TestModels.Defaults(), FixedWorkspace.standard(), TestClock.fixed());
+            new TestModels.Defaults(), new TestModels.Allowed(), TestModels.lists(), FixedWorkspace.standard(),
+            TestClock.fixed());
     private final Map<UUID, AgentBrief> agents = new HashMap<>();
     private final Map<UUID, SourceSummary> sources = new HashMap<>();
     private final Map<UUID, List<MeetingLibrary.Text>> meetings = new HashMap<>();
@@ -58,7 +60,19 @@ class StartTestRunTest {
         }
     };
 
-    private final StartTestRun run = new StartTestRun(id -> Optional.ofNullable(agents.get(id)), library,
+    private final AgentBriefs briefs = new AgentBriefs() {
+        @Override
+        public Optional<AgentBrief> draft(UUID agentId) {
+            return Optional.ofNullable(agents.get(agentId));
+        }
+
+        @Override
+        public List<String> usingModel(String provider, String model) {
+            return List.of();
+        }
+    };
+
+    private final StartTestRun run = new StartTestRun(briefs, library,
             new RunTools(id -> Optional.ofNullable(sources.get(id)), library), providers,
             (answer, required) -> answer.startsWith("{") && required.stream().allMatch(answer::contains)
                     ? Optional.of(Map.of("raw", answer)) : Optional.empty(),
@@ -326,6 +340,11 @@ class StartTestRunTest {
         @Override
         public boolean ready() {
             return ready;
+        }
+
+        @Override
+        public List<ProviderModel> models(java.time.Duration timeout) {
+            return List.of();
         }
 
         @Override

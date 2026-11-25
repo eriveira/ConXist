@@ -30,6 +30,17 @@ public final class ReadAgentBriefs implements AgentBriefs {
         return book.agents().find(book.workspaceId(), agentId).map(this::brief);
     }
 
+    @Override
+    public List<String> usingModel(String provider, String model) {
+        return book.agents().findAll(book.workspaceId()).stream()
+                .filter(agent -> agent.status() != AgentStatus.ARCHIVED)
+                .filter(agent -> agent.draft().model() != null && agent.draft().model().provider().equals(provider)
+                        && agent.draft().model().model().equals(model))
+                .map(agent -> agent.draft().name())
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
     private AgentBrief brief(Agent agent) {
         AgentDefinition draft = agent.draft();
         Optional<AgentModel> model = Optional.ofNullable(draft.model());

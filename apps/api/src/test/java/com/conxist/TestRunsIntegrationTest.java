@@ -78,6 +78,57 @@ class TestRunsIntegrationTest {
     }
 
     @Test
+    void settings_list_every_model_anthropic_offers_and_a_ticked_one_can_run_while_an_unticked_one_cannot()
+            throws Exception {
+        String workspace = workspace("Allowed models");
+
+        mvc.perform(get("/api/llm-providers/anthropic/models").header(HEADER, workspace))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connected").value(true))
+                .andExpect(jsonPath("$.listError").isEmpty())
+                .andExpect(jsonPath("$.models.length()").value(FakeClaudeServer.MODELS.size()))
+                .andExpect(jsonPath("$.models[0].id").value("claude-fable-5-2"))
+                .andExpect(jsonPath("$.models[0].label").value("Claude Fable 5.2"))
+                .andExpect(jsonPath("$.models[0].allowed").value(false))
+                .andExpect(jsonPath("$.models[1].allowed").value(true));
+
+        mvc.perform(put("/api/llm-providers/anthropic/models/claude-fable-5-2").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowed\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.models[0].allowed").value(true));
+        mvc.perform(get("/api/llm-providers").header(HEADER, workspace))
+                .andExpect(jsonPath("$.providers[0].models[3].label").value("Claude Fable 5.2"));
+        mvc.perform(get("/api/llm-providers").header(HEADER, workspace("Other")))
+                .andExpect(jsonPath("$.providers[0].models.length()").value(3));
+
+        String agent = agent(workspace, "Summary");
+        mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(summaryDraft(1, "claude-fable-5-2")))
+                .andExpect(jsonPath("$.problems").isEmpty());
+        mvc.perform(put("/api/llm-providers/anthropic/models/claude-fable-5-2").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowed\":false}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("model.in-use"))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Summary")));
+
+        mvc.perform(put("/api/llm-providers/anthropic/models/claude-haiku-5-5").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowed\":false}"))
+                .andExpect(status().isOk());
+        mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(summaryDraft(2, "claude-haiku-5-5")))
+                .andExpect(jsonPath("$.problems[0]").value("model-unavailable"));
+        mvc.perform(put("/api/llm-providers/anthropic/models/claude-made-up").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowed\":true}"))
+                .andExpect(jsonPath("$.code").value("model.not-offered"));
+        mvc.perform(put("/api/llm-providers/anthropic/models/{model}", "m".repeat(101)).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowed\":true}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/llm-providers/anthropic/models/claude-opus-5").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void a_run_uses_the_agents_own_model_and_a_model_that_cannot_run_is_refused() throws Exception {
         String workspace = workspace("Own model");
         String source = source(workspace, "Specs");

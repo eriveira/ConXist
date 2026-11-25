@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
 import type { AgentSummary } from '../../domain/agents';
+import type { OfferedModels } from '../../domain/settings';
 import { LLM_PROVIDERS, stubApi } from '../../testing';
 import { SettingsPage } from './SettingsPage';
 
@@ -10,6 +11,14 @@ const agent = (name: string, model: AgentSummary['model']): AgentSummary => ({
   id: name, name, purpose: '', status: 'ACTIVE', publishedVersion: 0, draftPublished: false, givesBack: 'TOPICS', model,
   skills: [], updatedAt: '2026-11-24T00:00:00Z',
 });
+const OFFERED: OfferedModels = {
+  provider: 'anthropic', connected: true, listError: null, models: [
+    { id: 'claude-fable-5-2', label: 'Claude Fable 5.2', allowed: false, listed: true },
+    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', allowed: true, listed: true },
+    { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', allowed: true, listed: true },
+    { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', allowed: true, listed: true },
+  ],
+};
 const CHECKOUT = { id: 't1', name: 'Checkout', description: 'Cart and payment' };
 
 function open(section: string) {
@@ -26,6 +35,7 @@ describe('SettingsPage', () => {
   it('lists each model with who uses it at what effort, and saves where new agents start', async () => {
     const calls = stubApi({
       'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
+      'GET /api/llm-providers/anthropic/models': () => ({ body: OFFERED }),
       'GET /api/agents': () => ({ body: [
         agent('Topic classifier', { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }),
         agent('Analyst', { provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' }),
@@ -37,11 +47,12 @@ describe('SettingsPage', () => {
     const { container } = open('#/settings/llm');
 
     const model = await screen.findByRole('combobox', { name: 'Model for new agents' });
+    await screen.findByRole('checkbox', { name: 'Claude Haiku 5.5' });
     expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /Claude Haiku 5.5/ })).toHaveTextContent('Topic classifier (low)');
     expect(screen.getByRole('row', { name: /Claude Opus 5.5/ })).toHaveTextContent('Analyst (high)');
     expect(screen.getByRole('row', { name: /Claude Sonnet 5.5/ })).toHaveTextContent('No agents yet');
-    expect(screen.getByText(/More providers/)).toHaveTextContent('Coming soon');
+    expect(screen.queryByText(/More providers/)).not.toBeInTheDocument();
     expect(model).toHaveValue('anthropic/claude-sonnet-5-5');
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
@@ -54,6 +65,47 @@ describe('SettingsPage', () => {
       .toEqual({ provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' });
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(await accessibilityViolations(container)).toEqual([]);
+  });
+
+  it('ticks a model the provider offers, keeps the ones in use ticked, and says why an untick was refused', async () => {
+    let offered = OFFERED;
+    const calls = stubApi({
+      'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
+      'GET /api/llm-providers/anthropic/models': () => ({ body: offered }),
+      'GET /api/llm-providers/anthropic/models?refresh=true': () => ({ body: { ...offered, listError: 'FAILED' } }),
+      'GET /api/agents': () => ({ body: [agent('Topic classifier', { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' })] }),
+      'PUT /api/llm-providers/anthropic/models/claude-fable-5-2': () => {
+        offered = { ...offered, models: offered.models.map((m) => (m.id === 'claude-fable-5-2' ? { ...m, allowed: true } : m)) };
+        return { body: offered };
+      },
+      'PUT /api/llm-providers/anthropic/models/claude-opus-5-5': () => ({
+        status: 422, body: { code: 'model.in-use', detail: 'Agents run on this model: Analyst. Switch them to another model first.' },
+      }),
+    });
+    const { container } = open('#/settings/llm');
+
+    const fable = await screen.findByRole('checkbox', { name: 'Claude Fable 5.2' });
+    expect(screen.getByText('Offered: 4. Allowed: 3.')).toBeInTheDocument();
+    expect(fable).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Claude Haiku 5.5' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Claude Haiku 5.5' })).toHaveAccessibleDescription(/Agents run on it/);
+    expect(screen.getByRole('checkbox', { name: 'Claude Sonnet 5.5' })).toHaveAccessibleDescription(/New agents start on it/);
+    expect(await accessibilityViolations(container)).toEqual([]);
+
+    await userEvent.click(fable);
+    expect(await screen.findByText('Saved')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Claude Fable 5.2' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Claude Fable 5.2' })).toHaveFocus();
+    expect(calls.find((call) => call.key === 'PUT /api/llm-providers/anthropic/models/claude-fable-5-2')?.init?.body)
+      .toBe('{"allowed":true}');
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Claude Opus 5.5' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('An agent runs on this model now.');
+    expect(screen.getByRole('checkbox', { name: 'Claude Opus 5.5' })).toBeChecked();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh list' }));
+    expect(await screen.findByText(/could not be fetched just now/)).toHaveTextContent('ConXist could not reach the provider.');
+    expect(screen.queryByText('An agent runs on this model now.', { exact: false })).not.toBeInTheDocument();
   });
 
   it('says how to add a key when no provider is connected, and offers no default', async () => {

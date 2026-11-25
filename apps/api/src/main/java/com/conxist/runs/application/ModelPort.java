@@ -19,6 +19,13 @@ public interface ModelPort {
     Turn next(Request request);
 
     /**
+     * Every model the provider offers this key, newest first, as the provider lists it.
+     *
+     * @throws Failure when the list could not be fetched
+     */
+    List<ProviderModel> models(Duration timeout);
+
+    /**
      * One call. {@code exchanges} are the earlier turns with their tool results, in order; {@code outputSchema} is
      * null when the answer is plain text.
      */

@@ -1,6 +1,7 @@
 package com.conxist.runs.adapter.model;
 
 import java.io.InterruptedIOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,8 +28,11 @@ import com.anthropic.models.beta.messages.BetaStopReason;
 import com.anthropic.models.beta.messages.BetaTool;
 import com.anthropic.models.beta.messages.BetaToolResultBlockParam;
 import com.anthropic.models.beta.messages.MessageCreateParams;
+import com.anthropic.models.models.ModelListPage;
+import com.anthropic.models.models.ModelListParams;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
+import com.conxist.runs.application.ProviderModel;
 
 /**
  * Claude through the official Anthropic Java SDK (ADR 0012). Each turn is one Messages call: adaptive thinking (the
@@ -39,6 +43,13 @@ public final class ClaudeModel implements ModelPort {
 
     /** Server-side fallback when a model declines (the Anthropic API's beta), for the models that offer it. */
     static final String FALLBACK_BETA = "server-side-fallback-2026-07-01";
+    /** Models asked for per page, and the most pages read: a guard against a list that never ends. */
+    private static final long PAGE_SIZE = 100;
+    private static final int MAX_PAGES = 10;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ClaudeModel.class);
+    private static final String KEY_REFUSED =
+            "Anthropic refused the key. Check CONXIST_ANTHROPIC_API_KEY and what it may use.";
+    private static final String BUSY = "Anthropic is busy right now. Try again in a minute.";
     private final AnthropicClient client;
     private final boolean ready;
 
@@ -74,25 +85,65 @@ public final class ClaudeModel implements ModelPort {
             BetaMessage message = client.beta().messages().create(params(request),
                     RequestOptions.builder().timeout(request.timeout()).build());
             return turn(message);
-        } catch (UnauthorizedException | PermissionDeniedException rejected) {
-            throw new Failure(Failure.Reason.KEY_REJECTED,
-                    "Anthropic refused the key. Check CONXIST_ANTHROPIC_API_KEY and that it can use this model.",
-                    rejected);
-        } catch (RateLimitException | OverloadedException busy) {
-            throw new Failure(Failure.Reason.BUSY, "Anthropic is busy right now. Try again in a minute.", busy);
-        } catch (AnthropicIoException io) {
-            if (io.getCause() instanceof InterruptedIOException) {
-                throw new Timeout();
-            }
-            throw new Failure(Failure.Reason.FAILED, "ConXist could not reach Anthropic. Check the connection.", io);
-        } catch (AnthropicServiceException other) {
-            throw new Failure(Failure.Reason.FAILED, "Anthropic could not run this test (" + other.statusCode() + ").",
-                    other);
-        } catch (AnthropicException | IllegalArgumentException | IllegalStateException unreadable) {
-            // An answer the library could not read. Its message can quote the answer, so only the class goes on.
-            throw new Failure(Failure.Reason.FAILED, "Anthropic's answer could not be read ("
-                    + unreadable.getClass().getSimpleName() + ").", unreadable);
+        } catch (AnthropicException | IllegalArgumentException | IllegalStateException failure) {
+            throw failure(failure, "run this test");
         }
+    }
+
+    /** Reads every page within one time limit; a model id ConXist can't keep is left out, and only counted in the log. */
+    @Override
+    public List<ProviderModel> models(Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        List<ProviderModel> models = new ArrayList<>();
+        int skipped = 0;
+        try {
+            ModelListPage page = client.models().list(ModelListParams.builder().limit(PAGE_SIZE).build(),
+                    remaining(deadline));
+            for (int pages = 1; ; pages++) {
+                for (var info : page.data()) {
+                    if (ProviderModel.validId(info.id())) {
+                        models.add(new ProviderModel(info.id(), info.displayName()));
+                    } else {
+                        skipped++;
+                    }
+                }
+                if (!page.hasNextPage() || pages == MAX_PAGES) {
+                    break;
+                }
+                page = client.models().list(page.nextPageParams(), remaining(deadline));
+            }
+        } catch (AnthropicException | IllegalArgumentException | IllegalStateException failure) {
+            throw failure(failure, "list its models");
+        }
+        if (skipped > 0) {
+            log.warn("Left out {} Anthropic models whose id ConXist can't keep", skipped);
+        }
+        return List.copyOf(models);
+    }
+
+    private static RequestOptions remaining(long deadline) {
+        long left = deadline - System.nanoTime();
+        if (left <= 0) {
+            throw new Timeout();
+        }
+        return RequestOptions.builder().timeout(Duration.ofNanos(left)).build();
+    }
+
+    /** What the person sees when a call fails. The library's own message can quote the answer, so it stays out. */
+    private static RuntimeException failure(RuntimeException thrown, String doing) {
+        return switch (thrown) {
+            case UnauthorizedException rejected -> new Failure(Failure.Reason.KEY_REJECTED, KEY_REFUSED, rejected);
+            case PermissionDeniedException rejected -> new Failure(Failure.Reason.KEY_REJECTED, KEY_REFUSED, rejected);
+            case RateLimitException busy -> new Failure(Failure.Reason.BUSY, BUSY, busy);
+            case OverloadedException busy -> new Failure(Failure.Reason.BUSY, BUSY, busy);
+            case AnthropicIoException io when io.getCause() instanceof InterruptedIOException -> new Timeout();
+            case AnthropicIoException io -> new Failure(Failure.Reason.FAILED,
+                    "ConXist could not reach Anthropic. Check the connection.", io);
+            case AnthropicServiceException other -> new Failure(Failure.Reason.FAILED,
+                    "Anthropic could not " + doing + " (" + other.statusCode() + ").", other);
+            default -> new Failure(Failure.Reason.FAILED,
+                    "Anthropic's answer could not be read (" + thrown.getClass().getSimpleName() + ").", thrown);
+        };
     }
 
     MessageCreateParams params(Request request) {

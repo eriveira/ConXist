@@ -74,10 +74,11 @@ Sources page does not show it for now, owner decision 2026-11-17).
   can't be published either, since their provider is not connected (ADR 0014).
   `mvn spring-boot:test-run` also runs a fake Claude, so the panel works without a key.
 - Workspace Settings (ADR 0014, owner 2026-11-24): a Settings button in the workspace menu opens `#/settings` with
-  General (rename, description), LLM providers (connected providers and their models, who uses each and at what
-  effort, and the default for new agents; more providers, zero retention and a monthly limit are coming soon),
+  General (rename, description), LLM providers (Anthropic only: every model it offers with an Allowed box, who uses
+  each and at what effort, and the default for new agents),
   Connectors (Storage and MCP access, both coming soon) and Topics (up to 50 per workspace, for the topic classifier).
-  Each agent picks its own provider, model and effort; the models it may pick are listed in `conxist.runs.models`.
+  Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
+  lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

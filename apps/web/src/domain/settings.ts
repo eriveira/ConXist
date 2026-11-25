@@ -20,16 +20,45 @@ export interface LlmProvider {
   id: string;
   /** Whether the API has a key for it. The key itself never reaches the app. */
   connected: boolean;
+  /** The models this workspace allows agents to pick. */
   models: LlmModel[];
 }
 
-/** The providers a workspace can use (ADR 0014), and where its new blank agents start. */
+/** A model the provider offers, and whether this workspace lets agents pick it. */
+export interface OfferedModel {
+  id: string;
+  label: string;
+  allowed: boolean;
+  /** False when the provider no longer offers a model that is still allowed. */
+  listed: boolean;
+}
+
+export type ListError = 'KEY_REJECTED' | 'BUSY' | 'TIMEOUT' | 'FAILED';
+
+/** Every model a provider offers this workspace's key (ADR 0014). */
+export interface OfferedModels {
+  provider: string;
+  connected: boolean;
+  models: OfferedModel[];
+  /** Why the provider's list could not be fetched just now; null when it was. */
+  listError: ListError | null;
+}
+
+/** Why a model must stay allowed: agents run on it, or new agents start on it. Null when it may be unticked. */
+export function lockReason(providers: LlmProviders, users: readonly ModelUser[], provider: string, model: string):
+  'used' | 'default' | null {
+  if (users.length > 0) return 'used';
+  const start = providers.defaultForNewAgents;
+  return start.provider === provider && start.model === model ? 'default' : null;
+}
+
+/** The providers a workspace can use (ADR 0014), the models it allows, and where its new blank agents start. */
 export interface LlmProviders {
   providers: LlmProvider[];
   defaultForNewAgents: AgentModel;
 }
 
-/** Whether the agent's pick can run now: its provider is connected and still lists the model. */
+/** Whether the agent's pick can run now: its provider is connected and the workspace allows the model. */
 export function modelAvailable(providers: LlmProviders, pick: AgentModel | null): boolean {
   if (!pick) return false;
   const provider = providers.providers.find((each) => each.id === pick.provider);

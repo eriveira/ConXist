@@ -232,6 +232,24 @@ class AgentsTest {
     }
 
     @Test
+    void the_agents_on_a_model_are_the_active_ones_whose_draft_picks_it_by_name() {
+        ReadAgentBriefs briefs = new ReadAgentBriefs(book, skills);
+        ready("zed");
+        ready("Alpha");
+        AgentView gone = ready("Gone");
+        archive.archive(gone.id(), gone.revision());
+        AgentView none = ready("None");
+        save.save(none.id(), none.revision(), withModel(none.draft(), null));
+        AgentView haiku = ready("Haiku one");
+        save.save(haiku.id(), haiku.revision(),
+                withModel(haiku.draft(), new AgentModel("anthropic", "claude-haiku-5-5", AgentModel.Effort.LOW)));
+
+        assertThat(briefs.usingModel("anthropic", "claude-sonnet-5-5")).containsExactly("Alpha", "zed");
+        assertThat(briefs.usingModel("openai", "claude-sonnet-5-5")).isEmpty();
+        assertThat(briefs.usingModel("anthropic", "claude-haiku-5-5")).containsExactly("Haiku one");
+    }
+
+    @Test
     void archived_agents_stay_listed_and_can_come_back() {
         AgentView created = ready("Summarizer");
         AgentView archived = archive.archive(created.id(), created.revision());

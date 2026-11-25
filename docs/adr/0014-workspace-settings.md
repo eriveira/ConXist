@@ -5,6 +5,9 @@
 - Deciders: owner, Claude
 - Changes: ADR 0010's "agents name a setting (Fast, Balanced, Thorough), never a model"
 - Changed by: ADR 0015 (2026-11-25): template tiers removed; `conxist.runs.new-agents` is where new agents start.
+- Amended 2026-11-25 (owner): LLM providers keeps only what adding a provider needs, Anthropic only; Settings lists
+  every model the provider offers and the workspace ticks the ones agents may pick (mock
+  `App/mocks/workspace-settings-v3/`). See "Allowed models" below.
 
 ## Context
 
@@ -37,13 +40,24 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
 - `GET /api/llm-providers` returns each provider (connected when its key is set) with its models, and the default;
   `PUT /api/llm-providers/default` saves the default. Keys stay in `CONXIST_ANTHROPIC_API_KEY` and never reach the app.
 - The app shows, per model, "Used by (effort)" from the agents list, which carries each agent's model.
+- **Allowed models** (amendment, 2026-11-25): `GET /api/llm-providers/{provider}/models` lists every model the
+  provider offers this key (Anthropic's Models API through the Java SDK, `client.models().list()`), each marked
+  allowed or not; `?refresh=true` asks the provider now, otherwise the list is kept for `conxist.runs.model-list-kept-for`
+  (1 hour) and asking may take `model-list-timeout` (10 s). When asking fails the reason comes back with the last list.
+  `PUT /api/llm-providers/{provider}/models/{model}` with `{allowed}` ticks or unticks one (`AllowModel`). Table
+  `workspace_allowed_models` (V16, `runs` module) keeps each tick with the provider's name for the model; a model
+  with no row is allowed when `conxist.runs.models` lists it, so a new workspace starts with those. Only a model the
+  provider offers can be ticked; a model a non-archived agent's draft runs on (`AgentBriefs.usingModel`) or new
+  agents start on can't be unticked. `GET /api/llm-providers` returns only allowed models, so the agent picker and the
+  default offer only those, and a pick of an unticked model is `model-unavailable`. A ticked model the settings do not
+  list runs without server-side fallbacks and with `conxist.runs.default-max-tokens`.
 - **Connectors** now hold what is not a model: Storage (where Knowledge and Memories will be saved) and AI tools that
   reach ConXist over MCP. Both show "coming soon".
 - **Topics** live in the `workspaces` module: table `workspace_topics` (V13) with a name of 1 to 60 characters,
   unique per workspace ignoring case, and a description up to 300. A workspace keeps up to 50, which the app enforces.
   `/api/topics` (GET, POST, PUT and DELETE `/{id}`) acts for the workspace in `X-Workspace-Id`.
-- Coming soon, shown but not built: more providers, keys saved in Settings (they need sign-in), the zero data
-  retention rule and a monthly limit per provider.
+- Not shown for now (owner, 2026-11-25): more providers, the zero data retention rule and a monthly limit per
+  provider. Keys saved in Settings still need sign-in; the note says so.
 
 ## Consequences
 
@@ -51,7 +65,11 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   saying exactly what it runs on, which is what portable agents (and other LLMs calling ConXist) need.
 - Removing a model from the list, or disconnecting a provider, does not change any agent; its agents show
   `model-unavailable` and can't run or publish until someone picks another.
-- Adding a provider means a `ModelPort` adapter with its `provider()` id and its models in the settings list.
+- Adding a provider means a `ModelPort` adapter with its `provider()` id, its `models()` list, and its starting
+  models in the settings list.
+- The list of offered models is the API key's, so it is the same for every workspace; ticks are per workspace.
+- The in-use check reads agents' drafts. A published version on an unticked model can't be reached today (only
+  drafts run); schedules must check the live version too when they arrive.
 - Skills do not pick a model yet. When they do, the same `AgentModel` shape applies.
 - Removing a topic changes nothing else yet. Once Knowledge files exist per topic, removing or renaming one must ask
   where its files go (in the mock's note).
