@@ -16,7 +16,7 @@ repo, `eriveira/engineering-standards`, which is also a Claude Code plugin.
 ## Decision
 
 - build-flow is no longer copied. `.claude/settings.json` turns on the
-  `engineering-standards@wdteams` plugin, so local, cloud and teammate sessions load
+  `engineering-standards@wdteams` plugin and `ponytail@ponytail`, so local, cloud and teammate sessions load
   it from that repo. The owner also has it installed at user scope for every repo.
 - Still copied, as in ADR 0001: `docs/standards/` (people and CI read it), the
   reviewer agents (the CI reviewer reads `.claude/agents/`), and ConXist's own UI hook.
