@@ -2,7 +2,6 @@ package com.conxist.capture.config;
 
 import java.time.Clock;
 import java.net.http.HttpClient;
-import java.util.Base64;
 import com.conxist.capture.adapter.extraction.TikaTextExtractor;
 import com.conxist.capture.adapter.files.LocalFileStore;
 import com.conxist.capture.application.CaptureContext;
@@ -19,7 +18,7 @@ import com.conxist.capture.MeetingLibrary;
 import com.conxist.capture.application.SyncHistory;
 import com.conxist.capture.adapter.plaud.JdbcRecorderKeys;
 import com.conxist.capture.adapter.plaud.PlaudTeamClient;
-import com.conxist.capture.adapter.secrets.SecretBox;
+import com.conxist.platform.SecretBox;
 import com.conxist.capture.application.ConnectPlaudTeam;
 import com.conxist.capture.application.ListRecorderConnections;
 import com.conxist.capture.application.PlaudTeam;
@@ -52,11 +51,6 @@ class CaptureConfiguration {
     @Bean
     TextExtractor textExtractor(CaptureProperties properties) {
         return new TikaTextExtractor(properties.maxTextCharacters());
-    }
-
-    @Bean
-    SecretBox secretBox(SecretsProperties secrets) {
-        return new SecretBox(Base64.getDecoder().decode(secrets.encryptionKey()));
     }
 
     @Bean

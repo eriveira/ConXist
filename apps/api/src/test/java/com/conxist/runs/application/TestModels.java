@@ -15,6 +15,7 @@ final class TestModels {
     static final String HAIKU = "claude-haiku-5-5";
     static final String SONNET = "claude-sonnet-5-5";
     static final String OPUS = "claude-opus-5-5";
+    static final ApiKey COMPUTER_KEY = new ApiKey("sk-ant-computer-key-0001");
 
     private TestModels() {
     }
@@ -30,6 +31,37 @@ final class TestModels {
     static ProviderModelLists lists() {
         return new ProviderModelLists(java.time.Duration.ofHours(1), java.time.Duration.ZERO,
                 java.time.Duration.ofSeconds(5), TestClock.fixed());
+    }
+
+    /** This computer's keys: Anthropic's, which a test may take away. */
+    static Map<String, ApiKey> computerKeys() {
+        return new HashMap<>(Map.of(ANTHROPIC, COMPUTER_KEY));
+    }
+
+    /** Workspace keys kept in memory, in the clear: the encryption is the store's, tested with it. */
+    static final class Keys implements ProviderKeysRepository {
+        final Map<String, StoredKey> saved = new HashMap<>();
+
+        @Override
+        public Optional<StoredKey> find(UUID workspaceId, String provider) {
+            return Optional.ofNullable(saved.get(workspaceId + "/" + provider));
+        }
+
+        @Override
+        public void save(UUID workspaceId, String provider, ApiKey key, Instant at) {
+            saved.put(workspaceId + "/" + provider, new StoredKey(key, at, at, false));
+        }
+
+        @Override
+        public void checked(UUID workspaceId, String provider, Instant at, boolean refused) {
+            saved.computeIfPresent(workspaceId + "/" + provider,
+                    (id, key) -> new StoredKey(key.key(), key.addedAt(), at, refused));
+        }
+
+        @Override
+        public boolean delete(UUID workspaceId, String provider) {
+            return saved.remove(workspaceId + "/" + provider) != null;
+        }
     }
 
     /** Ticks and unticks kept in memory. */

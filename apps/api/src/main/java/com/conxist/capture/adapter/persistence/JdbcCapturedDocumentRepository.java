@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.DocumentOrigin;
-import com.conxist.capture.adapter.secrets.SecretBox;
+import com.conxist.platform.SecretBox;
 import com.conxist.capture.application.CapturedDocumentRepository;
 import com.conxist.capture.domain.CapturedDocument;
 import com.conxist.capture.domain.DocumentTitle;

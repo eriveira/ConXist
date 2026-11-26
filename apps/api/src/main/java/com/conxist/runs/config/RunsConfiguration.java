@@ -10,6 +10,9 @@ import com.conxist.runs.adapter.model.JsonAnswerReader;
 import com.conxist.runs.application.AllowModel;
 import com.conxist.runs.application.AllowedModelsRepository;
 import com.conxist.runs.application.AnswerReader;
+import com.conxist.runs.application.ConnectProvider;
+import com.conxist.runs.application.ProviderKeys;
+import com.conxist.runs.application.ProviderKeysRepository;
 import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.LlmProviders;
 import com.conxist.runs.application.ModelDefaultsRepository;
@@ -21,14 +24,20 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Wires test runs and LLM providers: the read tools, Claude as the model, its model list, and the use cases. */
+/** Wires test runs and LLM providers: the read tools, Claude as the model, keys, model lists, and the use cases. */
 @Configuration(proxyBeanMethods = false)
 class RunsConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ModelPort.class)
     ModelPort claudeModel(RunsProperties properties) {
-        return new ClaudeModel(properties.anthropicApiKey(), properties.anthropicBaseUrl());
+        return new ClaudeModel(properties.anthropicBaseUrl());
+    }
+
+    /** A workspace's own key first; else the key set on this computer, when there is one. */
+    @Bean
+    ProviderKeys providerKeys(RunsProperties properties, ProviderKeysRepository stored, CurrentWorkspace workspace) {
+        return new ProviderKeys(stored, properties.computerKeys(), workspace);
     }
 
     @Bean
@@ -50,8 +59,14 @@ class RunsConfiguration {
     /** Also answers the agents module which models an agent may pick (AgentModels). */
     @Bean
     LlmProviders llmProviders(RunsProperties properties, List<ModelPort> ports, ModelDefaultsRepository defaults,
-            AllowedModelsRepository allowed, ProviderModelLists lists, CurrentWorkspace workspace, Clock clock) {
-        return new LlmProviders(properties.catalog(), ports, defaults, allowed, lists, workspace, clock);
+            AllowedModelsRepository allowed, ProviderModelLists lists, ProviderKeys keys, CurrentWorkspace workspace,
+            Clock clock) {
+        return new LlmProviders(properties.catalog(), ports, defaults, allowed, lists, keys, workspace, clock);
+    }
+
+    @Bean
+    ConnectProvider connectProvider(LlmProviders providers, ProviderModelLists lists, ProviderKeys keys, Clock clock) {
+        return new ConnectProvider(providers, lists, keys, clock);
     }
 
     @Bean

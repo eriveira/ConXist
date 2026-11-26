@@ -39,8 +39,10 @@ class StartTestRunTest {
     private static final UUID OTHER_MEETING_ID = UUID.randomUUID();
     private final TestClock.Moving clock = TestClock.moving();
     private final ScriptedModel model = new ScriptedModel();
+    private final Map<String, ApiKey> computerKeys = TestModels.computerKeys();
     private final LlmProviders providers = new LlmProviders(TestModels.catalog(), List.of(model),
-            new TestModels.Defaults(), new TestModels.Allowed(), TestModels.lists(), FixedWorkspace.standard(),
+            new TestModels.Defaults(), new TestModels.Allowed(), TestModels.lists(),
+            new ProviderKeys(new TestModels.Keys(), computerKeys, FixedWorkspace.standard()), FixedWorkspace.standard(),
             TestClock.fixed());
     private final Map<UUID, AgentBrief> agents = new HashMap<>();
     private final Map<UUID, SourceSummary> sources = new HashMap<>();
@@ -272,7 +274,7 @@ class StartTestRunTest {
         assertThatThrownBy(() -> run.run(AGENT_ID, SOURCE_ID, UUID.randomUUID())).isInstanceOf(NotFound.class);
         assertThatThrownBy(() -> run.run(UUID.randomUUID(), SOURCE_ID, MEETING_ID)).isInstanceOf(NotFound.class);
 
-        model.ready = false;
+        computerKeys.clear();
         assertCode(() -> run.run(AGENT_ID, SOURCE_ID, MEETING_ID), "run.no-model-key");
         assertThat(model.requests).isEmpty();
     }
@@ -322,7 +324,6 @@ class StartTestRunTest {
         private final Deque<Function<Request, Turn>> script = new ArrayDeque<>();
         private final List<Request> requests = new ArrayList<>();
         private Function<Request, Turn> always;
-        private boolean ready = true;
 
         void then(Function<Request, Turn> turn) {
             script.add(turn);
@@ -338,17 +339,12 @@ class StartTestRunTest {
         }
 
         @Override
-        public boolean ready() {
-            return ready;
-        }
-
-        @Override
-        public List<ProviderModel> models(java.time.Duration timeout) {
+        public List<ProviderModel> models(ApiKey key, java.time.Duration timeout) {
             return List.of();
         }
 
         @Override
-        public Turn next(Request request) {
+        public Turn next(ApiKey key, Request request) {
             requests.add(request);
             return script.isEmpty() ? always.apply(request) : script.poll().apply(request);
         }

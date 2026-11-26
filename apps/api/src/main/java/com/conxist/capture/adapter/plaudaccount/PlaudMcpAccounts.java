@@ -25,7 +25,7 @@ import com.conxist.capture.adapter.plaudaccount.PlaudTokenSlots.Slot;
 import com.conxist.capture.application.PlaudAccounts;
 import com.conxist.capture.application.PlaudTeam.Transcript;
 import com.conxist.capture.domain.MeetingText.Line;
-import com.conxist.capture.adapter.secrets.SecretBox;
+import com.conxist.platform.SecretBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;

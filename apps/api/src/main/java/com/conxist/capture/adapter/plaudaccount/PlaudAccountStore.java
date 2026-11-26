@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.capture.adapter.plaudaccount.PlaudOAuth.Tokens;
-import com.conxist.capture.adapter.secrets.SecretBox;
+import com.conxist.platform.SecretBox;
 import com.conxist.capture.application.PlaudAccounts.SignIn;
 import com.conxist.capture.application.PlaudAccounts.SignInStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;

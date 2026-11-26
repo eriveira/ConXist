@@ -3,6 +3,7 @@ package com.conxist.runs.adapter.model;
 import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +31,7 @@ import com.anthropic.models.beta.messages.BetaToolResultBlockParam;
 import com.anthropic.models.beta.messages.MessageCreateParams;
 import com.anthropic.models.models.ModelListPage;
 import com.anthropic.models.models.ModelListParams;
+import com.conxist.runs.application.ApiKey;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.ProviderModel;
@@ -37,7 +39,8 @@ import com.conxist.runs.application.ProviderModel;
 /**
  * Claude through the official Anthropic Java SDK (ADR 0012). Each turn is one Messages call: adaptive thinking (the
  * models' default), the agent's effort, strict tools, and structured output when the agent gives back a shape. Earlier
- * turns go back exactly as Claude sent them, thinking included. The key comes from settings and is never logged.
+ * turns go back exactly as Claude sent them, thinking included. Each call names the key to use (the workspace's own or
+ * this computer's); keys are never logged.
  */
 public final class ClaudeModel implements ModelPort {
 
@@ -48,22 +51,40 @@ public final class ClaudeModel implements ModelPort {
     private static final int MAX_PAGES = 10;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ClaudeModel.class);
     private static final String KEY_REFUSED =
-            "Anthropic refused the key. Check CONXIST_ANTHROPIC_API_KEY and what it may use.";
+            "Anthropic refused the key. Check it in Settings, LLM providers, and what it may use.";
+    /** Clients kept, one per key; a key used less recently is dropped past this. */
+    private static final int MAX_CLIENTS = 32;
     private static final String BUSY = "Anthropic is busy right now. Try again in a minute.";
-    private final AnthropicClient client;
-    private final boolean ready;
+    private final String baseUrl;
+    /**
+     * The SDK sets the key per client, so each key has its own, kept for its connections. Dropped clients are not
+     * closed: a call may still be using one, and their idle connections and threads end on their own.
+     */
+    private final Map<ApiKey, AnthropicClient> clients = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<ApiKey, AnthropicClient> eldest) {
+            return size() > MAX_CLIENTS;
+        }
+    };
 
     /** @param baseUrl the API's address; blank for Anthropic's own */
-    public ClaudeModel(String apiKey, String baseUrl) {
-        this.ready = apiKey != null && !apiKey.isBlank();
-        AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder()
-                .apiKey(ready ? apiKey : "not-set")
-                // A run has its own time limit; a retry would hide a slow call inside it, so the person sees it instead.
-                .maxRetries(0);
-        if (baseUrl != null && !baseUrl.isBlank()) {
-            builder.baseUrl(baseUrl);
+    public ClaudeModel(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
+    private AnthropicClient client(ApiKey key) {
+        synchronized (clients) {
+            return clients.computeIfAbsent(key, any -> {
+                AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder()
+                        .apiKey(key.value())
+                        // A run has its own time limit; a retry would hide a slow call inside it, so the person sees it.
+                        .maxRetries(0);
+                if (baseUrl != null && !baseUrl.isBlank()) {
+                    builder.baseUrl(baseUrl);
+                }
+                return builder.build();
+            });
         }
-        this.client = builder.build();
     }
 
     /** The provider name the API's settings use for Claude. */
@@ -75,14 +96,9 @@ public final class ClaudeModel implements ModelPort {
     }
 
     @Override
-    public boolean ready() {
-        return ready;
-    }
-
-    @Override
-    public Turn next(Request request) {
+    public Turn next(ApiKey key, Request request) {
         try {
-            BetaMessage message = client.beta().messages().create(params(request),
+            BetaMessage message = client(key).beta().messages().create(params(request),
                     RequestOptions.builder().timeout(request.timeout()).build());
             return turn(message);
         } catch (AnthropicException | IllegalArgumentException | IllegalStateException failure) {
@@ -92,7 +108,8 @@ public final class ClaudeModel implements ModelPort {
 
     /** Reads every page within one time limit; a model id ConXist can't keep is left out, and only counted in the log. */
     @Override
-    public List<ProviderModel> models(Duration timeout) {
+    public List<ProviderModel> models(ApiKey key, Duration timeout) {
+        AnthropicClient client = client(key);
         long deadline = System.nanoTime() + timeout.toNanos();
         List<ProviderModel> models = new ArrayList<>();
         int skipped = 0;

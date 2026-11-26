@@ -1,4 +1,4 @@
-package com.conxist.capture.adapter.secrets;
+package com.conxist.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
