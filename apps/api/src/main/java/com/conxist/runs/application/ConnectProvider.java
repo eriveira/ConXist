@@ -3,7 +3,10 @@ package com.conxist.runs.application;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.RuleViolation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Connects a workspace to an LLM provider with its own key, tests the connection, and disconnects it (ADR 0014). A key
@@ -11,12 +14,18 @@ import com.conxist.platform.RuleViolation;
  */
 public final class ConnectProvider {
 
+    /** Who changed or used a key, and when: the workspace, the provider and the action, never the key or its ending. */
+    private static final Logger log = LoggerFactory.getLogger(ConnectProvider.class);
+
     private final LlmProviders providers;
     private final ProviderModelLists lists;
     private final ProviderKeys keys;
+    private final CurrentWorkspace workspace;
     private final Clock clock;
 
-    public ConnectProvider(LlmProviders providers, ProviderModelLists lists, ProviderKeys keys, Clock clock) {
+    public ConnectProvider(LlmProviders providers, ProviderModelLists lists, ProviderKeys keys, CurrentWorkspace workspace,
+            Clock clock) {
+        this.workspace = workspace;
         this.providers = providers;
         this.lists = lists;
         this.keys = keys;
@@ -30,9 +39,12 @@ public final class ConnectProvider {
                 "This does not look like an API key. Copy it again from the provider's console."));
         ProviderModelLists.Listing listing = lists.check(port, key);
         if (listing.error() != null) {
+            log.info("Workspace {} tried to connect a {} key: not saved, {}", workspace.id(), provider, listing.error());
             throw problem(listing.error());
         }
+        boolean replacing = keys.hasOwn(provider);
         keys.save(provider, key, clock.instant());
+        log.info("Workspace {} {} its {} key", workspace.id(), replacing ? "replaced" : "connected", provider);
         return providers.providerView(provider);
     }
 
@@ -45,6 +57,8 @@ public final class ConnectProvider {
         ProviderModelLists.Listing listing = lists.check(port, key);
         long millis = Duration.between(asked, clock.instant()).toMillis();
         providers.recordCheck(provider, key, listing);
+        log.info("Workspace {} tested its {} key: {}", workspace.id(), provider,
+                listing.error() == null ? "works" : listing.error());
         return new Check(listing.error() == null, listing.error(), millis, providers.providerView(provider));
     }
 
@@ -54,7 +68,9 @@ public final class ConnectProvider {
      */
     public LlmProviders.View disconnect(String provider) {
         providers.port(provider).orElseThrow(LlmProviders::unknownProvider);
-        keys.delete(provider);
+        if (keys.delete(provider)) {
+            log.info("Workspace {} disconnected its {} key", workspace.id(), provider);
+        }
         return providers.view();
     }
 

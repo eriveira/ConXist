@@ -65,8 +65,9 @@ class RunsConfiguration {
     }
 
     @Bean
-    ConnectProvider connectProvider(LlmProviders providers, ProviderModelLists lists, ProviderKeys keys, Clock clock) {
-        return new ConnectProvider(providers, lists, keys, clock);
+    ConnectProvider connectProvider(LlmProviders providers, ProviderModelLists lists, ProviderKeys keys,
+            CurrentWorkspace workspace, Clock clock) {
+        return new ConnectProvider(providers, lists, keys, workspace, clock);
     }
 
     @Bean

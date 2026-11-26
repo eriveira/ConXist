@@ -20,6 +20,8 @@ import com.conxist.platform.RuleViolation;
  */
 public final class LlmProviders implements AgentModels {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LlmProviders.class);
+
     private final ModelCatalog catalog;
     private final List<ModelPort> ports;
     private final ModelDefaultsRepository defaults;
@@ -99,7 +101,10 @@ public final class LlmProviders implements AgentModels {
                 && allowedModels(provider).stream().anyMatch(m -> m.id().equals(model));
     }
 
-    /** Keeps how the provider answered about the workspace's key, so Settings shows when it last worked. */
+    /**
+     * Keeps how the provider answered about the workspace's key, so Settings shows when it last worked. Listing the
+     * models in Settings records it too, so a key revoked at Anthropic shows as refused on the next visit.
+     */
     void recordCheck(String provider, ApiKey key, ProviderModelLists.Listing listing) {
         if (listing.answered()) {
             keys.checked(provider, key, clock.instant(), listing.error() == ProviderModelLists.ListError.KEY_REJECTED);
@@ -144,7 +149,10 @@ public final class LlmProviders implements AgentModels {
             return Optional.empty();
         }
         ModelOption option = catalog.callable(agent.provider(), agent.model());
-        ApiKey key = keys.current(agent.provider()).orElseThrow().value();
+        ProviderKeys.Key current = keys.current(agent.provider()).orElseThrow();
+        log.info("Workspace {} opened its {} key ({}) for a test run of agent {}", workspace.id(), agent.provider(),
+                current.source(), agent.id());
+        ApiKey key = current.value();
         return port(agent.provider()).map(port -> new Call(port, key, new ModelChoice(option.id(),
                 ModelChoice.Effort.valueOf(agent.effort()), option.fallbacks(), option.maxTokens())));
     }

@@ -45,6 +45,10 @@ public final class ProviderKeys {
                 .ifPresent(own -> stored.checked(workspace.id(), provider, at, refused));
     }
 
+    boolean hasOwn(String provider) {
+        return stored.find(workspace.id(), provider).isPresent();
+    }
+
     void save(String provider, ApiKey key, Instant at) {
         stored.save(workspace.id(), provider, key, at);
     }

@@ -23,7 +23,8 @@ class ConnectProviderTest {
     private final LlmProviders providers = new LlmProviders(TestModels.catalog(), List.of(anthropic),
             new TestModels.Defaults(), new TestModels.Allowed(), lists, keys, FixedWorkspace.standard(),
             TestClock.fixed());
-    private final ConnectProvider connect = new ConnectProvider(providers, lists, keys, TestClock.fixed());
+    private final ConnectProvider connect = new ConnectProvider(providers, lists, keys, FixedWorkspace.standard(),
+            TestClock.fixed());
 
     @Test
     void a_pasted_key_is_checked_with_the_provider_then_saved_and_shown_only_by_its_ending() {

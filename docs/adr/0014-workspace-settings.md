@@ -87,7 +87,11 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
 - The list of offered models is the key's, so workspaces with different keys may see different models; ticks are
   per workspace.
 - Until sign-in, anyone who can reach the API on this machine can connect, test or remove a workspace's key. Before
-  hosting, these endpoints need the workspace's owner (or admin) and an audit of who changed the key.
+  hosting, these endpoints need the workspace's owner (or admin); connect, replace, test, disconnect and each run's
+  use of a key are logged (workspace, provider, action; never the key). Also before hosting (security review,
+  2026-11-26): turn the computer-key fallback off by default, rate-limit `/key` and `/test` (a pasted key is checked
+  with Anthropic, so the endpoint answers whether a key works), bound the per-key client and list caches, and delete a
+  workspace's keys when workspace delete arrives.
 - The in-use check reads agents' drafts. A published version on an unticked model can't be reached today (only
   drafts run); schedules must check the live version too when they arrive.
 - Skills do not pick a model yet. When they do, the same `AgentModel` shape applies.
