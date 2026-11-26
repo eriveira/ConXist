@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
 import type { AgentSummary } from '../../domain/agents';
-import type { OfferedModels } from '../../domain/settings';
+import type { ConnectionCheck, OfferedModels } from '../../domain/settings';
 import { LLM_PROVIDERS, stubApi } from '../../testing';
 import { SettingsPage } from './SettingsPage';
 
@@ -19,6 +19,8 @@ const OFFERED: OfferedModels = {
     { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', allowed: true, listed: true },
   ],
 };
+const ANTHROPIC = LLM_PROVIDERS.providers[0];
+const NO_KEY = { source: 'NONE' as const, keyEnding: null, addedAt: null, checkedAt: null, refused: false };
 const CHECKOUT = { id: 't1', name: 'Checkout', description: 'Cart and payment' };
 
 function open(section: string) {
@@ -108,17 +110,100 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('An agent runs on this model now.', { exact: false })).not.toBeInTheDocument();
   });
 
-  it('says how to add a key when no provider is connected, and offers no default', async () => {
-    stubApi({
-      'GET /api/llm-providers': () => ({ body: { ...LLM_PROVIDERS, providers: [{ ...LLM_PROVIDERS.providers[0], connected: false }] } }),
+  it('connects Anthropic with a pasted key, says when the key is refused, and offers no default until then', async () => {
+    const none = { ...ANTHROPIC, connected: false, connection: { ...NO_KEY } };
+    let connected = false;
+    const calls = stubApi({
+      'GET /api/llm-providers': () => ({ body: { ...LLM_PROVIDERS, providers: [connected ? ANTHROPIC : none] } }),
+      'GET /api/llm-providers/anthropic/models': () => ({ body: OFFERED }),
       'GET /api/agents': () => ({ body: [] }),
+      'PUT /api/llm-providers/anthropic/key': (init) => {
+        const { apiKey } = JSON.parse(String(init?.body)) as { apiKey: string };
+        if (apiKey === 'sk-ant-wrong') return { status: 422, body: { code: 'provider.key-refused' } };
+        connected = true;
+        return { body: ANTHROPIC };
+      },
+    });
+    const { container } = open('#/settings/llm');
+
+    expect(await screen.findByText('Not connected')).toBeInTheDocument();
+    expect(screen.getByText(/Connect a provider to see its models/)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Model for new agents' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    const dialog = screen.getByRole('dialog', { name: 'Connect Anthropic' });
+    const field = within(dialog).getByLabelText('API key');
+    expect(field).toHaveAttribute('type', 'password');
+    expect(field).toHaveFocus();
+    expect(await accessibilityViolations(container)).toEqual([]);
+
+    await userEvent.type(field, 'sk-ant-wrong');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Check and connect' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('The provider refused this key.');
+
+    await userEvent.clear(field);
+    await userEvent.type(field, 'sk-ant-good-key{Enter}');
+    expect(await screen.findByText(/Key ending 3fQa/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: 'Model for new agents' })).toBeInTheDocument();
+    expect(calls.filter((call) => call.key === 'PUT /api/llm-providers/anthropic/key')).toHaveLength(2);
+  });
+
+  it('tests the connection, and disconnects after naming the agents that stop', async () => {
+    let check = { works: true, error: null, millis: 412, provider: ANTHROPIC } as ConnectionCheck;
+    stubApi({
+      'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
+      'GET /api/llm-providers/anthropic/models': () => ({ body: OFFERED }),
+      'GET /api/agents': () => ({ body: [
+        agent('Topic classifier', { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }),
+        agent('Analyst', { provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' }),
+      ] }),
+      'POST /api/llm-providers/anthropic/test': () => ({ body: check }),
+      'DELETE /api/llm-providers/anthropic/key': () => ({
+        body: { ...LLM_PROVIDERS, providers: [{ ...ANTHROPIC, connected: false, connection: { ...NO_KEY } }] },
+      }),
     });
     open('#/settings/llm');
 
-    expect(await screen.findByText('No key')).toBeInTheDocument();
-    expect(screen.getByText(/Add CONXIST_ANTHROPIC_API_KEY/)).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('No provider is connected yet');
-    expect(screen.queryByRole('combobox', { name: 'Model for new agents' })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Test connection' }));
+    expect(await screen.findByText('Connection works. Anthropic answered in 0.4 s.')).toBeInTheDocument();
+
+    check = { works: false, error: 'BUSY', millis: 90, provider: ANTHROPIC };
+    await userEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+    expect(await screen.findByText(/Connection failed. The provider is busy/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+    const dialog = screen.getByRole('dialog', { name: 'Disconnect Anthropic?' });
+    expect(dialog).toHaveTextContent('Analyst, Topic classifier');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disconnect' }));
+    expect(await screen.findByText('Not connected')).toBeInTheDocument();
+  });
+
+  it('shows a refused key with Replace first, and a computer key with Connect', async () => {
+    const refused = { ...ANTHROPIC, connection: { ...ANTHROPIC.connection, refused: true } };
+    stubApi({
+      'GET /api/llm-providers': () => ({ body: { ...LLM_PROVIDERS, providers: [refused] } }),
+      'GET /api/llm-providers/anthropic/models': () => ({ body: { ...OFFERED, listError: 'KEY_REJECTED' } }),
+      'GET /api/agents': () => ({ body: [] }),
+    });
+    const first = open('#/settings/llm');
+
+    expect(await screen.findByText('Key refused')).toBeInTheDocument();
+    expect(screen.getByText(/Anthropic refused key ending 3fQa/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace key' })).toHaveClass('primary');
+    expect(screen.queryByRole('button', { name: 'Test connection' })).not.toBeInTheDocument();
+    first.unmount();
+
+    const computer = { ...ANTHROPIC, connection: { ...NO_KEY, source: 'COMPUTER' as const } };
+    stubApi({
+      'GET /api/llm-providers': () => ({ body: { ...LLM_PROVIDERS, providers: [computer] } }),
+      'GET /api/llm-providers/anthropic/models': () => ({ body: OFFERED }),
+      'GET /api/agents': () => ({ body: [] }),
+    });
+    open('#/settings/llm');
+    expect(await screen.findByText(/Using the key set on this computer/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument();
   });
 
   it('shows storage and the AI tools that reach ConXist as coming soon', async () => {

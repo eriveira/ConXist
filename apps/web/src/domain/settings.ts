@@ -16,12 +16,43 @@ export interface LlmModel {
   label: string;
 }
 
+/** Where the key that calls a provider comes from: this workspace's own, the one set on this computer, or none. */
+export type KeySource = 'WORKSPACE' | 'COMPUTER' | 'NONE';
+
+/** What the app may know about a provider's key: never the key, only its last characters and how its checks went. */
+export interface ProviderConnection {
+  source: KeySource;
+  /** The last characters of the workspace's own key; null otherwise. */
+  keyEnding: string | null;
+  addedAt: string | null;
+  checkedAt: string | null;
+  /** True when the provider refused the key at its last check. */
+  refused: boolean;
+}
+
 export interface LlmProvider {
   id: string;
-  /** Whether the API has a key for it. The key itself never reaches the app. */
+  /** Whether the workspace has a key for it, its own or this computer's. The key itself never reaches the app. */
   connected: boolean;
+  connection: ProviderConnection;
   /** The models this workspace allows agents to pick. */
   models: LlmModel[];
+}
+
+/** How a test of the connection went: the provider answered, or why it did not, and how long it took. */
+export interface ConnectionCheck {
+  works: boolean;
+  error: ListError | null;
+  millis: number;
+  provider: LlmProvider;
+}
+
+/** The agents that run on the provider, archived ones left out, by name: they stop if it is disconnected. */
+export function providerUsers(agents: readonly AgentSummary[], provider: string): string[] {
+  return agents
+    .filter((agent) => agent.status !== 'ARCHIVED' && agent.model?.provider === provider)
+    .map((agent) => agent.name)
+    .sort((a, b) => a.localeCompare(b));
 }
 
 /** A model the provider offers, and whether this workspace lets agents pick it. */
@@ -58,11 +89,12 @@ export interface LlmProviders {
   defaultForNewAgents: AgentModel;
 }
 
-/** Whether the agent's pick can run now: its provider is connected and the workspace allows the model. */
+/** Whether the agent's pick can run now: its provider is connected with a key it accepts, and the model is allowed. */
 export function modelAvailable(providers: LlmProviders, pick: AgentModel | null): boolean {
   if (!pick) return false;
   const provider = providers.providers.find((each) => each.id === pick.provider);
-  return Boolean(provider?.connected && provider.models.some((model) => model.id === pick.model));
+  return Boolean(provider?.connected && !provider.connection.refused
+    && provider.models.some((model) => model.id === pick.model));
 }
 
 /** The model's name as its provider lists it, or its id when no provider lists it any more. */

@@ -28,10 +28,12 @@ export function stubApi(routes: Record<string, Route>) {
   return calls;
 }
 
-/** Anthropic connected with its three models; new blank agents start on Sonnet at medium effort. */
+/** Anthropic connected with the workspace's own key and its three models; new blank agents start on Sonnet at medium. */
 export const LLM_PROVIDERS: LlmProviders = {
   providers: [{
-    id: 'anthropic', connected: true, models: [
+    id: 'anthropic', connected: true,
+    connection: { source: 'WORKSPACE', keyEnding: '3fQa', addedAt: '2026-11-26T15:00:00Z', checkedAt: '2026-11-26T15:00:00Z', refused: false },
+    models: [
       { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
       { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' },
       { id: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
