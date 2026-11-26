@@ -38,7 +38,7 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   template starts on its tier unless that model can't run, then on the default. A saved default that can no longer
   run falls back to the balanced tier.
 - `GET /api/llm-providers` returns each provider (connected when its key is set) with its models, and the default;
-  `PUT /api/llm-providers/default` saves the default. Keys stay in `CONXIST_ANTHROPIC_API_KEY` and never reach the app.
+  `PUT /api/llm-providers/default` saves the default. No answer ever carries a key (see Provider keys).
 - The app shows, per model, "Used by (effort)" from the agents list, which carries each agent's model.
 - **Allowed models** (amendment, 2026-11-25): `GET /api/llm-providers/{provider}/models` lists every model the
   provider offers this key (Anthropic's Models API through the Java SDK, `client.models().list()`), each marked
@@ -51,13 +51,30 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   agents start on can't be unticked. `GET /api/llm-providers` returns only allowed models, so the agent picker and the
   default offer only those, and a pick of an unticked model is `model-unavailable`. A ticked model the settings do not
   list runs without server-side fallbacks and with `conxist.runs.default-max-tokens`.
+- **Provider keys** (amendment, 2026-11-26, owner: "adding real connection experience with a LLM provider"; one key
+  per workspace, the recommended option): a workspace connects its own Anthropic key in Settings.
+  `PUT /api/llm-providers/{provider}/key` with `{apiKey}` checks the key by listing the provider's models (free), and
+  saves it only when the provider accepts it; a refused, busy or unreachable provider is a problem
+  (`provider.key-refused`, `provider.busy`, `provider.timeout`, `provider.unreachable`), a pasted value that can't be a
+  key is `provider.key-invalid`. Table `workspace_provider_keys` (V17, `runs` module) keeps the key sealed with the
+  platform's `SecretBox` (ADR 0004; moved from `capture` to `platform` so both modules use one), bound to its
+  workspace and provider, with only its last 4 characters in the clear, when it was added, when it was last checked
+  and whether the provider refused it. `POST /{provider}/test` asks the provider now and says how long it took;
+  `DELETE /{provider}/key` forgets the workspace's key. Each provider view carries `connection`: its source
+  (`WORKSPACE`, `COMPUTER` or `NONE`), the key's ending, added and checked times, and `refused`.
+  `ProviderKeys` picks the key: the workspace's own first, else this computer's `CONXIST_ANTHROPIC_API_KEY` (kept so
+  a local setup still works), else none. `ModelPort` calls take the key; `ClaudeModel` keeps one SDK client per key
+  (the SDK sets the key per client). Model lists are kept per key (by a SHA-256 digest, never the key). A listing or
+  test that the provider answers records the check; a refused key makes its models unavailable until a test passes
+  or the key is replaced. A run that the provider refuses does not mark the key (a 403 may be about one model only).
+  `ApiKey` and the request record hide the key in `toString`, so it can't reach a log.
 - **Connectors** now hold what is not a model: Storage (where Knowledge and Memories will be saved) and AI tools that
   reach ConXist over MCP. Both show "coming soon".
 - **Topics** live in the `workspaces` module: table `workspace_topics` (V13) with a name of 1 to 60 characters,
   unique per workspace ignoring case, and a description up to 300. A workspace keeps up to 50, which the app enforces.
   `/api/topics` (GET, POST, PUT and DELETE `/{id}`) acts for the workspace in `X-Workspace-Id`.
 - Not shown for now (owner, 2026-11-25): more providers, the zero data retention rule and a monthly limit per
-  provider. Keys saved in Settings still need sign-in; the note says so.
+  provider.
 
 ## Consequences
 
@@ -67,7 +84,10 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   `model-unavailable` and can't run or publish until someone picks another.
 - Adding a provider means a `ModelPort` adapter with its `provider()` id, its `models()` list, and its starting
   models in the settings list.
-- The list of offered models is the API key's, so it is the same for every workspace; ticks are per workspace.
+- The list of offered models is the key's, so workspaces with different keys may see different models; ticks are
+  per workspace.
+- Until sign-in, anyone who can reach the API on this machine can connect, test or remove a workspace's key. Before
+  hosting, these endpoints need the workspace's owner (or admin) and an audit of who changed the key.
 - The in-use check reads agents' drafts. A published version on an unticked model can't be reached today (only
   drafts run); schedules must check the live version too when they arrive.
 - Skills do not pick a model yet. When they do, the same `AgentModel` shape applies.

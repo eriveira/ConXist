@@ -44,7 +44,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
 - `apps/web/`: the web app (the Sources, Agents, Skills and Settings pages and their dialogs). `domain` and `api` stay
   free of React; screens live in `features`.
 
-## Current state (2026-11-25)
+## Current state (2026-11-26)
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
@@ -72,13 +72,15 @@ Sources page does not show it for now, owner decision 2026-11-17).
   into the `AgentUses` port.
 - Test run (ADR 0012, step 3): a `runs` module and the Test panel on an agent's page. It runs the saved draft once on
   a picked meeting with Claude (Anthropic Java SDK), with the draft's read tools, sources and limits, and shows the
-  answer, its shape check and each step. Nothing of a run is kept. Local only until sign-in (owner, 2026-11-21): the
-  API reads the owner's key from `CONXIST_ANTHROPIC_API_KEY`; without it the panel says how to add one, and agents
-  can't be published either, since their provider is not connected (ADR 0014).
-  `mvn spring-boot:test-run` also runs a fake Claude, so the panel works without a key.
+  answer, its shape check and each step. Nothing of a run is kept. It runs on the workspace's Anthropic key (below);
+  without one the panel links to Settings, and agents can't be published either, since their provider is not
+  connected (ADR 0014). `mvn spring-boot:test-run` also runs a fake Claude that takes any key starting with
+  `sk-ant-fake-`; `CONXIST_FAKE_COMPUTER_KEY=false` starts it with no computer key, to try Settings from scratch.
 - Workspace Settings (ADR 0014, owner 2026-11-24): a Settings button in the workspace menu opens `#/settings` with
-  General (rename, description), LLM providers (Anthropic only: every model it offers with an Allowed box, who uses
-  each and at what effort, and the default for new agents),
+  General (rename, description), LLM providers (Anthropic only: Connect with a pasted API key that ConXist checks and
+  stores encrypted per workspace, Test connection, Replace key, Disconnect; a workspace without its own key uses
+  `CONXIST_ANTHROPIC_API_KEY` when set; every model the key offers with an Allowed box, who uses each and at what
+  effort, and the default for new agents),
   Connectors (Storage and MCP access, both coming soon) and Topics (up to 50 per workspace, for the topic classifier).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.

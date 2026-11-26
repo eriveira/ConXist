@@ -105,6 +105,8 @@ class ClaudeModelTest {
                         org.assertj.core.groups.Tuple.tuple("claude-opus-5-5", "Claude Opus 5.5"))
                 .hasSize(FakeClaudeServer.MODELS.size());
 
+        assertThat(claude.models(new ApiKey(FakeClaudeServer.ANY_KEY_PREFIX + "pasted"), Duration.ofSeconds(10)))
+                .hasSize(FakeClaudeServer.MODELS.size());
         assertThatThrownBy(() -> claude.models(WRONG, Duration.ofSeconds(10)))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.KEY_REJECTED));

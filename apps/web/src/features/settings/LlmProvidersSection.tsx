@@ -183,7 +183,7 @@ function TestResult({ test, brand }: { test: Test; brand: string }) {
     text = t('settings.provider.testError');
     failed = true;
   } else if (test.state === 'done' && test.check.works) {
-    text = t('settings.provider.works', { provider: brand, seconds: (test.check.millis / 1000).toFixed(1) });
+    text = t('settings.provider.works', { provider: brand, seconds: (Math.max(test.check.millis, 100) / 1000).toFixed(1) });
   } else if (test.state === 'done') {
     text = `${t('settings.provider.testFailed')} ${t(`settings.models.listFailed.${test.check.error ?? 'FAILED'}`)}`;
     failed = true;
