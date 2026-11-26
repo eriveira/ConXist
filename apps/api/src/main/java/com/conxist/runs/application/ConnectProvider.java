@@ -51,10 +51,10 @@ public final class ConnectProvider {
     /** Asks the provider now with the workspace's key and says how it went; the answer is also kept for Settings. */
     public Check test(String provider) {
         ModelPort port = providers.port(provider).orElseThrow(LlmProviders::unknownProvider);
-        ApiKey key = providers.key(provider)
+        ProviderKeys.Key key = providers.key(provider)
                 .orElseThrow(() -> new RuleViolation("provider.not-connected", "Connect the provider first."));
         Instant asked = clock.instant();
-        ProviderModelLists.Listing listing = lists.check(port, key);
+        ProviderModelLists.Listing listing = lists.check(port, key.value());
         long millis = Duration.between(asked, clock.instant()).toMillis();
         providers.recordCheck(provider, key, listing);
         log.info("Workspace {} tested its {} key: {}", workspace.id(), provider,

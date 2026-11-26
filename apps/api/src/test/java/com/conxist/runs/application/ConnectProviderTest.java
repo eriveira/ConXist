@@ -31,8 +31,8 @@ class ConnectProviderTest {
         LlmProviders.ProviderView view = connect.connect("anthropic", "  " + OWN.value() + "\n");
 
         assertThat(anthropic.lastKey).isEqualTo(OWN);
-        assertThat(stored.find(FixedWorkspace.standard().id(), "anthropic")).hasValueSatisfying(saved -> {
-            assertThat(saved.key()).isEqualTo(OWN);
+        assertThat(stored.open(FixedWorkspace.standard().id(), "anthropic")).contains(OWN);
+        assertThat(stored.status(FixedWorkspace.standard().id(), "anthropic")).hasValueSatisfying(saved -> {
             assertThat(saved.addedAt()).isEqualTo(TestClock.NOW);
             assertThat(saved.refused()).isFalse();
         });
@@ -50,6 +50,11 @@ class ConnectProviderTest {
         anthropic.refuses = null;
         anthropic.failWith = "down";
         assertCode(() -> connect.connect("anthropic", OWN.value()), "provider.unreachable");
+        anthropic.failReason = ModelPort.Failure.Reason.BUSY;
+        assertCode(() -> connect.connect("anthropic", OWN.value()), "provider.busy");
+        anthropic.failWith = null;
+        anthropic.timesOut = true;
+        assertCode(() -> connect.connect("anthropic", OWN.value()), "provider.timeout");
 
         assertThat(stored.saved).isEmpty();
     }
@@ -103,11 +108,12 @@ class ConnectProviderTest {
     void a_busy_provider_says_nothing_about_the_key() {
         connect.connect("anthropic", OWN.value());
         anthropic.failWith = "busy";
+        anthropic.failReason = ModelPort.Failure.Reason.BUSY;
 
         ConnectProvider.Check check = connect.test("anthropic");
 
         assertThat(check.works()).isFalse();
-        assertThat(check.error()).isEqualTo(ProviderModelLists.ListError.FAILED);
+        assertThat(check.error()).isEqualTo(ProviderModelLists.ListError.BUSY);
         assertThat(check.provider().connection().refused()).isFalse();
     }
 
@@ -154,8 +160,6 @@ class ConnectProviderTest {
     @Test
     void the_key_is_hidden_wherever_it_could_be_printed() {
         assertThat(OWN.toString()).doesNotContain("sk-ant");
-        assertThat(new ProviderKeysRepository.StoredKey(OWN, TestClock.NOW, TestClock.NOW, false).toString())
-                .doesNotContain(OWN.value());
         assertThat(OWN.ending()).isEqualTo("9xQa");
     }
 

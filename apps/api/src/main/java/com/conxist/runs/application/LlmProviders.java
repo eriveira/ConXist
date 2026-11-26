@@ -68,7 +68,7 @@ public final class LlmProviders implements AgentModels {
             return new Offered(provider, false, List.of(), null);
         }
         ProviderModelLists.Listing listing = lists.models(port, key.get().value(), refresh);
-        recordCheck(provider, key.get().value(), listing);
+        recordCheck(provider, key.get(), listing);
         Map<String, OfferedModel> rows = new LinkedHashMap<>();
         listing.models().forEach(m -> rows.put(m.id(), new OfferedModel(m.id(), m.label(), allows.contains(m.id()), true)));
         // An allowed model missing from the list is gone only when the provider answered; if it did not, it may be there.
@@ -97,7 +97,8 @@ public final class LlmProviders implements AgentModels {
     /** Whether the provider is connected with a key it has not refused, and this workspace allows the model. */
     @Override
     public boolean available(String provider, String model) {
-        return keys.current(provider).filter(key -> !key.refused()).isPresent()
+        ProviderKeys.Connection connection = keys.connection(provider);
+        return port(provider).isPresent() && connection.connected() && !connection.refused()
                 && allowedModels(provider).stream().anyMatch(m -> m.id().equals(model));
     }
 
@@ -105,7 +106,7 @@ public final class LlmProviders implements AgentModels {
      * Keeps how the provider answered about the workspace's key, so Settings shows when it last worked. Listing the
      * models in Settings records it too, so a key revoked at Anthropic shows as refused on the next visit.
      */
-    void recordCheck(String provider, ApiKey key, ProviderModelLists.Listing listing) {
+    void recordCheck(String provider, ProviderKeys.Key key, ProviderModelLists.Listing listing) {
         if (listing.answered()) {
             keys.checked(provider, key, clock.instant(), listing.error() == ProviderModelLists.ListError.KEY_REJECTED);
         }
@@ -149,22 +150,30 @@ public final class LlmProviders implements AgentModels {
             return Optional.empty();
         }
         ModelOption option = catalog.callable(agent.provider(), agent.model());
-        ProviderKeys.Key current = keys.current(agent.provider()).orElseThrow();
+        Optional<ModelPort> port = port(agent.provider());
+        Optional<ProviderKeys.Key> key = keys.current(agent.provider());
+        if (port.isEmpty() || key.isEmpty()) {
+            return Optional.empty(); // disconnected meanwhile
+        }
         log.info("Workspace {} opened its {} key ({}) for a test run of agent {}", workspace.id(), agent.provider(),
-                current.source(), agent.id());
-        ApiKey key = current.value();
-        return port(agent.provider()).map(port -> new Call(port, key, new ModelChoice(option.id(),
+                key.get().source(), agent.id());
+        return Optional.of(new Call(port.get(), key.get().value(), new ModelChoice(option.id(),
                 ModelChoice.Effort.valueOf(agent.effort()), option.fallbacks(), option.maxTokens())));
     }
 
-    /** The key that calls the provider for this workspace, if it has one. */
-    Optional<ApiKey> key(String provider) {
-        return keys.current(provider).map(ProviderKeys.Key::value);
+    /** The key that calls the provider for this workspace, if it has one, opened. */
+    Optional<ProviderKeys.Key> key(String provider) {
+        return keys.current(provider);
+    }
+
+    /** Whether the provider refused the workspace's own key at its last check. */
+    boolean refused(String provider) {
+        return keys.connection(provider).refused();
     }
 
     /** Whether the workspace has a key for the provider, its own or this computer's. */
     boolean connected(String provider) {
-        return port(provider).isPresent() && keys.current(provider).isPresent();
+        return port(provider).isPresent() && keys.connection(provider).connected();
     }
 
     Optional<ModelPort> port(String provider) {

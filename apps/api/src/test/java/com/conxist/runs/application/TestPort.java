@@ -12,6 +12,8 @@ final class TestPort implements ModelPort {
             new ProviderModel(TestModels.SONNET, "Claude Sonnet 5.5"),
             new ProviderModel(TestModels.HAIKU, "Claude Haiku 5.5"));
     String failWith;
+    ModelPort.Failure.Reason failReason = ModelPort.Failure.Reason.FAILED;
+    boolean timesOut;
     /** A key the provider refuses, as Anthropic answers a wrong or revoked key. */
     ApiKey refuses;
     ApiKey lastKey;
@@ -29,8 +31,11 @@ final class TestPort implements ModelPort {
         if (key.equals(refuses)) {
             throw new Failure(Failure.Reason.KEY_REJECTED, "refused");
         }
+        if (timesOut) {
+            throw new Timeout();
+        }
         if (failWith != null) {
-            throw new Failure(Failure.Reason.FAILED, failWith);
+            throw new Failure(failReason, failWith);
         }
         return offers;
     }

@@ -7,7 +7,8 @@ import com.conxist.platform.CurrentWorkspace;
 
 /**
  * Which key calls a provider for the current workspace: the workspace's own when it connected one, else the key set on
- * this computer ({@code CONXIST_ANTHROPIC_API_KEY}), else none (ADR 0014).
+ * this computer ({@code CONXIST_ANTHROPIC_API_KEY}), else none (ADR 0014). A stored key is opened only to call the
+ * provider; Settings reads its status without opening it.
  */
 public final class ProviderKeys {
 
@@ -22,31 +23,37 @@ public final class ProviderKeys {
         this.workspace = workspace;
     }
 
-    /** The key that calls the provider now, if any. */
+    /** The key that calls the provider now, if any, opened. */
     Optional<Key> current(String provider) {
-        Optional<ProviderKeysRepository.StoredKey> own = stored.find(workspace.id(), provider);
+        Optional<ProviderKeysRepository.KeyStatus> own = stored.status(workspace.id(), provider);
         if (own.isPresent()) {
-            return own.map(k -> new Key(k.key(), Source.WORKSPACE, k.addedAt(), k.checkedAt(), k.refused()));
+            return stored.open(workspace.id(), provider)
+                    .map(key -> new Key(key, Source.WORKSPACE, own.get().refused()));
         }
-        return Optional.ofNullable(computerKeys.get(provider))
-                .map(key -> new Key(key, Source.COMPUTER, null, null, false));
+        return Optional.ofNullable(computerKeys.get(provider)).map(key -> new Key(key, Source.COMPUTER, false));
     }
 
     /** What Settings shows about the key: where it comes from and how its checks went, never the key. */
     Connection connection(String provider) {
-        return current(provider).map(k -> new Connection(k.source(), k.source() == Source.WORKSPACE
-                        ? k.value().ending() : null, k.addedAt(), k.checkedAt(), k.refused()))
-                .orElseGet(() -> new Connection(Source.NONE, null, null, null, false));
+        Optional<ProviderKeysRepository.KeyStatus> own = stored.status(workspace.id(), provider);
+        if (own.isPresent()) {
+            ProviderKeysRepository.KeyStatus status = own.get();
+            return new Connection(Source.WORKSPACE, status.ending(), status.addedAt(), status.checkedAt(),
+                    status.refused());
+        }
+        Source source = computerKeys.containsKey(provider) ? Source.COMPUTER : Source.NONE;
+        return new Connection(source, null, null, null, false);
     }
 
-    /** Records how a check of the provider went, when the key checked is the workspace's own. */
-    void checked(String provider, ApiKey key, Instant at, boolean refused) {
-        stored.find(workspace.id(), provider).filter(own -> own.key().equals(key))
-                .ifPresent(own -> stored.checked(workspace.id(), provider, at, refused));
+    /** Records how a check went, when the key checked is the workspace's own; nothing is kept about this computer's. */
+    void checked(String provider, Key key, Instant at, boolean refused) {
+        if (key.source() == Source.WORKSPACE) {
+            stored.checked(workspace.id(), provider, at, refused);
+        }
     }
 
     boolean hasOwn(String provider) {
-        return stored.find(workspace.id(), provider).isPresent();
+        return stored.status(workspace.id(), provider).isPresent();
     }
 
     void save(String provider, ApiKey key, Instant at) {
@@ -67,14 +74,19 @@ public final class ProviderKeys {
         NONE
     }
 
-    /** @param addedAt and {@code checkedAt} are null for the computer's key, which ConXist does not keep */
-    record Key(ApiKey value, Source source, Instant addedAt, Instant checkedAt, boolean refused) {
+    /** @param refused true when the provider refused this workspace key at its last check */
+    record Key(ApiKey value, Source source, boolean refused) {
     }
 
     /**
      * @param keyEnding the last characters of the workspace's own key; null otherwise
+     * @param addedAt   and {@code checkedAt} are null for this computer's key, which ConXist does not keep
      * @param refused   true when the provider refused the key at its last check
      */
     public record Connection(Source source, String keyEnding, Instant addedAt, Instant checkedAt, boolean refused) {
+
+        boolean connected() {
+            return source != Source.NONE;
+        }
     }
 }

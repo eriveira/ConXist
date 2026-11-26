@@ -24,19 +24,31 @@ class JdbcProviderKeysRepository implements ProviderKeysRepository {
     }
 
     @Override
-    public Optional<StoredKey> find(UUID workspaceId, String provider) {
+    public Optional<KeyStatus> status(UUID workspaceId, String provider) {
         return jdbc.sql("""
-                select key_sealed, added_at, checked_at, refused from workspace_provider_keys
+                select key_ending, added_at, checked_at, refused from workspace_provider_keys
                 where workspace_id = :workspaceId and provider = :provider
                 """)
                 .param("workspaceId", workspaceId)
                 .param("provider", provider)
-                .query((row, rowNumber) -> new StoredKey(
-                        new ApiKey(new String(box.open(row.getBytes("key_sealed"), context(workspaceId, provider)),
-                                StandardCharsets.UTF_8)),
+                .query((row, rowNumber) -> new KeyStatus(row.getString("key_ending"),
                         row.getTimestamp("added_at").toInstant(), row.getTimestamp("checked_at").toInstant(),
                         row.getBoolean("refused")))
                 .optional();
+    }
+
+    @Override
+    public Optional<ApiKey> open(UUID workspaceId, String provider) {
+        return jdbc.sql("""
+                select key_sealed from workspace_provider_keys
+                where workspace_id = :workspaceId and provider = :provider
+                """)
+                .param("workspaceId", workspaceId)
+                .param("provider", provider)
+                .query(byte[].class)
+                .optional()
+                .map(sealed -> new ApiKey(new String(box.open(sealed, context(workspaceId, provider)),
+                        StandardCharsets.UTF_8)));
     }
 
     @Override

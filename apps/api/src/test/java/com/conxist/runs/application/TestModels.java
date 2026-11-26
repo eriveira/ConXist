@@ -40,26 +40,34 @@ final class TestModels {
 
     /** Workspace keys kept in memory, in the clear: the encryption is the store's, tested with it. */
     static final class Keys implements ProviderKeysRepository {
-        final Map<String, StoredKey> saved = new HashMap<>();
+        final Map<String, ApiKey> saved = new HashMap<>();
+        final Map<String, KeyStatus> statuses = new HashMap<>();
 
         @Override
-        public Optional<StoredKey> find(UUID workspaceId, String provider) {
+        public Optional<KeyStatus> status(UUID workspaceId, String provider) {
+            return Optional.ofNullable(statuses.get(workspaceId + "/" + provider));
+        }
+
+        @Override
+        public Optional<ApiKey> open(UUID workspaceId, String provider) {
             return Optional.ofNullable(saved.get(workspaceId + "/" + provider));
         }
 
         @Override
         public void save(UUID workspaceId, String provider, ApiKey key, Instant at) {
-            saved.put(workspaceId + "/" + provider, new StoredKey(key, at, at, false));
+            saved.put(workspaceId + "/" + provider, key);
+            statuses.put(workspaceId + "/" + provider, new KeyStatus(key.ending(), at, at, false));
         }
 
         @Override
         public void checked(UUID workspaceId, String provider, Instant at, boolean refused) {
-            saved.computeIfPresent(workspaceId + "/" + provider,
-                    (id, key) -> new StoredKey(key.key(), key.addedAt(), at, refused));
+            statuses.computeIfPresent(workspaceId + "/" + provider,
+                    (id, status) -> new KeyStatus(status.ending(), status.addedAt(), at, refused));
         }
 
         @Override
         public boolean delete(UUID workspaceId, String provider) {
+            statuses.remove(workspaceId + "/" + provider);
             return saved.remove(workspaceId + "/" + provider) != null;
         }
     }

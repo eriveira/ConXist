@@ -63,6 +63,10 @@ public final class StartTestRun {
             throw new RuleViolation("run.no-model-key",
                     "No LLM provider is connected. Connect one in Settings, LLM providers.");
         }
+        if (agent.provider() != null && providers.refused(agent.provider())) {
+            throw new RuleViolation("run.key-refused",
+                    "The provider refused this workspace's key. Test or replace it in Settings, LLM providers.");
+        }
         if (!agent.problems().isEmpty()) {
             throw notReady();
         }

@@ -179,7 +179,7 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('Not connected')).toBeInTheDocument();
   });
 
-  it('shows a refused key with Replace first, and a computer key with Connect', async () => {
+  it('shows a refused key with Replace first and Test still there, and a computer key with Connect', async () => {
     const refused = { ...ANTHROPIC, connection: { ...ANTHROPIC.connection, refused: true } };
     stubApi({
       'GET /api/llm-providers': () => ({ body: { ...LLM_PROVIDERS, providers: [refused] } }),
@@ -191,7 +191,7 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('Key refused')).toBeInTheDocument();
     expect(screen.getByText(/Anthropic refused key ending 3fQa/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace key' })).toHaveClass('primary');
-    expect(screen.queryByRole('button', { name: 'Test connection' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Test connection' })).toBeInTheDocument();
     first.unmount();
 
     const computer = { ...ANTHROPIC, connection: { ...NO_KEY, source: 'COMPUTER' as const } };

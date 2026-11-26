@@ -40,9 +40,10 @@ class StartTestRunTest {
     private final TestClock.Moving clock = TestClock.moving();
     private final ScriptedModel model = new ScriptedModel();
     private final Map<String, ApiKey> computerKeys = TestModels.computerKeys();
+    private final TestModels.Keys stored = new TestModels.Keys();
     private final LlmProviders providers = new LlmProviders(TestModels.catalog(), List.of(model),
             new TestModels.Defaults(), new TestModels.Allowed(), TestModels.lists(),
-            new ProviderKeys(new TestModels.Keys(), computerKeys, FixedWorkspace.standard()), FixedWorkspace.standard(),
+            new ProviderKeys(stored, computerKeys, FixedWorkspace.standard()), FixedWorkspace.standard(),
             TestClock.fixed());
     private final Map<UUID, AgentBrief> agents = new HashMap<>();
     private final Map<UUID, SourceSummary> sources = new HashMap<>();
@@ -274,6 +275,12 @@ class StartTestRunTest {
         assertThatThrownBy(() -> run.run(AGENT_ID, SOURCE_ID, UUID.randomUUID())).isInstanceOf(NotFound.class);
         assertThatThrownBy(() -> run.run(UUID.randomUUID(), SOURCE_ID, MEETING_ID)).isInstanceOf(NotFound.class);
 
+        UUID workspace = FixedWorkspace.standard().id();
+        stored.save(workspace, "anthropic", new ApiKey("sk-ant-revoked-key-0001"), TestClock.NOW);
+        stored.checked(workspace, "anthropic", TestClock.NOW, true);
+        assertCode(() -> run.run(AGENT_ID, SOURCE_ID, MEETING_ID), "run.key-refused");
+
+        stored.delete(workspace, "anthropic");
         computerKeys.clear();
         assertCode(() -> run.run(AGENT_ID, SOURCE_ID, MEETING_ID), "run.no-model-key");
         assertThat(model.requests).isEmpty();

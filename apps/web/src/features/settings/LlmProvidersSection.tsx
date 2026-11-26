@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
-import { Pill } from '../../components/Pill';
 import { type AgentModel, type AgentSummary, EFFORTS, type Effort } from '../../domain/agents';
 import {
-  type ConnectionCheck, type LlmProvider, type LlmProviders, lockReason, modelAvailable, modelLabel, modelUsers, type OfferedModel,
+  type LlmProvider, type LlmProviders, lockReason, modelAvailable, modelLabel, modelUsers, type OfferedModel,
   type OfferedModels, providerUsers, samePick,
 } from '../../domain/settings';
-import { elapsedSince } from '../../domain/time';
-import { providerLabel, type Translate, useLanguage, useT } from '../../i18n/i18n';
+import { providerLabel, useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { problemMessage } from '../../i18n/problems';
-import { ConnectDialog, DisconnectDialog } from './ProviderDialogs';
-import { ProviderMark, providerBrand } from './ProviderMark';
+import { ProviderRow } from './ProviderRow';
 import { ErrorState, LoadingState, SavedStatus, SettingsCard } from './SettingsParts';
 
 type Loaded = { providers: LlmProviders; agents: AgentSummary[] };
@@ -42,15 +39,21 @@ export function LlmProvidersSection() {
 
 function ProvidersCard({ providers, agents, onChanged }: Loaded & { onChanged: (providers: LlmProviders) => void }) {
   const t = useT();
-  const connected = providers.providers.filter((provider) => provider.connected);
+  const live = providers.providers.filter((provider) => provider.connected);
 
-  /** A tick, a new key or a disconnect changes which models can run, so the providers are read again. */
+  /** A tick changes which models the default may use, so the providers are read again. */
   async function reload() {
     try {
       onChanged(await api.llmProviders());
     } catch {
-      // What changed is already shown; the default's choices catch up on the next visit.
+      // The tick is already shown; the default's choices catch up on the next visit.
     }
+  }
+
+  /** A new key or a test changes the provider's row at once; its models are then read again. */
+  function connected(next: LlmProvider) {
+    onChanged({ ...providers, providers: providers.providers.map((each) => (each.id === next.id ? next : each)) });
+    void reload();
   }
 
   return (
@@ -58,137 +61,18 @@ function ProvidersCard({ providers, agents, onChanged }: Loaded & { onChanged: (
       <ul className="vendors">
         {providers.providers.map((provider) => (
           <ProviderRow key={provider.id} provider={provider} users={providerUsers(agents, provider.id)}
-            onConnected={() => void reload()} onDisconnected={onChanged} />
+            onConnected={(next) => connected(next)} onDisconnected={onChanged} />
         ))}
       </ul>
-      {connected.map((provider) => (
+      {live.map((provider) => (
         <ModelsTable key={`${provider.id}-${provider.connection.source}-${provider.connection.addedAt ?? ''}`}
           provider={provider} providers={providers} agents={agents} onAllowedChanged={() => void reload()} />
       ))}
-      {connected.length > 0
-        ? <DefaultPick providers={providers} connected={connected} onSaved={onChanged} />
+      {live.length > 0
+        ? <DefaultPick providers={providers} connected={live} onSaved={onChanged} />
         : <p className="alert info"><Icon name="info" /> {t('settings.noProvider')}</p>}
     </SettingsCard>
   );
-}
-
-type Dialogs = 'connect' | 'replace' | 'disconnect' | null;
-type Test = { state: 'idle' } | { state: 'testing' } | { state: 'done'; check: ConnectionCheck } | { state: 'error' };
-
-/**
- * One provider and its key: not connected (Connect), on this computer's key (Test, Connect), on the workspace's own
- * key (Test, Replace, Disconnect), or with a key the provider refused (Replace, Disconnect).
- */
-function ProviderRow({ provider, users, onConnected, onDisconnected }: {
-  provider: LlmProvider; users: string[]; onConnected: () => void; onDisconnected: (providers: LlmProviders) => void;
-}) {
-  const t = useT();
-  const language = useLanguage();
-  const [dialog, setDialog] = useState<Dialogs>(null);
-  const [test, setTest] = useState<Test>({ state: 'idle' });
-  const brand = providerBrand(t, provider.id);
-  const { connection } = provider;
-  const own = connection.source === 'WORKSPACE';
-  const refused = own && connection.refused;
-
-  async function runTest() {
-    setTest({ state: 'testing' });
-    try {
-      const check = await api.testProvider(provider.id);
-      setTest({ state: 'done', check });
-      if (check.provider.connection.refused !== connection.refused) onConnected();
-    } catch {
-      setTest({ state: 'error' });
-    }
-  }
-
-  return (
-    <li className="vendor-item">
-      <div className="vendor">
-        <span className="vendor-icon brand" aria-hidden="true"><ProviderMark provider={provider.id} /></span>
-        <span className="grow">
-          <span className="vendor-name">
-            {providerLabel(t, provider.id)}{' '}
-            {!provider.connected && <Pill tone="soon">{t('settings.provider.missing')}</Pill>}
-            {provider.connected && !refused && <Pill tone="live">{t('settings.provider.connected')}</Pill>}
-            {refused && <Pill tone="error">{t('settings.provider.refused')}</Pill>}
-          </span>
-          <span className="vendor-desc">{describe(provider, brand, t, language)}</span>
-        </span>
-        <span className="vendor-actions">
-          {connection.source === 'NONE' && (
-            <button type="button" className="btn primary" onClick={() => setDialog('connect')}>
-              {t('settings.provider.connect')}
-            </button>
-          )}
-          {provider.connected && !refused && (
-            <button type="button" className="btn sm" disabled={test.state === 'testing'} onClick={() => void runTest()}>
-              {test.state === 'testing' ? t('settings.provider.testing') : t('settings.provider.test')}
-            </button>
-          )}
-          {connection.source === 'COMPUTER' && (
-            <button type="button" className="btn sm" onClick={() => setDialog('connect')}>{t('settings.provider.connect')}</button>
-          )}
-          {own && (
-            <button type="button" className={refused ? 'btn sm primary' : 'btn sm'} onClick={() => setDialog('replace')}>
-              {t('settings.provider.replace')}
-            </button>
-          )}
-          {own && (
-            <button type="button" className="btn sm" onClick={() => setDialog('disconnect')}>
-              {t('settings.provider.disconnect')}
-            </button>
-          )}
-        </span>
-      </div>
-      <TestResult test={test} brand={brand} />
-      {(dialog === 'connect' || dialog === 'replace') && (
-        <ConnectDialog provider={provider.id} replacing={dialog === 'replace'} onClose={() => setDialog(null)}
-          onConnected={() => { setDialog(null); setTest({ state: 'idle' }); onConnected(); }} />
-      )}
-      {dialog === 'disconnect' && (
-        <DisconnectDialog provider={provider.id} users={users} onClose={() => setDialog(null)}
-          onDisconnected={(next) => { setDialog(null); setTest({ state: 'idle' }); onDisconnected(next); }} />
-      )}
-    </li>
-  );
-}
-
-/** What the person reads about the key: where it comes from, its ending, when it was added and last checked. */
-function describe(provider: LlmProvider, brand: string, t: Translate, language: string): string {
-  const { connection } = provider;
-  if (connection.source === 'NONE') return t('settings.provider.none', { provider: brand });
-  if (connection.source === 'COMPUTER') return t('settings.provider.computer');
-  const ending = connection.keyEnding ?? '';
-  const added = connection.addedAt
-    ? new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' }).format(new Date(connection.addedAt)) : '';
-  const when = connection.checkedAt ? ago(connection.checkedAt, t) : '';
-  if (connection.refused) return t('settings.provider.ownRefused', { provider: brand, ending, when });
-  return connection.checkedAt
-    ? t('settings.provider.ownChecked', { ending, added, when })
-    : t('settings.provider.own', { ending, added });
-}
-
-function ago(iso: string, t: Translate): string {
-  const elapsed = elapsedSince(iso, new Date());
-  return elapsed.unit === 'now' ? t('time.now') : t(`time.${elapsed.unit}`, { count: elapsed.count });
-}
-
-/** The answer to Test connection, read out once it arrives. */
-function TestResult({ test, brand }: { test: Test; brand: string }) {
-  const t = useT();
-  let text = '';
-  let failed = false;
-  if (test.state === 'error') {
-    text = t('settings.provider.testError');
-    failed = true;
-  } else if (test.state === 'done' && test.check.works) {
-    text = t('settings.provider.works', { provider: brand, seconds: (Math.max(test.check.millis, 100) / 1000).toFixed(1) });
-  } else if (test.state === 'done') {
-    text = `${t('settings.provider.testFailed')} ${t(`settings.models.listFailed.${test.check.error ?? 'FAILED'}`)}`;
-    failed = true;
-  }
-  return <p className={failed ? 'status-line failed' : 'status-line'} role="status">{text}</p>;
 }
 
 type Offered = { status: 'loading' } | { status: 'error' } | { status: 'ready'; offered: OfferedModels };

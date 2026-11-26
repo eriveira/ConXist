@@ -8,6 +8,9 @@
 - Amended 2026-11-25 (owner): LLM providers keeps only what adding a provider needs, Anthropic only; Settings lists
   every model the provider offers and the workspace ticks the ones agents may pick (mock
   `App/mocks/workspace-settings-v3/`). See "Allowed models" below.
+- Amended 2026-11-26 (owner): a workspace connects its own Anthropic key in Settings, checked before it is saved and
+  stored encrypted (table V17, `SecretBox` moved to `platform`); test, replace and disconnect. This replaces the
+  earlier "keys saved in Settings wait for sign-in". Mock `App/mocks/workspace-settings-v4/`. See "Provider keys".
 
 ## Context
 
@@ -65,8 +68,9 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   `ProviderKeys` picks the key: the workspace's own first, else this computer's `CONXIST_ANTHROPIC_API_KEY` (kept so
   a local setup still works), else none. `ModelPort` calls take the key; `ClaudeModel` keeps one SDK client per key
   (the SDK sets the key per client). Model lists are kept per key (by a SHA-256 digest, never the key). A listing or
-  test that the provider answers records the check; a refused key makes its models unavailable until a test passes
-  or the key is replaced. A run that the provider refuses does not mark the key (a 403 may be about one model only).
+  test that the provider answers records the check (so opening Settings also notices a revoked key); a refused key
+  makes its models unavailable, and its test runs say so (`run.key-refused`), until a test or a listing passes or the
+  key is replaced. Settings reads a key's ending and checks without opening the sealed key. A run that the provider refuses does not mark the key (a 403 may be about one model only).
   `ApiKey` and the request record hide the key in `toString`, so it can't reach a log.
 - **Connectors** now hold what is not a model: Storage (where Knowledge and Memories will be saved) and AI tools that
   reach ConXist over MCP. Both show "coming soon".
