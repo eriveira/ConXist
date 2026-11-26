@@ -59,7 +59,7 @@ export function ConnectDialog({ provider, replacing, onClose, onConnected }: {
       <form id={`${field}-form`} className="m-body" onSubmit={(event) => void submit(event)}>
         <div className="field">
           <label htmlFor={field}>{t('settings.connect.label')}</label>
-          <input id={field} className="input" type="password" autoComplete="off" spellCheck={false}
+          <input id={field} className="input" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" spellCheck={false}
             placeholder="sk-ant-..." value={key} disabled={busy} maxLength={1000}
             aria-invalid={error ? true : undefined} aria-describedby={error ? `${help} ${errorId}` : help}
             onChange={(event) => { setKey(event.target.value); setError(null); }} />
