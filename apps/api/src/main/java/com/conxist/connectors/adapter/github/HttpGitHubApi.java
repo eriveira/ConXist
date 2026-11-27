@@ -2,6 +2,7 @@ package com.conxist.connectors.adapter.github;
 
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +14,6 @@ import com.conxist.connectors.domain.Integration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,11 +26,15 @@ public final class HttpGitHubApi implements GitHubApi {
 
     static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
     private static final String API_VERSION = "2022-11-28";
+    private static final String JSON = "application/vnd.github+json";
+    /** A path's contents as one object that says whether it is a file or a folder, a file's text in Base64. */
+    private static final String OBJECT_JSON = "application/vnd.github.object+json";
 
     private final RestClient http;
     private final URI base;
     private final JsonMapper json = JsonMapper.builder().build();
-    private final GitHubToolCalls tools = new GitHubToolCalls(this::get);
+    private final GitHubToolCalls tools = new GitHubToolCalls((token, path, query) -> get(token, path, query,
+            OBJECT_JSON));
 
     public HttpGitHubApi(RestClient http, URI base) {
         this.http = http;
@@ -52,27 +56,34 @@ public final class HttpGitHubApi implements GitHubApi {
     }
 
     private Account readAccount(String token) {
-        JsonNode user = json.readTree(get(token, "/user", Map.of(), false));
+        JsonNode user = json.readTree(get(token, "/user", Map.of(), JSON));
+        String login = user.path("login").asString("").strip();
+        if (login.isEmpty() || login.length() > 100) {
+            throw new Unreachable("GitHub answered without an account name");
+        }
         List<String> repositories = new ArrayList<>();
         for (JsonNode repository : json.readTree(get(token, "/user/repos",
-                Map.of("per_page", String.valueOf(Integration.MAX_REPOSITORIES), "sort", "full_name"), false))) {
+                Map.of("per_page", String.valueOf(Integration.MAX_REPOSITORIES), "sort", "full_name"), JSON))) {
             String name = repository.path("full_name").asString("");
             if (GitHubTools.REPOSITORY.matcher(name).matches()) {
                 repositories.add(name);
             }
         }
-        return new Account(user.path("login").asString(""), List.copyOf(repositories));
+        return new Account(login, List.copyOf(repositories));
     }
 
     /** One GET request; {@code path} has each part encoded already, {@code query} is encoded here. */
-    String get(String token, String path, Map<String, String> query, boolean raw) {
-        UriComponentsBuilder uri = UriComponentsBuilder.fromUri(base).path(path);
-        query.forEach((name, value) -> uri.queryParam(name, "{" + name + "}"));
-        URI address = uri.encode().buildAndExpand(query).toUri();
+    String get(String token, String path, Map<String, String> query, String accept) {
+        StringBuilder address = new StringBuilder(base.toString().replaceAll("/+$", "")).append(path);
+        String separator = "?";
+        for (Map.Entry<String, String> parameter : query.entrySet()) {
+            address.append(separator).append(encode(parameter.getKey())).append('=').append(encode(parameter.getValue()));
+            separator = "&";
+        }
         try {
-            return http.get().uri(address)
+            return http.get().uri(URI.create(address.toString()))
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .header(HttpHeaders.ACCEPT, raw ? "application/vnd.github.raw+json" : "application/vnd.github+json")
+                    .header(HttpHeaders.ACCEPT, accept)
                     .header("X-GitHub-Api-Version", API_VERSION)
                     .exchange((sent, answer) -> {
                         int status = answer.getStatusCode().value();
@@ -93,5 +104,9 @@ public final class HttpGitHubApi implements GitHubApi {
         } catch (ResourceAccessException | UncheckedIOException failed) {
             throw new Unreachable("GitHub could not be reached: " + failed.getClass().getSimpleName());
         }
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 }

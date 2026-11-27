@@ -61,7 +61,7 @@ describe('Settings › Integrations', () => {
     await userEvent.type(within(dialog).getByLabelText('Token'), TOKEN);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
     expect(await within(dialog).findByRole('heading', { name: 'GitHub is connected' })).toBeInTheDocument();
-    expect(within(dialog).getByText(/The token of alex-acme reaches 2 repositories: acme\/api, acme\/web\./)).toBeInTheDocument();
+    expect(within(dialog).getByText(/alex-acme’s token reaches 2 repositories: acme\/api, acme\/web\./)).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox', { name: 'Allow get_pull_request' })).toBeChecked();
     expect(await accessibilityViolations(container)).toEqual([]);
 
@@ -73,6 +73,7 @@ describe('Settings › Integrations', () => {
     });
     expect(screen.getByText(/alex-acme · 2 repositories · token ending 9kQ2 · 4 of 5 tools allowed/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Manage GitHub' })).toHaveFocus();
     expect(document.body).not.toHaveTextContent(TOKEN);
   });
 

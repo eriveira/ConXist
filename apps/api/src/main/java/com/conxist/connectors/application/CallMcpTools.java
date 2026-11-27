@@ -128,10 +128,15 @@ public final class CallMcpTools implements McpToolbox {
         if (String.valueOf(arguments).length() > MAX_ARGUMENT_CHARACTERS) {
             return new Result("The arguments are too long. Send this tool only what it asks for.", true);
         }
-        String token = integrations.token(integration.workspaceId(), integration.id()).orElse(null);
-        if (token == null) {
-            return new Result("This integration is no longer in this workspace.", true);
+        if (integration.status() == Integration.Status.SIGN_IN_NEEDED) {
+            return new Result("GitHub refused ConXist's token. A person replaces it in Settings.", true);
         }
+        return integrations.token(integration.workspaceId(), integration.id())
+                .map(token -> callGitHub(integration, token, tool, arguments))
+                .orElseGet(() -> new Result("This integration is no longer in this workspace.", true));
+    }
+
+    private Result callGitHub(Integration integration, String token, String tool, Map<String, Object> arguments) {
         try {
             return new Result(capped(github.call(integration, token, tool, arguments), MAX_ANSWER_CHARACTERS), false);
         } catch (GitHubApi.Problem problem) {
@@ -150,6 +155,11 @@ public final class CallMcpTools implements McpToolbox {
         } catch (GitHubApi.Unreachable unreachable) {
             log.info("Workspace {}: GitHub could not be reached for integration {}", integration.workspaceId(),
                     integration.id());
+            return new Result("GitHub could not be reached. Try again later.", true);
+        } catch (RuntimeException unexpected) {
+            // Only the class: the message may hold what the model searched for, which is customer data.
+            log.warn("Workspace {}: a call to GitHub for integration {} failed: {}", integration.workspaceId(),
+                    integration.id(), unexpected.getClass().getSimpleName());
             return new Result("GitHub could not be reached. Try again later.", true);
         }
     }

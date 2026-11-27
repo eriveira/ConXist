@@ -17,8 +17,8 @@ class GitHubToolCallsTest {
 
     private final List<String> sent = new ArrayList<>();
     private final Map<String, String> answers = new java.util.HashMap<>();
-    private final GitHubToolCalls calls = new GitHubToolCalls((token, path, query, raw) -> {
-        sent.add(path + " " + new java.util.TreeMap<>(query) + (raw ? " raw" : ""));
+    private final GitHubToolCalls calls = new GitHubToolCalls((token, path, query) -> {
+        sent.add(path + " " + new java.util.TreeMap<>(query));
         return answers.getOrDefault(path, "{}");
     });
     private final Integration github = new Integration(UUID.randomUUID(), UUID.randomUUID(), Integration.Kind.GITHUB,
@@ -34,7 +34,7 @@ class GitHubToolCallsTest {
         String answer = calls.call(github, "t", "search_code", Map.of("query", "refund repo:evil/secrets org:evil"));
 
         assertThat(sent).containsExactly("/search/code {per_page=20, q=refund repo:acme/api repo:acme/web}");
-        assertThat(answer).contains("\"path\":\"src/Pay.java\"").contains("\"total\":1");
+        assertThat(answer).contains("\"path\":\"src/Pay.java\"").contains("\"total\":1").contains("\"cut\":false");
     }
 
     @Test
@@ -65,12 +65,26 @@ class GitHubToolCallsTest {
     }
 
     @Test
-    void a_file_is_read_raw_with_each_part_of_its_path_encoded() {
-        answers.put("/repos/acme/api/contents/docs/my%20notes.md", "# Notes");
+    void a_file_is_read_whatever_its_text_starts_with_and_a_folder_lists_its_names() {
+        answers.put("/repos/acme/api/contents/Cargo.toml", "{\"type\":\"file\",\"size\":10,\"content\":\""
+                + java.util.Base64.getEncoder().encodeToString("[package]\n".getBytes()) + "\"}");
+        answers.put("/repos/acme/api/contents/src", "{\"type\":\"dir\",\"entries\":[{\"name\":\"app\",\"type\":\"dir\"},"
+                + "{\"name\":\"Main.java\",\"type\":\"file\"}]}");
 
-        assertThat(calls.call(github, "t", "get_file", Map.of("repository", "acme/api", "path", "/docs/my notes.md",
-                "ref", "release/1.2"))).isEqualTo("# Notes");
-        assertThat(sent).containsExactly("/repos/acme/api/contents/docs/my%20notes.md {ref=release/1.2} raw");
+        assertThat(calls.call(github, "t", "get_file", Map.of("repository", "acme/api", "path", "Cargo.toml",
+                "ref", "release/1.2"))).isEqualTo("[package]\n");
+        assertThat(calls.call(github, "t", "get_file", Map.of("repository", "acme/api", "path", "/src")))
+                .isEqualTo("{\"folder\":\"src\",\"entries\":[\"app/\",\"Main.java\"]}");
+        assertThat(sent).containsExactly("/repos/acme/api/contents/Cargo.toml {ref=release/1.2}",
+                "/repos/acme/api/contents/src {}");
+    }
+
+    @Test
+    void a_search_keeps_code_words_and_drops_github_syntax_in_any_case() {
+        assertThat(GitHubToolCalls.plainWords("std::vector Foo::bar")).isEqualTo("std::vector Foo::bar");
+        assertThat(GitHubToolCalls.plainWords("refund Repo:evil/x ORG:evil -user:x (path:src OR NOT y)"))
+                .isEqualTo("refund y");
+        assertThat(GitHubToolCalls.plainWords("http://acme.test")).isEmpty();
     }
 
     @Test

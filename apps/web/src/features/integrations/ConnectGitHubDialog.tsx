@@ -81,7 +81,7 @@ export function ConnectGitHubDialog({ integration, onClose, onDone }: {
       <form id={ids.form} className="m-body" onSubmit={(event) => void submitToken(event)} noValidate>
         <div className="mcp-found">
           <McpLogo name="GitHub" icon={GITHUB_ICON} />
-          <h3>{t(integration ? 'github.dialog.replace' : 'github.dialog.title')}</h3>
+          <h3>GitHub</h3>
         </div>
         <p>{t('github.connect.help')}</p>
         <ol className="github-steps">
@@ -162,7 +162,7 @@ export function ConnectGitHubDialog({ integration, onClose, onDone }: {
     <Dialog
       title={t(integration ? 'github.dialog.replace' : 'github.dialog.title')}
       subtitle={t('github.dialog.subtitle')}
-      icon={<Icon name="vendor" />}
+      icon={<McpLogo name="GitHub" icon={GITHUB_ICON} size="sm" />}
       closeLabel={t('dialog.close')}
       onClose={onClose}
       step={step.kind}

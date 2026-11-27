@@ -370,7 +370,7 @@ describe('AgentPage', () => {
     api(AGENT, { 'GET /api/mcps': () => ({ status: 500, body: {} }) });
     render(<AgentPage agentId={ID} />);
 
-    expect(await screen.findByText(/The MCP servers’ tools could not load/)).toBeInTheDocument();
+    expect(await screen.findByText(/The tools of MCP servers and integrations could not load/)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
     expect(await screen.findByRole('checkbox', { name: /Specs/ })).toBeInTheDocument();
   });

@@ -107,11 +107,20 @@ class JdbcIntegrationRepository implements IntegrationRepository {
     }
 
     @Override
-    public void saveToken(UUID workspaceId, UUID integrationId, String token) {
-        jdbc.sql("update integrations set token_sealed = :sealed where workspace_id = :workspaceId and id = :id")
-                .param("workspaceId", workspaceId)
-                .param("id", integrationId)
-                .param("sealed", seal(workspaceId, integrationId, token))
+    public void replaceToken(Integration integration, String token) {
+        jdbc.sql("""
+                update integrations set account = :account, repositories = cast(:repositories as jsonb),
+                    token_ending = :ending, status = :status, checked_at = :checkedAt, token_sealed = :sealed
+                where workspace_id = :workspaceId and id = :id
+                """)
+                .param("id", integration.id())
+                .param("workspaceId", integration.workspaceId())
+                .param("account", integration.account())
+                .param("repositories", json.writeValueAsString(integration.repositories()))
+                .param("ending", integration.tokenEnding())
+                .param("status", integration.status().name())
+                .param("checkedAt", Timestamp.from(integration.checkedAt()))
+                .param("sealed", seal(integration.workspaceId(), integration.id(), token))
                 .update();
     }
 

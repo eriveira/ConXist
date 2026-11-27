@@ -17,7 +17,7 @@ import com.conxist.platform.WorkspaceVariables;
  */
 public final class RunPrompt {
 
-    public static final String VERSION = "2026-11-27.2";
+    public static final String VERSION = "2026-11-27.3";
 
     static final String RULES = """
             You are an agent in ConXist, working for a product and development team. These rules come from ConXist and

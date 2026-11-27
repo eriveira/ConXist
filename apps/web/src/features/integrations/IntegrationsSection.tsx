@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
@@ -24,6 +24,17 @@ export function IntegrationsSection() {
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const card = useRef<HTMLDivElement>(null);
+
+  // After Add or Remove the button that opened the dialog is gone: focus goes to the new row, or to the heading.
+  useEffect(() => {
+    if (!notice || state.status !== 'ready') return;
+    const target = notice.kind === 'added'
+      ? card.current?.querySelector<HTMLElement>('[data-manage]')
+      : card.current?.querySelector<HTMLElement>('h2');
+    if (target && target.tagName === 'H2') target.tabIndex = -1;
+    target?.focus();
+  }, [notice, state.status]);
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -61,6 +72,7 @@ export function IntegrationsSection() {
   );
 
   return (
+    <div ref={card}>
     <SettingsCard id="settings-integrations" title={t('settings.integrations')} lead={t('integration.lead')}>
       <p className="save-status" role="status">
         {notice && (
@@ -93,7 +105,7 @@ export function IntegrationsSection() {
                   <span className="vendor-desc">{summary(integration, t)}</span>
                 </span>
                 <span className="vendor-actions">
-                  <a className="btn sm" href={integrationHref(integration.id)}
+                  <a className="btn sm" data-manage href={integrationHref(integration.id)}
                     aria-label={t('integration.manage.label', { name: integration.name })}>
                     {t('integration.manage')}
                   </a>
@@ -105,6 +117,7 @@ export function IntegrationsSection() {
       )}
       {adding && <ConnectGitHubDialog onClose={() => setAdding(false)} onDone={added} />}
     </SettingsCard>
+    </div>
   );
 }
 

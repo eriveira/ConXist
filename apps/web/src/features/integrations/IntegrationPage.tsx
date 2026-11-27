@@ -99,7 +99,9 @@ export function IntegrationPage({ integrationId, onRemoved }: {
         })}
       </p>
       {integration.status !== 'WORKS' && (
-        <p className="alert info"><Icon name="alert" /> {t(`integration.state.${integration.status}`)}</p>
+        <p className={integration.status === 'SIGN_IN_NEEDED' ? 'alert error' : 'alert info'}>
+          <Icon name="alert" /> {t(`integration.state.${integration.status}`)}
+        </p>
       )}
       <div className="vendor-actions mcp-actions">
         <button type="button" className="btn sm" disabled={check.state === 'checking'} onClick={() => void runCheck()}>

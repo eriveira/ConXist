@@ -41,7 +41,7 @@ public final class IntegrationViews {
                         List.of()))).toList(), integration.addedAt(), integration.checkedAt());
     }
 
-    Map<java.util.UUID, Map<String, List<AgentBriefs.McpToolUse>>> uses() {
+    Map<UUID, Map<String, List<AgentBriefs.McpToolUse>>> uses() {
         return mcp.uses();
     }
 

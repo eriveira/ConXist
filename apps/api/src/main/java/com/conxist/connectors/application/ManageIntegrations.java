@@ -1,6 +1,7 @@
 package com.conxist.connectors.application;
 
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -99,7 +100,7 @@ public final class ManageIntegrations {
     /** Asks GitHub again what the token reaches. */
     public IntegrationViews.CheckView check(UUID integrationId) {
         Integration integration = load(integrationId);
-        String token = integrations.token(integration.workspaceId(), integrationId).orElseThrow();
+        String token = integrations.token(integration.workspaceId(), integrationId).orElseThrow(ManageIntegrations::gone);
         try {
             GitHubApi.Account account = github.account(token);
             Integration checked = integration.checked(account.login(), account.repositories(),
@@ -121,8 +122,7 @@ public final class ManageIntegrations {
         GitHubApi.Account account = account(checked);
         Integration replaced = integration.checked(account.login(), account.repositories(),
                 Integration.endingOf(checked), clock.instant());
-        integrations.saveToken(integration.workspaceId(), integrationId, checked);
-        integrations.update(replaced);
+        integrations.replaceToken(replaced, checked);
         log.info("Workspace {} replaced the token of integration {}", integration.workspaceId(), integrationId);
         return views.view(replaced);
     }
@@ -130,7 +130,7 @@ public final class ManageIntegrations {
     /** The agents that use the integration's tools; while there are any, it can't be removed. */
     public List<McpViews.AgentUseView> uses(UUID integrationId) {
         load(integrationId);
-        Map<UUID, AgentBriefs.McpToolUse> byAgent = new java.util.LinkedHashMap<>();
+        Map<UUID, AgentBriefs.McpToolUse> byAgent = new LinkedHashMap<>();
         views.usesOf(integrationId).forEach(use -> byAgent.putIfAbsent(use.agentId(), use));
         return byAgent.values().stream().map(use -> new McpViews.AgentUseView(use.agentId(), use.agentName(),
                 use.where(), use.archived())).toList();
@@ -171,8 +171,11 @@ public final class ManageIntegrations {
     }
 
     private Integration load(UUID integrationId) {
-        return integrations.find(workspace.id(), integrationId).orElseThrow(
-                () -> new NotFound("integration.not-found", "This integration is no longer in this workspace."));
+        return integrations.find(workspace.id(), integrationId).orElseThrow(ManageIntegrations::gone);
+    }
+
+    private static NotFound gone() {
+        return new NotFound("integration.not-found", "This integration is no longer in this workspace.");
     }
 
     private static String agentNames(List<AgentBriefs.McpToolUse> uses) {

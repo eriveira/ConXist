@@ -100,7 +100,7 @@ export const mcpEn = {
 
   'agent.tools.conxist': 'ConXist',
   'agent.tools.mcp': 'MCP',
-  'agent.tools.mcpError': 'The MCP servers’ tools could not load. The rest of the agent still saves.',
+  'agent.tools.mcpError': 'The tools of MCP servers and integrations could not load. The rest of the agent still saves.',
   'agent.tools.mcpMore': 'Missing a tool? Allow more in',
   'agent.tools.mcpSettings': 'Settings › MCPs',
   'agent.tools.mcpGone': '{tool} is no longer allowed in this workspace.',
@@ -232,7 +232,7 @@ export const mcpEs: Record<keyof typeof mcpEn, string> = {
 
   'agent.tools.conxist': 'ConXist',
   'agent.tools.mcp': 'MCP',
-  'agent.tools.mcpError': 'No se pudieron cargar las herramientas de los servidores MCP. El resto del agente se sigue guardando.',
+  'agent.tools.mcpError': 'No se pudieron cargar las herramientas de los servidores MCP y las integraciones. El resto del agente se sigue guardando.',
   'agent.tools.mcpMore': '¿Falta una herramienta? Permite más en',
   'agent.tools.mcpSettings': 'Ajustes › MCPs',
   'agent.tools.mcpGone': '{tool} ya no está permitida en este espacio de trabajo.',

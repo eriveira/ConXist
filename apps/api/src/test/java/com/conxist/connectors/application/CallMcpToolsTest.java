@@ -58,7 +58,7 @@ class CallMcpToolsTest {
         public boolean insertIfKindFree(com.conxist.connectors.domain.Integration integration, String token) { return false; }
         public void update(com.conxist.connectors.domain.Integration integration) { }
         public Optional<String> token(UUID workspaceId, UUID id) { return Optional.empty(); }
-        public void saveToken(UUID workspaceId, UUID id, String token) { }
+        public void replaceToken(com.conxist.connectors.domain.Integration integration, String token) { }
         public boolean delete(UUID workspaceId, UUID id) { return false; }
     };
     private final GitHubApi noGitHub = new GitHubApi() {

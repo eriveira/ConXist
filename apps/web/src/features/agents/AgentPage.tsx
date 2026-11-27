@@ -50,6 +50,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
     Promise.all([api.sources(), api.agentTools(), api.skills(), api.llmProviders(),
       // MCP servers and integrations load on their own terms: when they can't, the rest of the agent still edits.
       // Agents pick an integration's tools as they pick an MCP server's (ADR 0019), so both list as tool servers.
+      // Both or neither: a pick is judged allowed only against the full list, never half of it.
       Promise.all([api.integrations(), api.mcps()])
         .then(([integrations, mcps]) => [...integrations.map(asToolServer), ...mcps])
         .catch(() => null),

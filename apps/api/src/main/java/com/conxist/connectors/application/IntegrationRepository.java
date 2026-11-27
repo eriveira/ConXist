@@ -19,7 +19,8 @@ public interface IntegrationRepository {
 
     Optional<String> token(UUID workspaceId, UUID integrationId);
 
-    void saveToken(UUID workspaceId, UUID integrationId, String token);
+    /** Saves a new token together with what it reaches, in one write. */
+    void replaceToken(Integration integration, String token);
 
     boolean delete(UUID workspaceId, UUID integrationId);
 }
