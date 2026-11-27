@@ -104,7 +104,8 @@ class StartTestRunTest {
             new RunTools(id -> Optional.ofNullable(sources.get(id)), library, mcp), providers,
             (answer, required) -> answer.startsWith("{") && required.stream().allMatch(answer::contains)
                     ? Optional.of(Map.of("raw", answer)) : Optional.empty(),
-            FixedWorkspace.standard(), clock);
+            FixedWorkspace.standard(), workspaceId -> workspaceId.equals(FixedWorkspace.standard().id())
+                    ? Map.of("company_name", "Acme Inc.") : Map.of(), clock);
 
     StartTestRunTest() {
         source(SOURCE_ID, "Team meetings");
@@ -130,6 +131,18 @@ class StartTestRunTest {
                 .isEqualTo(new ModelChoice("claude-opus-5-5", ModelChoice.Effort.LOW, true, 16_000));
     }
 
+
+    @Test
+    void a_run_puts_the_workspaces_variables_in_the_agents_instructions() {
+        agents.put(AGENT_ID, new AgentBrief(AGENT_ID, "Analyst", "Finds requirements", "Write for {{company_name}}.",
+                List.of(), List.of(), "anthropic", "claude-opus-5-5", "LOW", "PRECISE", "FREE_TEXT", 6, 120, 10,
+                List.of(), List.of(), false));
+        model.then(request -> answer("Done."));
+
+        run.run(AGENT_ID, SOURCE_ID, MEETING_ID);
+
+        assertThat(model.requests.get(0).system()).contains("Write for Acme Inc.");
+    }
 
     @Test
     void an_agent_answers_in_its_shape_and_the_person_sees_what_it_did() {

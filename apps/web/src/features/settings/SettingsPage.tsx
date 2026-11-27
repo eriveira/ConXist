@@ -5,10 +5,10 @@ import type { MessageKey } from '../../i18n/messages';
 import { SETTINGS_SECTIONS, settingsHref, useSettingsSection } from '../../navigation';
 import { GeneralSection } from './GeneralSection';
 import { LlmProvidersSection } from './LlmProvidersSection';
-import { TopicsSection } from './TopicsSection';
+import { VariablesSection } from './VariablesSection';
 import { McpsSection } from '../mcps/McpsSection';
 
-/** A workspace's Settings, opened from the workspace menu: General, LLM providers, MCPs and Topics. */
+/** A workspace's Settings, opened from the workspace menu: General, LLM providers, MCPs and Variables. */
 export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onSaved: (workspace: Workspace) => void }) {
   const t = useT();
   const section = useSettingsSection();
@@ -35,7 +35,7 @@ export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onS
           {section === 'general' && <GeneralSection workspace={workspace} onSaved={onSaved} />}
           {section === 'llm' && <LlmProvidersSection />}
           {section === 'mcps' && <McpsSection />}
-          {section === 'topics' && <TopicsSection />}
+          {section === 'variables' && <VariablesSection />}
         </div>
       </div>
     </section>

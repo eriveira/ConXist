@@ -21,7 +21,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** Workspace Settings against a real PostgreSQL: General (name and description) and Topics (ADR 0014). */
+/** Workspace Settings against a real PostgreSQL: General (name and description) and Variables (ADR 0018). */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({PostgresContainerConfiguration.class, FakePlaudConfiguration.class})
@@ -62,36 +62,39 @@ class WorkspaceSettingsIntegrationTest {
     }
 
     @Test
-    void topics_belong_to_one_workspace_and_keep_unique_names() throws Exception {
-        String workspace = workspace("Topics one");
-        String other = workspace("Topics two");
+    void variables_belong_to_one_workspace_and_keep_unique_names() throws Exception {
+        String workspace = workspace("Variables one");
+        String other = workspace("Variables two");
 
-        String payments = topic(workspace, "{\"name\":\"Payments\",\"description\":\"Billing and refunds\"}");
-        topic(workspace, "{\"name\":\"Checkout\"}");
-        mvc.perform(post("/api/topics").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"payments\"}"))
+        String topics = variable(workspace, "{\"name\":\"topics\",\"value\":\"Checkout, Payments\"}");
+        variable(workspace, "{\"name\":\"company_name\",\"value\":\"Acme Inc.\"}");
+        mvc.perform(post("/api/variables").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Topics\",\"value\":\"x\"}"))
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("topic.name-taken"));
-        mvc.perform(get("/api/topics").header(HEADER, workspace))
-                .andExpect(jsonPath("$[0].name").value("Checkout"))
-                .andExpect(jsonPath("$[1].description").value("Billing and refunds"));
+                .andExpect(jsonPath("$.code").value("variable.name-taken"));
+        mvc.perform(post("/api/variables").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"company name\",\"value\":\"x\"}"))
+                .andExpect(jsonPath("$.code").value("variable.name-invalid"));
+        mvc.perform(get("/api/variables").header(HEADER, workspace))
+                .andExpect(jsonPath("$[0].name").value("company_name"))
+                .andExpect(jsonPath("$[1].value").value("Checkout, Payments"));
 
-        mvc.perform(put("/api/topics/{id}", payments).header(HEADER, other).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Mine\"}"))
+        mvc.perform(put("/api/variables/{id}", topics).header(HEADER, other).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"mine\",\"value\":\"x\"}"))
                 .andExpect(status().isNotFound());
-        mvc.perform(delete("/api/topics/{id}", payments).header(HEADER, other)).andExpect(status().isNotFound());
-        mvc.perform(get("/api/topics").header(HEADER, other)).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(delete("/api/variables/{id}", topics).header(HEADER, other)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/variables").header(HEADER, other)).andExpect(jsonPath("$.length()").value(0));
 
-        mvc.perform(put("/api/topics/{id}", payments).header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"checkout\"}"))
-                .andExpect(jsonPath("$.code").value("topic.name-taken"));
-        mvc.perform(put("/api/topics/{id}", payments).header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Billing\",\"description\":\"Invoices\"}"))
+        mvc.perform(put("/api/variables/{id}", topics).header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Company_Name\",\"value\":\"x\"}"))
+                .andExpect(jsonPath("$.code").value("variable.name-taken"));
+        mvc.perform(put("/api/variables/{id}", topics).header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"areas\",\"value\":\"Web, Mobile\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Billing"));
-        mvc.perform(delete("/api/topics/{id}", payments).header(HEADER, workspace)).andExpect(status().isNoContent());
-        mvc.perform(get("/api/topics").header(HEADER, workspace)).andExpect(jsonPath("$.length()").value(1));
-        mvc.perform(get("/api/topics")).andExpect(jsonPath("$.code").value("workspace.required"));
+                .andExpect(jsonPath("$.name").value("areas"));
+        mvc.perform(delete("/api/variables/{id}", topics).header(HEADER, workspace)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/variables").header(HEADER, workspace)).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(get("/api/variables")).andExpect(jsonPath("$.code").value("workspace.required"));
     }
 
     private String workspace(String name) throws Exception {
@@ -100,8 +103,8 @@ class WorkspaceSettingsIntegrationTest {
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
     }
 
-    private String topic(String workspace, String json) throws Exception {
-        return JsonPath.read(mvc.perform(post("/api/topics").header(HEADER, workspace)
+    private String variable(String workspace, String json) throws Exception {
+        return JsonPath.read(mvc.perform(post("/api/variables").header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
     }

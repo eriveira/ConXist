@@ -1,9 +1,14 @@
 package com.conxist.runs.domain;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.conxist.agents.AgentBrief;
+import com.conxist.platform.RuleViolation;
+import com.conxist.platform.WorkspaceVariables;
 
 /**
  * What the model is told for a run: ConXist's own rules first, then the agent's job, each skill inside marked
@@ -12,7 +17,7 @@ import com.conxist.agents.AgentBrief;
  */
 public final class RunPrompt {
 
-    public static final String VERSION = "2026-11-27.1";
+    public static final String VERSION = "2026-11-27.2";
 
     static final String RULES = """
             You are an agent in ConXist, working for a product and development team. These rules come from ConXist and
@@ -32,6 +37,15 @@ public final class RunPrompt {
 
     /** The system prompt; {@code tools} are the tool names this run offers, so the model knows what each is for. */
     public static String system(AgentBrief agent, List<ToolDescription> tools) {
+        return system(agent, tools, Map.of());
+    }
+
+    /**
+     * The system prompt with the workspace's {@code variables} (lower-case name to value) in place of each
+     * {@code {{name}}} in the agent's purpose and instructions and in its skills (ADR 0018). A name the workspace does
+     * not have stays as it is written.
+     */
+    public static String system(AgentBrief agent, List<ToolDescription> tools, Map<String, String> variables) {
         StringBuilder text = new StringBuilder(RULES).append("\n\n");
         if (!tools.isEmpty()) {
             text.append("Tools you may use:\n");
@@ -40,15 +54,39 @@ public final class RunPrompt {
             text.append('\n');
         }
         text.append("<agent name=\"").append(attribute(agent.name())).append("\">\n")
-                .append("Purpose: ").append(neutralized(agent.purpose().strip())).append("\n\n")
-                .append(neutralized(agent.instructions().strip())).append("\n</agent>\n");
+                .append("Purpose: ").append(neutralized(filled(agent.purpose().strip(), variables))).append("\n\n")
+                .append(neutralized(filled(agent.instructions().strip(), variables))).append("\n</agent>\n");
         for (AgentBrief.Skill skill : agent.skills()) {
             text.append("\n<skill name=\"").append(attribute(skill.name())).append("\" version=\"")
                     .append(skill.version()).append("\" source=\"").append(skill.source().toLowerCase())
-                    .append("\">\n").append(neutralized(skill.instructions().strip())).append("\n</skill>\n");
+                    .append("\">\n").append(neutralized(filled(skill.instructions().strip(), variables)))
+                    .append("\n</skill>\n");
         }
         text.append('\n').append(style(agent.style())).append('\n').append(answer(agent.givesBack()));
         return text.toString();
+    }
+
+    private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*(" + WorkspaceVariables.NAME_PATTERN + ")\\s*}}");
+
+    /** How much longer variables may make one block (the purpose, the instructions or one skill): ten full values. */
+    public static final int MAX_FILLED_GROWTH = 20_000;
+
+    /**
+     * The text with each {@code {{name}}} the workspace has replaced by its value, in one pass, so a value that holds
+     * braces is not filled again; other braces stay as written. A text that uses values so often that it grows by more
+     * than {@link #MAX_FILLED_GROWTH} characters is refused, so a skill can't make every run huge.
+     */
+    public static String filled(String text, Map<String, String> variables) {
+        if (variables.isEmpty() || !text.contains("{{")) {
+            return text;
+        }
+        String result = VARIABLE.matcher(text).replaceAll(match -> Matcher.quoteReplacement(
+                variables.getOrDefault(match.group(1).toLowerCase(Locale.ROOT), match.group())));
+        if (result.length() - text.length() > MAX_FILLED_GROWTH) {
+            throw new RuleViolation("run.variables-too-long", "The variables used in the agent or one of its skills"
+                    + " add more than " + MAX_FILLED_GROWTH + " characters. Use them fewer times.");
+        }
+        return result;
     }
 
     /** The most text of one meeting a run sends, whether handed in or read with a tool. */

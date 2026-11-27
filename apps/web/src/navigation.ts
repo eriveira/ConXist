@@ -61,7 +61,7 @@ export function useAgentsRoute(): AgentsRoute {
 }
 
 /** The parts of a workspace's Settings, each at #/settings/{section}; #/settings opens General. */
-export const SETTINGS_SECTIONS = ['general', 'llm', 'mcps', 'topics'] as const;
+export const SETTINGS_SECTIONS = ['general', 'llm', 'mcps', 'variables'] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 export function settingsSectionOf(hash: string): SettingsSection {

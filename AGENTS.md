@@ -84,7 +84,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, and the
   default for new agents, grouped by provider),
-  MCPs (ADR 0017, below), and Topics (up to 50 per workspace, for the topic classifier).
+  MCPs (ADR 0017, below), and Variables (ADR 0018, below).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - MCPs (ADR 0017, owner 2026-11-27): a `connectors` module and Settings › MCPs. Add any MCP server by its https
@@ -92,7 +92,12 @@ Sources page does not show it for now, owner decision 2026-11-17).
   and tools, and the workspace ticks the read tools (`readOnlyHint`) agents may use; others stay locked. An agent's
   Tools section lists them by server, and test runs call them, results as data. A tool or server agents use cannot
   be unticked or removed. `mvn spring-boot:test-run` runs three fake MCP servers (OAuth, token `mcp-fake-token`,
-  public). Next, each in its own PR: Variables (replacing Topics), then Integrations (direct APIs, GitHub first).
+  public). Next, in its own PR: Integrations (direct APIs, GitHub first).
+- Variables (ADR 0018, owner 2026-11-27): Settings › Variables replaces Topics. A name (letters, digits, underscores,
+  starting with a letter; unique ignoring case) and a value up to 2,000 characters, up to 100 per workspace, edited in
+  place. Agents' and skills' instructions use one as `{{name}}`; a run puts the value in its place, and a name the
+  workspace lacks stays as written (the agent page says so). V19 moved each workspace's topics into one `topics`
+  variable and renamed `workspace_topics` to `workspace_topics_v13` (dropped later). Values are not for secrets.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

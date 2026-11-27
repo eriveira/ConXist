@@ -38,6 +38,7 @@ function api(agent: Agent, routes: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/skills': () => ({ body: SKILLS }),
     'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
     'GET /api/mcps': () => ({ body: [] }),
+    'GET /api/variables': () => ({ body: [{ id: 'v1', name: 'company_name', value: 'Acme Inc.' }] }),
     'GET /api/test-runs/status': () => ({ body: { ready: true } }),
     [`GET /api/sources/${SOURCE.id}/documents`]: () => ({ body: [] }),
     ...routes,
@@ -349,6 +350,15 @@ describe('AgentPage', () => {
     expect(await screen.findByText(/The MCP servers’ tools could not load/)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
     expect(await screen.findByRole('checkbox', { name: /Specs/ })).toBeInTheDocument();
+  });
+
+  it('says which {{name}}s the workspace has no variable for, and links to add them', async () => {
+    api({ ...AGENT, draft: { ...DRAFT, instructions: 'Write for {{Company_Name}} about {{topics}}.' } });
+    render(<AgentPage agentId={ID} />);
+
+    const note = await screen.findByText(/no variable named \{\{topics\}\}/);
+    expect(note).toHaveTextContent('This workspace has no variable named {{topics}}, so a run reads it as written.');
+    expect(screen.getByRole('link', { name: 'Settings › Variables' })).toHaveAttribute('href', '#/settings/variables');
   });
 
   it('says why a save was refused', async () => {

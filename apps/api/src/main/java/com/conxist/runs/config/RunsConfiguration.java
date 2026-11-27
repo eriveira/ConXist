@@ -6,6 +6,7 @@ import com.conxist.agents.AgentBriefs;
 import com.conxist.capture.MeetingLibrary;
 import com.conxist.connectors.McpToolbox;
 import com.conxist.platform.CurrentWorkspace;
+import com.conxist.platform.WorkspaceVariables;
 import com.conxist.runs.adapter.model.ClaudeModel;
 import com.conxist.runs.adapter.model.JsonAnswerReader;
 import com.conxist.runs.adapter.model.OpenAiModel;
@@ -87,7 +88,7 @@ class RunsConfiguration {
 
     @Bean
     StartTestRun startTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
-            AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
-        return new StartTestRun(agents, library, tools, providers, reader, workspace, clock);
+            AnswerReader reader, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
+        return new StartTestRun(agents, library, tools, providers, reader, workspace, variables, clock);
     }
 }

@@ -8,10 +8,11 @@ import {
 } from '../../domain/agents';
 import type { Source } from '../../domain/model';
 import { type PinnedSkill, skillRows } from '../../domain/skills';
+import { unknownVariables, type Variable } from '../../domain/variables';
 import { characterCount } from '../../domain/workspaces';
 import { type Translate, toolDescription, toolLabel, useT } from '../../i18n/i18n';
 import { MESSAGES, type MessageKey } from '../../i18n/messages';
-import { SOURCES_HREF } from '../../navigation';
+import { SOURCES_HREF, settingsHref } from '../../navigation';
 import type { Choices } from './AgentPage';
 import { AgentMcpTools } from './AgentMcpTools';
 import { AgentModelPicker } from './AgentModelPicker';
@@ -79,6 +80,9 @@ export function AgentSections({ draft, pinned, onChange, disabled, choices, onRe
           <span id={ids.hint} className="hint"><Icon name="lock" size={14} /> {t('agent.instructions.safety')}</span>
           <Counter id={ids.instructionsCount} count={instructionsLength} max={MAX_INSTRUCTIONS_LENGTH} />
         </div>
+        {choices.status === 'ready' && choices.variables && (
+          <UnknownVariables text={`${draft.purpose}\n${draft.instructions}`} variables={choices.variables} />
+        )}
       </Section>
 
       <Section number={3} title={t('agent.section.io')} lead={t('agent.section.io.lead')}>
@@ -265,4 +269,21 @@ function Knowledge({ draft, sources, onChange }: Pick<AgentSectionsProps, 'draft
 function providerLabel(source: Source, t: Translate): string {
   const key = `provider.${source.provider}` as MessageKey;
   return key in MESSAGES.en ? t(key) : source.provider;
+}
+
+/** The {{name}}s the agent writes that the workspace has no variable for: a run leaves them as written. */
+function UnknownVariables({ text, variables }: { text: string; variables: Variable[] }) {
+  const t = useT();
+  const unknown = unknownVariables(text, variables);
+  if (unknown.length === 0) return null;
+  return (
+    <p className="alert info variables-unknown">
+      <Icon name="info" />
+      <span className="grow">
+        {t(unknown.length === 1 ? 'agent.variables.unknown_one' : 'agent.variables.unknown',
+          { names: unknown.map((name) => `{{${name}}}`).join(', '), count: unknown.length })}{' '}
+        <a href={settingsHref('variables')}>{t('agent.variables.settings')}</a>.
+      </span>
+    </p>
+  );
 }

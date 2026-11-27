@@ -5,7 +5,8 @@ import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
 import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
-import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels, Topic } from '../domain/settings';
+import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels } from '../domain/settings';
+import type { Variable } from '../domain/variables';
 import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
 import type { TestRunResult, TestRunStatus } from '../domain/testRuns';
@@ -109,10 +110,11 @@ export const api = {
   /** A new name and description for a workspace; names stay unique. */
   updateWorkspace: (workspaceId: string, workspace: NewWorkspace) =>
     putJson<Workspace>(`/api/workspaces/${encodeURIComponent(workspaceId)}`, workspace),
-  topics: () => request<Topic[]>('/api/topics'),
-  addTopic: (topic: Omit<Topic, 'id'>) => postJson<Topic>('/api/topics', topic),
-  changeTopic: (topicId: string, topic: Omit<Topic, 'id'>) => putJson<Topic>(`/api/topics/${encodeURIComponent(topicId)}`, topic),
-  removeTopic: (topicId: string) => request<void>(`/api/topics/${encodeURIComponent(topicId)}`, { method: 'DELETE' }),
+  variables: () => request<Variable[]>('/api/variables'),
+  addVariable: (variable: Omit<Variable, 'id'>) => postJson<Variable>('/api/variables', variable),
+  changeVariable: (id: string, variable: Omit<Variable, 'id'>) =>
+    putJson<Variable>(`/api/variables/${encodeURIComponent(id)}`, variable),
+  removeVariable: (id: string) => request<void>(`/api/variables/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   mcps: () => request<McpServer[]>('/api/mcps'),
   mcp: (serverId: string) => request<McpServer>(mcpPath(serverId)),
   /** Checks the address and finds how to sign in; with a token, checks it. `serverId` signs an added server in again. */
