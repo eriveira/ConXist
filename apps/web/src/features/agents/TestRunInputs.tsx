@@ -102,11 +102,12 @@ export function TextFile({ id, file, onFile, disabled }: {
     <div className="field test-pick">
       <label htmlFor={`${id}-file`}>{t('run.file')}</label>
       <input id={`${id}-file`} type="file" accept=".txt,.md,.markdown,.vtt,.srt,text/plain,text/markdown,text/vtt"
-        disabled={disabled} aria-invalid={problem ? true : undefined} aria-describedby={`${id}-file-hint`}
+        disabled={disabled} aria-invalid={problem ? true : undefined} aria-describedby={problem ? `${id}-file-problem ${id}-file-hint` : `${id}-file-hint`}
         onChange={(event) => void read(event.target.files?.[0])} />
-      <small id={`${id}-file-hint`} className={problem ? 'hint error' : 'hint'} role={problem ? 'alert' : undefined}>
-        {problem ?? (file ? t('run.file.read', { name: file.title, count: number.format(file.text.length) })
-          : t('run.file.hint'))}
+      {problem && <small id={`${id}-file-problem`} className="hint error" role="alert">{problem}</small>}
+      <small id={`${id}-file-hint`} className="hint" role="status">
+        {file && !problem ? t('run.file.read', { name: file.title, count: number.format(file.text.length) })
+          : t('run.file.hint')}
       </small>
     </div>
   );

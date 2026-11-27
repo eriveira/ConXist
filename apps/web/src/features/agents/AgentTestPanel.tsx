@@ -150,7 +150,10 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
           {changes.length > 0 ? (
             <p className="alert warn test-changes">
               <Icon name="alert" size={16} />
-              <span>{t(changes.length === 1 ? 'run.changes_one' : 'run.changes', { tools: changes.join(', ') })}</span>
+              <span>
+                {t(changes.length === 1 ? 'run.changes_one' : 'run.changes', { tools: changes.join(', ') })}{' '}
+                {t(changes.length === 1 ? 'run.changesFix_one' : 'run.changesFix')}
+              </span>
             </p>
           ) : null}
           <p className="test-note"><Icon name="info" size={16} />{' '}

@@ -117,7 +117,8 @@ export function McpToolTable({ server, tools, allowed, busy, fresh, onToggle }: 
                 {isAsking && (
                   <tr className="tool-ask-row">
                     <td colSpan={3}>
-                      <div ref={confirmRef} className="tool-ask" role="group" tabIndex={-1}
+                      <div ref={confirmRef} className="tool-ask" role="group" tabIndex={-1} data-own-escape
+                        onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); answer(tool, false); } }}
                         aria-labelledby={`${box}-ask`} aria-describedby={`${box}-ask-body`}>
                         <b id={`${box}-ask`}>{t('mcp.warn.title', { name: tool.name })}</b>
                         <span id={`${box}-ask-body`}>

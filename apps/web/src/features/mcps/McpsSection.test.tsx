@@ -67,7 +67,11 @@ describe('Settings › MCPs', () => {
     expect(ask).toHaveFocus();
     expect(ask).toHaveTextContent('ConXist can’t undo what this tool does.');
     expect(await accessibilityViolations(container.ownerDocument.body)).toEqual([]);
-    await userEvent.click(within(ask).getByRole('button', { name: 'Keep it off' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog', { name: 'Add an MCP' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('group', { name: 'Let agents use create_doc?' })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep it off' }));
     expect(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' })).not.toBeChecked();
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Allow this tool' }));

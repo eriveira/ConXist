@@ -76,7 +76,7 @@ describe('AgentTestPanel', () => {
   it('warns that a run may use picked tools that change things for real', async () => {
     api();
     render(panel(null, ['create_issue']));
-    expect(await screen.findByText('This test may use create_issue for real. It changes things, and ConXist can’t undo it.'))
+    expect(await screen.findByText(/This test may use create_issue for real\. It changes things, and ConXist can’t undo it\. Untick it under Tools/))
       .toBeInTheDocument();
     expect(screen.queryByText(/A test only reads/)).not.toBeInTheDocument();
   });
