@@ -53,6 +53,11 @@ public final class McpConnections {
                     newCredential, newFacts, null, startedAt);
         }
 
+        Connection claimed() {
+            return new Connection(id, workspaceId, serverId, address, status, signIn, null, verifier, signInUrl,
+                    credential, facts, error, startedAt);
+        }
+
         Connection failed(String code) {
             return new Connection(id, workspaceId, serverId, address, Status.FAILED, signIn, null, null, null, null,
                     null, code, startedAt);
@@ -75,14 +80,22 @@ public final class McpConnections {
                 .filter(connection -> connection.workspaceId().equals(workspaceId));
     }
 
-    /** The connection waiting for this OAuth state, which comes back only once. */
-    Optional<Connection> signingIn(String state) {
+    /**
+     * Takes the connection waiting for this OAuth state, which works only once: the state is cleared before anything
+     * else happens, so a second callback with it (a reload or a replay) finds nothing. The connection stays
+     * {@link Status#SIGNING_IN} until the sign-in is finished.
+     */
+    Optional<Connection> claim(String state) {
         if (state == null || state.isEmpty()) {
             return Optional.empty();
         }
         return connections.values().stream().filter(this::fresh)
                 .filter(connection -> connection.status() == Status.SIGNING_IN && state.equals(connection.state()))
-                .findFirst();
+                .findFirst()
+                .flatMap(waiting -> {
+                    Connection claimed = waiting.claimed();
+                    return connections.replace(waiting.id(), waiting, claimed) ? Optional.of(claimed) : Optional.empty();
+                });
     }
 
     void forget(UUID id) {

@@ -66,7 +66,7 @@ public final class RunTools {
                 .filter(tool -> scope.toolNames().contains(tool.fullName()))
                 .map(tool -> new ModelPort.ToolSpec(tool.name(), tool.description(), tool.schema())).toList());
         scope.mcpTools().forEach(tool -> specs.add(new ModelPort.ToolSpec(tool.modelName(), tool.description(),
-                tool.inputSchema())));
+                tool.inputSchema(), false)));
         return List.copyOf(specs);
     }
 

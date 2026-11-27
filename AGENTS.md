@@ -38,7 +38,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   shared standards.
 
 - `apps/api/`: the API. Spring Boot with Spring Modulith; each top-level package
-  is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`, `runs`) with `domain`,
+  is a module (`platform`, `sources`, `capture`, `hub`, `workspaces`, `agents`, `runs`, `connectors`) with `domain`,
   `application`, `adapter` and `config` inside. Modules talk through their root
   package (API) and events. See `docs/adr/0002-stack.md` (accepted).
 - `apps/web/`: the web app (the Sources, Agents, Skills and Settings pages and their dialogs). `domain` and `api` stay
@@ -84,9 +84,15 @@ Sources page does not show it for now, owner decision 2026-11-17).
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, and the
   default for new agents, grouped by provider),
-  and Topics (up to 50 per workspace, for the topic classifier).
+  MCPs (ADR 0017, below), and Topics (up to 50 per workspace, for the topic classifier).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
+- MCPs (ADR 0017, owner 2026-11-27): a `connectors` module and Settings › MCPs. Add any MCP server by its https
+  address; ConXist finds the sign-in (the server's OAuth sign-in, else a pasted token, else public), shows its logo
+  and tools, and the workspace ticks the read tools (`readOnlyHint`) agents may use; others stay locked. An agent's
+  Tools section lists them by server, and test runs call them, results as data. A tool or server agents use cannot
+  be unticked or removed. `mvn spring-boot:test-run` runs three fake MCP servers (OAuth, token `mcp-fake-token`,
+  public). Next, each in its own PR: Variables (replacing Topics), then Integrations (direct APIs, GitHub first).
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

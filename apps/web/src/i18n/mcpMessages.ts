@@ -1,7 +1,7 @@
 /** The words of Settings › MCPs and of MCP tools on an agent's page (ADR 0017). */
 export const mcpEn = {
   'settings.mcps': 'MCPs',
-  'mcp.lead': 'MCP servers your team or a vendor runs. Agents only get the tools you allow, and only tools that read.',
+  'mcp.lead': 'MCP servers your team or a vendor runs. Agents only get the tools you allow, and only the ones the server marks as read-only.',
   'mcp.add': 'Add',
   'mcp.empty.title': 'No MCPs yet',
   'mcp.empty.body': 'Add an MCP server your team or a vendor runs, then choose which of its tools your agents may use. ConXist’s own tools are always there.',
@@ -17,6 +17,7 @@ export const mcpEn = {
   'mcp.manage': 'Manage',
   'mcp.manage.label': 'Manage {name}',
   'mcp.back': 'All MCPs',
+  'mcp.tool.new': 'New',
   'mcp.added': 'Added {name}.',
   'mcp.useInAgent': 'Use it in an agent',
   'mcp.removed': 'Removed {name}.',
@@ -78,7 +79,7 @@ export const mcpEn = {
   'mcp.token.connecting': 'Connecting…',
   'mcp.tools.title': '{name} offers {count} tools',
   'mcp.tools.title_one': '{name} offers 1 tool',
-  'mcp.tools.help': 'Tick the tools agents in this workspace may use. You can change this any time.',
+  'mcp.tools.help': 'Tick the tools agents in this workspace may use. The server says which tools only read; ConXist can’t check that, so add servers you trust. What an agent asks a tool is sent to the server.',
   'mcp.tools.ticked': '{count} of {total} read tools ticked',
   'mcp.tools.all': 'Tick all read tools',
   'mcp.tools.none': 'Untick all',
@@ -98,6 +99,7 @@ export const mcpEn = {
 
   'agent.tools.conxist': 'ConXist',
   'agent.tools.mcp': 'MCP',
+  'agent.tools.mcpError': 'The MCP servers’ tools could not load. The rest of the agent still saves.',
   'agent.tools.mcpMore': 'Missing a tool? Allow more in',
   'agent.tools.mcpSettings': 'Settings › MCPs',
   'agent.tools.mcpGone': '{tool} from an MCP server is no longer allowed.',
@@ -130,7 +132,7 @@ export const mcpEn = {
 
 export const mcpEs: Record<keyof typeof mcpEn, string> = {
   'settings.mcps': 'MCPs',
-  'mcp.lead': 'Servidores MCP que gestiona tu equipo o un proveedor. Los agentes solo reciben las herramientas que permites, y solo las que leen.',
+  'mcp.lead': 'Servidores MCP que gestiona tu equipo o un proveedor. Los agentes solo reciben las herramientas que permites, y solo las que el servidor marca como de solo lectura.',
   'mcp.add': 'Añadir',
   'mcp.empty.title': 'Aún no hay MCPs',
   'mcp.empty.body': 'Añade un servidor MCP que gestione tu equipo o un proveedor y elige qué herramientas pueden usar tus agentes. Las herramientas de ConXist siempre están.',
@@ -146,6 +148,7 @@ export const mcpEs: Record<keyof typeof mcpEn, string> = {
   'mcp.manage': 'Gestionar',
   'mcp.manage.label': 'Gestionar {name}',
   'mcp.back': 'Todos los MCPs',
+  'mcp.tool.new': 'Nueva',
   'mcp.added': 'Se añadió {name}.',
   'mcp.useInAgent': 'Úsalo en un agente',
   'mcp.removed': 'Se quitó {name}.',
@@ -207,7 +210,7 @@ export const mcpEs: Record<keyof typeof mcpEn, string> = {
   'mcp.token.connecting': 'Conectando…',
   'mcp.tools.title': '{name} ofrece {count} herramientas',
   'mcp.tools.title_one': '{name} ofrece 1 herramienta',
-  'mcp.tools.help': 'Marca las herramientas que pueden usar los agentes de este espacio de trabajo. Puedes cambiarlo cuando quieras.',
+  'mcp.tools.help': 'Marca las herramientas que pueden usar los agentes de este espacio de trabajo. El servidor indica qué herramientas solo leen; ConXist no puede comprobarlo, así que añade servidores de confianza. Lo que un agente pide a una herramienta se envía al servidor.',
   'mcp.tools.ticked': '{count} de {total} herramientas de lectura marcadas',
   'mcp.tools.all': 'Marcar todas las de lectura',
   'mcp.tools.none': 'Desmarcar todas',
@@ -227,6 +230,7 @@ export const mcpEs: Record<keyof typeof mcpEn, string> = {
 
   'agent.tools.conxist': 'ConXist',
   'agent.tools.mcp': 'MCP',
+  'agent.tools.mcpError': 'No se pudieron cargar las herramientas de los servidores MCP. El resto del agente se sigue guardando.',
   'agent.tools.mcpMore': '¿Falta una herramienta? Permite más en',
   'agent.tools.mcpSettings': 'Ajustes › MCPs',
   'agent.tools.mcpGone': '{tool}, de un servidor MCP, ya no está permitida.',

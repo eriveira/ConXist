@@ -342,6 +342,15 @@ describe('AgentPage', () => {
     expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.mcpTools).toEqual([{ serverId, tool: 'search_docs' }]);
   });
 
+  it('keeps the agent editable when the MCP servers can’t load', async () => {
+    api(AGENT, { 'GET /api/mcps': () => ({ status: 500, body: {} }) });
+    render(<AgentPage agentId={ID} />);
+
+    expect(await screen.findByText(/The MCP servers’ tools could not load/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
+    expect(await screen.findByRole('checkbox', { name: /Specs/ })).toBeInTheDocument();
+  });
+
   it('says why a save was refused', async () => {
     api(AGENT, { [`PUT /api/agents/${ID}/draft`]: () => ({ status: 422, body: { code: 'agent.name-taken' } }) });
     render(<AgentPage agentId={ID} />);

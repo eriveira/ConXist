@@ -2,6 +2,7 @@ package com.conxist.connectors.adapter.mcp;
 
 import java.net.URI;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -10,6 +11,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import com.conxist.connectors.application.McpGateway;
 import com.conxist.connectors.domain.McpServer;
@@ -28,6 +35,9 @@ import tools.jackson.databind.json.JsonMapper;
 public final class HttpMcpGateway implements McpGateway {
 
     private static final Logger log = LoggerFactory.getLogger(HttpMcpGateway.class);
+    /** How long one tool call may take in all; a test run counts it against its own deadline too. */
+    static final Duration CALL_DEADLINE = Duration.ofSeconds(45);
+    private static final ExecutorService CALLS = Executors.newVirtualThreadPerTaskExecutor();
     /** A server that lists more pages than this is cut here. */
     private static final int MAX_LIST_PAGES = 10;
     /** A tool whose input schema is larger than this is left out. */
@@ -114,6 +124,27 @@ public final class HttpMcpGateway implements McpGateway {
 
     @Override
     public ToolAnswer call(URI address, String bearer, String tool, Map<String, Object> arguments) {
+        // A call is three exchanges (open, opened, call); the whole of it stays within one deadline.
+        Future<ToolAnswer> answer = CALLS.submit(() -> callOnce(address, bearer, tool, arguments));
+        try {
+            return answer.get(CALL_DEADLINE.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException late) {
+            answer.cancel(true);
+            log.info("MCP server on {} took too long to answer a call to {}", address.getHost(), tool);
+            throw new McpGateway.Unreachable("call too slow");
+        } catch (InterruptedException interrupted) {
+            answer.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new McpGateway.Unreachable("interrupted");
+        } catch (ExecutionException failed) {
+            if (failed.getCause() instanceof RuntimeException known) {
+                throw known;
+            }
+            throw new McpGateway.Unreachable(failed.getCause().getClass().getSimpleName());
+        }
+    }
+
+    private ToolAnswer callOnce(URI address, String bearer, String tool, Map<String, Object> arguments) {
         McpSession session = new McpSession(http, guard.check(address.toString()), bearer, json);
         session.open();
         JsonNode result;

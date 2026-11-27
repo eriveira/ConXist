@@ -17,7 +17,8 @@ public record McpTool(String name, String title, String description, boolean rea
         Map<String, Object> inputSchema, boolean allowed) {
 
     /** MCP's own rule for tool names. */
-    public static final Pattern NAME = Pattern.compile("[A-Za-z0-9_\\-./]{1,128}");
+    public static final String NAME_PATTERN = "[A-Za-z0-9_\\-./]{1,128}";
+    public static final Pattern NAME = Pattern.compile(NAME_PATTERN);
     public static final int MAX_TITLE_LENGTH = 200;
     public static final int MAX_DESCRIPTION_LENGTH = 2_000;
 

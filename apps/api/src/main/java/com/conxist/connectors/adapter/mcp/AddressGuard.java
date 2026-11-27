@@ -74,22 +74,43 @@ final class AddressGuard {
         }
         byte[] bytes = address.getAddress();
         if (address instanceof Inet6Address) {
-            boolean uniqueLocal = (bytes[0] & 0xfe) == 0xfc;
-            boolean mappedV4 = Arrays.equals(Arrays.copyOf(bytes, 12),
-                    new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 0xff, (byte) 0xff});
-            if (mappedV4) {
-                try {
-                    return notPublic(InetAddress.getByAddress(Arrays.copyOfRange(bytes, 12, 16)));
-                } catch (UnknownHostException impossible) {
-                    return true;
-                }
+            // Only global unicast (2000::/3) is public, and some of it carries an IPv4 address that must pass too.
+            if ((bytes[0] & 0xe0) != 0x20) {
+                return !embeddedV4Public(bytes);
             }
-            return uniqueLocal;
+            int high = ((bytes[0] & 0xff) << 8) | (bytes[1] & 0xff);
+            if (high == 0x2002) {
+                return notPublic(v4(Arrays.copyOfRange(bytes, 2, 6)));
+            }
+            if (high == 0x2001 && bytes[2] == 0 && bytes[3] == 0) {
+                return true;
+            }
+            return false;
         }
         int first = bytes[0] & 0xff;
         int second = bytes[1] & 0xff;
         return first == 0 || first == 100 && second >= 64 && second <= 127 || first == 198 && (second == 18
-                || second == 19) || first >= 240;
+                || second == 19) || first == 192 && second == 0 && bytes[2] == 0 || first >= 240;
+    }
+
+    /**
+     * Outside 2000::/3 the only addresses that reach the internet carry an IPv4 one: IPv4-mapped (::ffff:0:0/96) and
+     * NAT64 (64:ff9b::/96). They are as public as the address they carry; everything else there is not.
+     */
+    private static boolean embeddedV4Public(byte[] bytes) {
+        boolean mapped = Arrays.equals(Arrays.copyOf(bytes, 12), new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 0xff,
+                (byte) 0xff});
+        boolean nat64 = Arrays.equals(Arrays.copyOf(bytes, 12), new byte[] {0, 0x64, (byte) 0xff, (byte) 0x9b, 0, 0, 0, 0,
+                0, 0, 0, 0});
+        return (mapped || nat64) && !notPublic(v4(Arrays.copyOfRange(bytes, 12, 16)));
+    }
+
+    private static InetAddress v4(byte[] bytes) {
+        try {
+            return InetAddress.getByAddress(bytes);
+        } catch (UnknownHostException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     private static URI withoutFragment(URI uri) {

@@ -11,6 +11,7 @@ import com.conxist.connectors.application.ConnectMcpServer;
 import com.conxist.connectors.application.ManageMcpServers;
 import com.conxist.connectors.application.McpViews;
 import com.conxist.connectors.domain.McpServer;
+import com.conxist.connectors.domain.McpTool;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -36,7 +37,6 @@ import org.springframework.web.bind.annotation.RestController;
 class McpServersController {
 
     private static final int MAX_ADDRESS = 2_000;
-    private static final int MAX_TOKEN = 8_000;
 
     /** Shown in the sign-in window after the server sends the person back. Fixed text: nothing is echoed. */
     private static final String DONE_PAGE = """
@@ -129,22 +129,20 @@ class McpServersController {
         servers.remove(serverId);
     }
 
-    record ConnectionRequest(@Size(max = MAX_ADDRESS) String address, @Size(max = MAX_TOKEN) String token,
+    record ConnectionRequest(@Size(max = MAX_ADDRESS) String address, @Size(max = ConnectMcpServer.MAX_TOKEN_LENGTH) String token,
             UUID serverId) {
     }
 
     record AddRequest(@NotNull UUID connectionId, @Size(max = McpServer.MAX_NAME_LENGTH * 2) String name,
-            @NotNull @Size(max = McpServer.MAX_TOOLS) List<@NotNull @Pattern(regexp = TOOL_NAME) String> allowedTools) {
+            @NotNull @Size(max = McpServer.MAX_TOOLS) List<@NotNull @Pattern(regexp = McpTool.NAME_PATTERN) String> allowedTools) {
     }
 
     record UpdateRequest(@Size(max = McpServer.MAX_NAME_LENGTH * 2) String name,
-            @NotNull @Size(max = McpServer.MAX_TOOLS) List<@NotNull @Pattern(regexp = TOOL_NAME) String> allowedTools) {
+            @NotNull @Size(max = McpServer.MAX_TOOLS) List<@NotNull @Pattern(regexp = McpTool.NAME_PATTERN) String> allowedTools) {
     }
 
     record CredentialRequest(@NotNull UUID connectionId) {
     }
-
-    private static final String TOOL_NAME = "[A-Za-z0-9_\\-./]{1,128}";
 
     private static <T> ResponseEntity<T> noStore(T body) {
         return ResponseEntity.status(HttpStatus.OK).cacheControl(CacheControl.noStore()).body(body);

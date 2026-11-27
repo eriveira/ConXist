@@ -12,6 +12,8 @@ import { McpLogo, McpToolTable } from './McpParts';
 
 /** How often the dialog asks whether the person finished on the server's sign-in page. */
 export const MCP_SIGN_IN_POLL_MS = 1_500;
+/** After this many failed asks in a row the dialog stops and says so. */
+const MAX_POLL_FAILURES = 5;
 
 type Step =
   | { kind: 'address' }
@@ -94,8 +96,10 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
   useEffect(() => {
     if (!waitingFor) return undefined;
     let stopped = false;
+    let failures = 0;
     const timer = window.setInterval(() => {
       void api.mcpConnection(waitingFor).then((connection) => {
+        failures = 0;
         if (stopped || connection.status === 'SIGNING_IN') return;
         stopped = true;
         window.clearInterval(timer);
@@ -106,7 +110,10 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
         }
         void ready(connection);
       }).catch((problem: unknown) => {
-        if (!stopped && problem instanceof ApiError && problem.status >= 400 && problem.status < 500) {
+        if (stopped) return;
+        failures += 1;
+        const gone = problem instanceof ApiError && problem.status >= 400 && problem.status < 500;
+        if (gone || failures >= MAX_POLL_FAILURES) {
           stopped = true;
           window.clearInterval(timer);
           setError(problemMessage(problem, t));
@@ -165,6 +172,12 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
     });
   }
 
+  const back = !server && (
+    <button type="button" className="btn ghost" disabled={busy}
+      onClick={() => { setError(null); setStep({ kind: 'address' }); }}>
+      {t('dialog.backStep')}
+    </button>
+  );
   const alert = error && <p id={ids.error} className="alert error" role="alert"><Icon name="alert" /> {error}</p>;
   const title = server ? t('mcp.dialog.again', { name: server.name }) : t('mcp.dialog.title');
   const formId = `${ids.address}-form`;
@@ -237,6 +250,7 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
     );
     footer = (
       <>
+        {back}
         <span className="grow" />
         <button type="button" className="btn" onClick={onClose}>{t('dialog.cancel')}</button>
         {!waiting && <button type="button" className="btn primary" onClick={() => openSignIn(connection)}>{t('mcp.signIn.go')}</button>}
@@ -268,6 +282,7 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
     );
     footer = (
       <>
+        {back}
         <span className="grow" />
         <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</button>
         <button type="submit" form={tokenForm} className="btn primary" disabled={busy || token.trim() === ''}>
@@ -293,7 +308,7 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
             onChange={(event) => { setName(event.target.value); setError(null); }} />
         </div>
         {reads.length === 0 ? (
-          <p className="alert info" role="alert"><Icon name="alert" /> {t('mcp.tools.empty')}</p>
+          <p className="alert info"><Icon name="info" /> {t('mcp.tools.empty')}</p>
         ) : (
           <>
             <p>{t('mcp.tools.help')}</p>
@@ -317,13 +332,19 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
     );
     footer = (
       <>
+        {back}
         {reads.length > 0 && allowed.size === 0 && <span className="hint">{t('mcp.tools.pickOne')}</span>}
         <span className="grow" />
         <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</button>
-        <button type="button" className="btn primary" disabled={busy || allowed.size === 0 || !nameOk}
-          onClick={() => void finish(connection)}>
-          {busy ? t('mcp.adding') : t('mcp.finish')}
-        </button>
+        {reads.length === 0 ? (
+          <button type="button" className="btn primary" disabled={busy}
+            onClick={() => void connect(null, { kind: 'address' })}>{t('settings.retry')}</button>
+        ) : (
+          <button type="button" className="btn primary" disabled={busy || allowed.size === 0 || !nameOk}
+            onClick={() => void finish(connection)}>
+            {busy ? t('mcp.adding') : t('mcp.finish')}
+          </button>
+        )}
       </>
     );
   }

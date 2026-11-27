@@ -180,13 +180,23 @@ public final class OpenAiModel implements ModelPort {
 
     private static ChatCompletionFunctionTool tool(ToolSpec spec) {
         FunctionParameters.Builder parameters = FunctionParameters.builder();
-        spec.inputSchema().forEach((key, value) -> parameters.putAdditionalProperty(key, JsonValue.from(value)));
-        parameters.putAdditionalProperty("additionalProperties", JsonValue.from(false));
+        spec.inputSchema().forEach((key, value) -> {
+            if (value != null) {
+                parameters.putAdditionalProperty(key, JsonValue.from(value));
+            }
+        });
+        if (!spec.inputSchema().containsKey("properties")) {
+            parameters.putAdditionalProperty("properties", JsonValue.from(Map.of()));
+        }
+        // Strict mode needs every property listed as required, which an MCP server's schema rarely is.
+        if (spec.strict()) {
+            parameters.putAdditionalProperty("additionalProperties", JsonValue.from(false));
+        }
         return ChatCompletionFunctionTool.builder()
                 .function(FunctionDefinition.builder()
                         .name(spec.name())
                         .description(spec.description())
-                        .strict(true)
+                        .strict(spec.strict())
                         .parameters(parameters.build())
                         .build())
                 .build();

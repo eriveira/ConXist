@@ -21,7 +21,7 @@ import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
 export type Choices =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[]; providers: LlmProviders; mcps: McpServer[] };
+  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[]; providers: LlmProviders; mcps: McpServer[] | null };
 
 type Busy = 'publish' | 'archive' | null;
 
@@ -44,7 +44,9 @@ export function AgentPage({ agentId }: { agentId: string }) {
 
   const loadChoices = useCallback(() => {
     setChoices({ status: 'loading' });
-    Promise.all([api.sources(), api.agentTools(), api.skills(), api.llmProviders(), api.mcps()])
+    Promise.all([api.sources(), api.agentTools(), api.skills(), api.llmProviders(),
+      // MCP servers load on their own terms: when they can't, the rest of the agent still edits.
+      api.mcps().catch(() => null)])
       .then(([sources, tools, skills, providers, mcps]) => setChoices({ status: 'ready', sources, tools, skills, providers, mcps }))
       .catch(() => setChoices({ status: 'error' }));
   }, []);
@@ -190,7 +192,10 @@ const MCP_PROBLEM = 'mcp-tool-unavailable';
 function currentProblems(saved: string[], draft: AgentDefinition, pinned: PinnedSkill[], choices: Choices): string[] {
   if (choices.status !== 'ready') return saved;
   const modelProblem = draft.model && !modelAvailable(choices.providers, draft.model) ? ['model-unavailable'] : [];
-  const mcpProblem = draft.mcpTools.some((pick) => !pickAllowed(choices.mcps, pick)) ? [MCP_PROBLEM] : [];
+  const mcps = choices.mcps;
+  if (mcps === null) return [...saved.filter((code) => !SKILL_PROBLEMS.includes(code) && !MODEL_PROBLEMS.includes(code)),
+    ...modelProblem, ...skillRowProblems(skillRows(draft.skills, pinned, choices.skills), draft.tools)];
+  const mcpProblem = draft.mcpTools.some((pick) => !pickAllowed(mcps, pick)) ? [MCP_PROBLEM] : [];
   return [...saved.filter((code) => !SKILL_PROBLEMS.includes(code) && !MODEL_PROBLEMS.includes(code) && code !== MCP_PROBLEM),
     ...modelProblem, ...mcpProblem, ...skillRowProblems(skillRows(draft.skills, pinned, choices.skills), draft.tools)];
 }

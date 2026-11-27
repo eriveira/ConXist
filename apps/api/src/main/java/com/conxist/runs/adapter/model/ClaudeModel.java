@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.core.JsonValue;
@@ -195,20 +196,28 @@ public final class ClaudeModel implements ModelPort {
     private static BetaTool tool(ToolSpec spec) {
         Map<String, Object> schema = spec.inputSchema();
         BetaTool.InputSchema.Properties.Builder properties = BetaTool.InputSchema.Properties.builder();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> fields = (Map<String, Object>) schema.get("properties");
-        fields.forEach((name, field) -> properties.putAdditionalProperty(name, JsonValue.from(field)));
-        @SuppressWarnings("unchecked")
-        List<String> required = (List<String>) schema.get("required");
+        // An MCP server's schema is its own: no properties, or a "required" that is not a list, must not break a run.
+        if (schema.get("properties") instanceof Map<?, ?> fields) {
+            fields.forEach((name, field) -> properties.putAdditionalProperty(String.valueOf(name), JsonValue.from(field)));
+        }
+        List<String> required = schema.get("required") instanceof List<?> names
+                ? names.stream().filter(String.class::isInstance).map(String.class::cast).toList()
+                : List.of();
+        BetaTool.InputSchema.Builder input = BetaTool.InputSchema.builder().properties(properties.build()).required(required);
+        if (spec.strict()) {
+            input.putAdditionalProperty("additionalProperties", JsonValue.from(false));
+        } else {
+            schema.forEach((key, value) -> {
+                if (!Set.of("type", "properties", "required").contains(key) && value != null) {
+                    input.putAdditionalProperty(key, JsonValue.from(value));
+                }
+            });
+        }
         return BetaTool.builder()
                 .name(spec.name())
                 .description(spec.description())
-                .strict(true)
-                .inputSchema(BetaTool.InputSchema.builder()
-                        .properties(properties.build())
-                        .required(required)
-                        .putAdditionalProperty("additionalProperties", JsonValue.from(false))
-                        .build())
+                .strict(spec.strict())
+                .inputSchema(input.build())
                 .build();
     }
 

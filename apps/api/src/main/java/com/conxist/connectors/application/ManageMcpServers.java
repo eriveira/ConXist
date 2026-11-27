@@ -93,6 +93,8 @@ public final class ManageMcpServers {
         }
         McpServer changed = server.renamed(name == null ? server.name() : name).allow(allowed);
         if (!servers.update(changed)) {
+            // Nothing changed: either the name is taken, or the server was removed a moment ago.
+            load(serverId);
             throw nameTaken(changed.name());
         }
         log.info("Workspace {} changed MCP server {} ({} tools allowed)", server.workspaceId(), serverId,

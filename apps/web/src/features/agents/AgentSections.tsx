@@ -118,7 +118,7 @@ export function AgentSections({ draft, pinned, onChange, disabled, choices, onRe
         <ChoicesState choices={choices} onRetry={onRetryChoices}>
           {({ tools, skills, mcps }) => {
             const rows = skillRows(draft.skills, pinned, skills);
-            const grouped = mcps.some((server) => server.tools.some((tool) => tool.allowed));
+            const grouped = mcps === null || mcps.some((server) => server.tools.some((tool) => tool.allowed));
             return (
           <>
           {grouped && <h4 className="tool-group">{t('agent.tools.conxist')}</h4>}
@@ -145,7 +145,12 @@ export function AgentSections({ draft, pinned, onChange, disabled, choices, onRe
               );
             })}
           </div>
-          <AgentMcpTools draft={draft} servers={mcps} onChange={onChange} />
+          {mcps === null ? (
+            <p className="alert error" role="alert">
+              <Icon name="alert" /> <span className="grow">{t('agent.tools.mcpError')}</span>
+              <button type="button" className="link" onClick={onRetryChoices}>{t('sources.retry')}</button>
+            </p>
+          ) : <AgentMcpTools draft={draft} servers={mcps} onChange={onChange} />}
           </>
             );
           }}

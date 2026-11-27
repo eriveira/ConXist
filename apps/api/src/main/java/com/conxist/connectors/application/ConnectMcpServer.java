@@ -23,7 +23,7 @@ public final class ConnectMcpServer {
 
     private static final Logger log = LoggerFactory.getLogger(ConnectMcpServer.class);
     /** Tokens are long, but not this long; anything longer is not a token. */
-    static final int MAX_TOKEN_LENGTH = 8_000;
+    public static final int MAX_TOKEN_LENGTH = 8_000;
     private static final Base64.Encoder URL_SAFE = Base64.getUrlEncoder().withoutPadding();
 
     private final McpGateway gateway;
@@ -64,7 +64,7 @@ public final class ConnectMcpServer {
             return views.connection(connections.save(started.ready(McpCredential.none(), facts)));
         } catch (McpGateway.SignInRefused asks) {
             return signIn(started);
-        } catch (McpGateway.NotMcp | McpGateway.Unreachable failure) {
+        } catch (McpGateway.NotMcp | McpGateway.Unreachable | McpGateway.AddressRefused failure) {
             throw problem(failure);
         }
     }
@@ -76,7 +76,7 @@ public final class ConnectMcpServer {
 
     /** The server's sign-in page sends the person back here, with a code or an error. Unknown states do nothing. */
     public void finish(String state, String code, String error) {
-        connections.signingIn(state).ifPresent(connection -> {
+        connections.claim(state).ifPresent(connection -> {
             if (error != null || code == null || code.isEmpty()) {
                 log.info("Workspace {} did not finish signing in to an MCP server", connection.workspaceId());
                 connections.save(connection.failed("sign-in-refused"));
@@ -124,7 +124,7 @@ public final class ConnectMcpServer {
         } catch (McpGateway.SignInRefused refused) {
             throw new InvalidMcp("token-refused",
                     "The server refused this token. Check that it is active and copied in full.");
-        } catch (McpGateway.NotMcp | McpGateway.Unreachable failure) {
+        } catch (McpGateway.NotMcp | McpGateway.Unreachable | McpGateway.AddressRefused failure) {
             throw problem(failure);
         }
     }
@@ -135,14 +135,17 @@ public final class ConnectMcpServer {
         } catch (McpGateway.Unreachable unknownHost) {
             throw problem(unknownHost);
         } catch (McpGateway.AddressRefused refused) {
-            throw switch (refused.code()) {
-                case "address-not-https" -> new InvalidMcp("address-not-https",
-                        "Use an address that starts with https://.");
-                case "address-private" -> new InvalidMcp("address-private",
-                        "This address is on a private network. ConXist only connects to servers on the internet.");
-                default -> new InvalidMcp("address-invalid", "This does not look like a server address.");
-            };
+            throw refusedAddress(refused);
         }
+    }
+
+    private static InvalidMcp refusedAddress(McpGateway.AddressRefused refused) {
+        return switch (refused.code()) {
+            case "address-not-https" -> new InvalidMcp("address-not-https", "Use an address that starts with https://.");
+            case "address-private" -> new InvalidMcp("address-private",
+                    "This address is on a private network. ConXist only connects to servers on the internet.");
+            default -> new InvalidMcp("address-invalid", "This does not look like a server address.");
+        };
     }
 
     private McpServer server(UUID workspaceId, UUID serverId) {
@@ -162,6 +165,9 @@ public final class ConnectMcpServer {
     }
 
     static RuntimeException problem(RuntimeException failure) {
+        if (failure instanceof McpGateway.AddressRefused refused) {
+            return refusedAddress(refused);
+        }
         if (failure instanceof McpGateway.NotMcp) {
             return new InvalidMcp("not-mcp", "This address answered, but not as an MCP server. Check the address.");
         }

@@ -88,7 +88,7 @@ export function McpServerPage({ serverId, onRemoved }: { serverId: string; onRem
         {t('mcp.page.meta', { address: server.address, auth: t(`mcp.auth.${server.auth}`), checked: dateTime(server.checkedAt, language) })}
       </p>
       {server.status !== 'WORKS' && (
-        <p className="alert info" role="alert"><Icon name="alert" /> {t(`mcp.state.${server.status}`)}</p>
+        <p className="alert info"><Icon name="alert" /> {t(`mcp.state.${server.status}`)}</p>
       )}
       <div className="vendor-actions mcp-actions">
         <button type="button" className="btn sm" disabled={check.state === 'checking'} onClick={() => void runCheck()}>
@@ -109,7 +109,8 @@ export function McpServerPage({ serverId, onRemoved }: { serverId: string; onRem
         <SavedStatus saved={saved} />
       </div>
       {problem && <p className="alert error" role="alert"><Icon name="alert" /> {problem}</p>}
-      <McpToolTable server={server} tools={server.tools} allowed={allowed} busy={saving} onToggle={(tool) => void toggle(tool)} />
+      <McpToolTable server={server} tools={server.tools} allowed={allowed} busy={saving}
+        fresh={check.state === 'done' ? new Set(check.check.newTools) : undefined} onToggle={(tool) => void toggle(tool)} />
       <p className="note"><Icon name="info" size={14} /> {t('mcp.page.newLater')} {t('mcp.tools.fromServer')}</p>
       {dialog === 'signIn' && (
         <AddMcpDialog server={server} onClose={() => setDialog(null)}
@@ -134,7 +135,9 @@ function CheckResult({ check }: { check: Check }) {
     const fresh = check.check.newTools;
     text = fresh.length ? t('mcp.check.new', { count: fresh.length, names: fresh.join(', ') }) : t('mcp.check.works');
   } else if (check.state === 'done') {
-    text = t(`mcp.check.${check.check.error ?? 'unreachable'}` as 'mcp.check.unreachable');
+    const known = ['sign-in-needed', 'not-mcp', 'unreachable'];
+    const code = known.includes(check.check.error ?? '') ? check.check.error : 'unreachable';
+    text = t(`mcp.check.${code}` as 'mcp.check.unreachable');
     failed = true;
   }
   return <p className={failed ? 'status-line failed' : 'status-line'} role="status">{text}</p>;

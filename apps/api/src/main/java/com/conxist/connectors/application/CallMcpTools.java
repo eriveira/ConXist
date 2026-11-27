@@ -27,6 +27,13 @@ public final class CallMcpTools implements McpToolbox {
 
     private static final Logger log = LoggerFactory.getLogger(CallMcpTools.class);
     static final int MAX_ANSWER_CHARACTERS = 100_000;
+    /** An error says what went wrong in a few lines; more is not resent to the model turn after turn. */
+    static final int MAX_ERROR_CHARACTERS = 2_000;
+    /**
+     * What the model may send a server in one call. A lookup needs a few words; a limit keeps meeting text or earlier
+     * answers from leaving ConXist in a tool's arguments, whatever a transcript or a tool's description asks.
+     */
+    static final int MAX_ARGUMENT_CHARACTERS = 4_000;
 
     private final McpServerRepository servers;
     private final McpCredentials credentials;
@@ -72,9 +79,17 @@ public final class CallMcpTools implements McpToolbox {
             return new Result("This tool is no longer allowed in this workspace.", true);
         }
         McpServer server = found.get();
+        Map<String, Object> sent = arguments == null ? Map.of() : arguments;
+        if (String.valueOf(sent).length() > MAX_ARGUMENT_CHARACTERS) {
+            log.info("Workspace {}: a call to {} on MCP server {} was refused, its arguments are too long",
+                    server.workspaceId(), ref.tool(), server.id());
+            return new Result("The arguments are too long. Send this tool only the few words it needs to look"
+                    + " something up.", true);
+        }
         try {
-            McpGateway.ToolAnswer answer = callWithRefresh(server, ref.tool(), arguments == null ? Map.of() : arguments);
-            return new Result(capped(answer.text()), answer.error());
+            McpGateway.ToolAnswer answer = callWithRefresh(server, ref.tool(), sent);
+            return new Result(capped(answer.text(), answer.error() ? MAX_ERROR_CHARACTERS : MAX_ANSWER_CHARACTERS),
+                    answer.error());
         } catch (McpGateway.SignInRefused refused) {
             servers.update(server.withStatus(McpServer.Status.SIGN_IN_NEEDED, clock.instant()));
             log.info("Workspace {}: MCP server {} refused ConXist's sign-in", server.workspaceId(), server.id());
@@ -100,9 +115,8 @@ public final class CallMcpTools implements McpToolbox {
         return "A tool of the MCP server \"" + server.name() + "\" (" + tool.name() + "). " + about;
     }
 
-    private static String capped(String text) {
+    private static String capped(String text, int max) {
         String value = text == null ? "" : text;
-        return value.length() <= MAX_ANSWER_CHARACTERS ? value
-                : value.substring(0, MAX_ANSWER_CHARACTERS) + "\n(The answer was cut here.)";
+        return value.length() <= max ? value : value.substring(0, max) + "\n(The answer was cut here.)";
     }
 }

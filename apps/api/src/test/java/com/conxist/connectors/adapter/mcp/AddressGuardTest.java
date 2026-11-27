@@ -15,13 +15,15 @@ class AddressGuardTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1",
-            "0.0.0.0", "224.0.0.1", "::1", "fc00::1", "fe80::1", "::ffff:10.0.0.1", "198.18.0.1"})
+            "0.0.0.0", "224.0.0.1", "::1", "fc00::1", "fe80::1", "::ffff:10.0.0.1", "198.18.0.1",
+            "64:ff9b::a00:5", "64:ff9b::a9fe:a9fe", "2002:a00:1::1", "2001:0:4136:e378::1", "::a00:1", "64:ff9b:1::1",
+            "192.0.0.8"})
     void private_and_special_addresses_are_not_public(String address) throws Exception {
         assertThat(AddressGuard.notPublic(InetAddress.getByName(address))).isTrue();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"203.0.113.5", "8.8.8.8", "2606:4700::1111"})
+    @ValueSource(strings = {"203.0.113.5", "8.8.8.8", "2606:4700::1111", "64:ff9b::808:808", "2002:808:808::1"})
     void internet_addresses_are_public(String address) throws Exception {
         assertThat(AddressGuard.notPublic(InetAddress.getByName(address))).isFalse();
     }

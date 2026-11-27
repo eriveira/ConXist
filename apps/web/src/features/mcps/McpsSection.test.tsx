@@ -132,6 +132,23 @@ describe('Settings › MCPs', () => {
     expect(bodyOf(calls, 'POST /api/mcps/connections')).toEqual({ address: 'https://mcp.acme.test/mcp', token: 'tok-123' });
   }, 15_000);
 
+  it('goes back to the address, and offers to try again when a server has no read tools', async () => {
+    stubApi({
+      'GET /api/mcps': () => ({ body: [] }),
+      'POST /api/mcps/connections': () => ({ body: ready({ tools: [tool('create_doc', false)] }) }),
+    });
+    open('#/settings/mcps');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add an MCP' });
+    await userEvent.type(within(dialog).getByLabelText('Server address'), 'https://mcp.acme.test/mcp');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+
+    expect(await within(dialog).findByText(/offers no tools agents can use yet/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Retry' })).toBeEnabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Back' }));
+    expect(within(dialog).getByLabelText('Server address')).toHaveValue('https://mcp.acme.test/mcp');
+  });
+
   it('a server’s page saves each tick, keeps a tool agents use, checks for new tools and refuses removal in use', async () => {
     const calls = stubApi({
       'GET /api/mcps': () => ({ body: [SERVER] }),
