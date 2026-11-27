@@ -51,6 +51,14 @@ conxist:
       mcp-url: ${CONXIST_PLAUD_MCP_URL:https://mcp.plaud.ai/mcp}
       # Where Plaud's sign-in page sends the person back: this API's callback, on this machine.
       redirect-uri: ${CONXIST_PLAUD_REDIRECT_URI:http://127.0.0.1:${server.port}/api/recorders/plaud/callback}
+  connectors:
+    # Outside MCP servers a workspace adds for its agents (ADR 0017). Where a server's sign-in page sends the person
+    # back: this API's callback, on this machine.
+    redirect-uri: ${CONXIST_MCP_REDIRECT_URI:http://127.0.0.1:${server.port}/api/mcps/callback}
+    # Only https servers on the internet. Tests and the local fake turn on plain http on this computer.
+    allow-loopback: false
+    connect-timeout: 10s
+    read-timeout: 30s
   runs:
     # Test runs (ADR 0012). The owner's own Anthropic key; blank means test runs say a key is missing.
     anthropic-api-key: ${CONXIST_ANTHROPIC_API_KEY:}

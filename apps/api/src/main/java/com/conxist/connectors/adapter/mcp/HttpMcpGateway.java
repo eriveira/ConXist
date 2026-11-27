@@ -1,0 +1,224 @@
+package com.conxist.connectors.adapter.mcp;
+
+import java.net.URI;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
+import com.conxist.connectors.application.McpGateway;
+import com.conxist.connectors.domain.McpServer;
+import com.conxist.connectors.domain.McpTool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * Outside MCP servers over Streamable HTTP, and their sign-in. Logs say what happened and on which host, never a
+ * token, a tool's input or what it answered.
+ */
+public final class HttpMcpGateway implements McpGateway {
+
+    private static final Logger log = LoggerFactory.getLogger(HttpMcpGateway.class);
+    /** A server that lists more pages than this is cut here. */
+    private static final int MAX_LIST_PAGES = 10;
+    /** A tool whose input schema is larger than this is left out. */
+    private static final int MAX_SCHEMA_CHARACTERS = 32_000;
+    private static final int MAX_ICON_BYTES = 100 * 1024;
+    private static final Pattern DATA_ICON =
+            Pattern.compile("data:(image/(?:png|jpeg|webp|svg\\+xml));base64,([A-Za-z0-9+/=]+)");
+    private static final Set<String> ICON_TYPES = Set.of("image/png", "image/jpeg", "image/webp", "image/svg+xml");
+
+    private final RestClient http;
+    private final AddressGuard guard;
+    private final McpOAuth oauth;
+    private final JsonMapper json = JsonMapper.builder().build();
+
+    /**
+     * @param http          must not follow redirects, so a token is never sent to another host
+     * @param allowLoopback lets plain http on this computer through, for tests and the local fake only
+     * @param redirectUri   ConXist's callback for the servers' sign-in pages
+     */
+    public HttpMcpGateway(RestClient http, boolean allowLoopback, URI redirectUri, Clock clock) {
+        this.http = http;
+        this.guard = new AddressGuard(allowLoopback);
+        this.oauth = new McpOAuth(http, guard, redirectUri, json, clock);
+    }
+
+    @Override
+    public URI checked(String address) {
+        return guard.check(address);
+    }
+
+    @Override
+    public ServerFacts list(URI address, String bearer) {
+        McpSession session = new McpSession(http, guard.check(address.toString()), bearer, json);
+        JsonNode opened = session.open();
+        JsonNode info = opened.path("serverInfo");
+        List<McpTool> tools = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        String cursor = null;
+        for (int page = 0; page < MAX_LIST_PAGES && tools.size() < McpServer.MAX_TOOLS; page++) {
+            JsonNode listed;
+            try {
+                listed = session.request("tools/list", cursor == null ? Map.of() : Map.of("cursor", cursor));
+            } catch (McpSession.RpcError refused) {
+                throw new NotMcp("tools/list refused");
+            }
+            for (JsonNode tool : listed.path("tools")) {
+                McpTool kept = tool(tool);
+                if (kept != null && seen.add(kept.name()) && tools.size() < McpServer.MAX_TOOLS) {
+                    tools.add(kept);
+                }
+            }
+            cursor = listed.path("nextCursor").asString("");
+            if (cursor.isEmpty() || cursor.length() > 1000) {
+                break;
+            }
+        }
+        log.info("MCP server on {} listed {} tools", address.getHost(), tools.size());
+        return new ServerFacts(text(info.path("name"), 200), text(info.path("title"), 200), icon(info.path("icons")),
+                List.copyOf(tools));
+    }
+
+    @Override
+    public Optional<SignIn> signInFor(URI address) {
+        Optional<SignIn> signIn = oauth.discover(address);
+        log.info("MCP server on {} {}", address.getHost(),
+                signIn.isPresent() ? "offers a sign-in ConXist can use" : "offers no sign-in ConXist can use");
+        return signIn;
+    }
+
+    @Override
+    public URI authorizationUrl(SignIn signIn, String state, String verifier) {
+        return oauth.authorizationUrl(signIn, state, verifier);
+    }
+
+    @Override
+    public Tokens exchange(SignIn signIn, String code, String verifier) {
+        return oauth.exchange(signIn, code, verifier);
+    }
+
+    @Override
+    public Tokens refresh(SignIn signIn, String refreshToken) {
+        return oauth.refresh(signIn, refreshToken);
+    }
+
+    @Override
+    public ToolAnswer call(URI address, String bearer, String tool, Map<String, Object> arguments) {
+        McpSession session = new McpSession(http, guard.check(address.toString()), bearer, json);
+        session.open();
+        JsonNode result;
+        try {
+            result = session.request("tools/call", Map.of("name", tool, "arguments", arguments));
+        } catch (McpSession.RpcError refused) {
+            log.info("MCP server on {} refused a call to {}", address.getHost(), tool);
+            return new ToolAnswer("The server refused the call: " + cut(refused.getMessage(), 500), true);
+        }
+        StringBuilder text = new StringBuilder();
+        for (JsonNode item : result.path("content")) {
+            if ("text".equals(item.path("type").asString(""))) {
+                text.append(item.path("text").asString("")).append('\n');
+            }
+        }
+        if (text.isEmpty() && result.has("structuredContent")) {
+            text.append(json.writeValueAsString(result.path("structuredContent")));
+        }
+        boolean failed = result.path("isError").asBoolean(false);
+        log.info("MCP server on {} answered a call to {}{}", address.getHost(), tool, failed ? " with an error" : "");
+        return new ToolAnswer(text.toString().strip(), failed);
+    }
+
+    /** A listed tool as ConXist keeps it; null for one with a name or schema ConXist can't use. */
+    @SuppressWarnings("unchecked")
+    private McpTool tool(JsonNode tool) {
+        String name = tool.path("name").asString("");
+        if (!McpTool.usableName(name)) {
+            return null;
+        }
+        JsonNode schema = tool.path("inputSchema");
+        Map<String, Object> inputSchema;
+        if (schema.isObject()) {
+            if (json.writeValueAsString(schema).length() > MAX_SCHEMA_CHARACTERS) {
+                return null;
+            }
+            inputSchema = json.convertValue(schema, LinkedHashMap.class);
+        } else {
+            inputSchema = Map.of("type", "object");
+        }
+        if (!"object".equals(inputSchema.get("type"))) {
+            inputSchema = new LinkedHashMap<>(inputSchema);
+            inputSchema.put("type", "object");
+        }
+        String title = text(tool.path("title"), McpTool.MAX_TITLE_LENGTH * 2);
+        if (title.isEmpty()) {
+            title = text(tool.path("annotations").path("title"), McpTool.MAX_TITLE_LENGTH * 2);
+        }
+        boolean readOnly = tool.path("annotations").path("readOnlyHint").asBoolean(false);
+        return new McpTool(name, title, text(tool.path("description"), McpTool.MAX_DESCRIPTION_LENGTH * 2), readOnly,
+                inputSchema, false);
+    }
+
+    /** The first logo the server gives that is a small image, as a {@code data:} address; null when none is. */
+    private String icon(JsonNode icons) {
+        int tried = 0;
+        for (JsonNode icon : icons) {
+            if (tried++ >= 3) {
+                break;
+            }
+            String src = icon.path("src").asString("");
+            try {
+                String found = src.startsWith("data:") ? dataIcon(src) : fetched(src);
+                if (found != null) {
+                    return found;
+                }
+            } catch (RuntimeException unusable) {
+                log.info("An MCP server's logo could not be used: {}", unusable.getClass().getSimpleName());
+            }
+        }
+        return null;
+    }
+
+    private static String dataIcon(String src) {
+        if (src.length() > MAX_ICON_BYTES * 4 / 3 + 100) {
+            return null;
+        }
+        var match = DATA_ICON.matcher(src);
+        if (!match.matches()) {
+            return null;
+        }
+        Base64.getDecoder().decode(match.group(2));
+        return src;
+    }
+
+    private String fetched(String src) {
+        URI uri = guard.check(src);
+        return http.get().uri(uri).accept(MediaType.IMAGE_PNG, MediaType.IMAGE_JPEG, MediaType.valueOf("image/*"))
+                .exchange((sent, answer) -> {
+                    MediaType type = answer.getHeaders().getContentType();
+                    String kind = type == null ? "" : type.getType() + "/" + type.getSubtype();
+                    if (answer.getStatusCode().value() != 200 || !ICON_TYPES.contains(kind)) {
+                        return null;
+                    }
+                    byte[] bytes = BoundedBody.read(answer.getBody(), MAX_ICON_BYTES);
+                    return "data:" + kind + ";base64," + Base64.getEncoder().encodeToString(bytes);
+                });
+    }
+
+    private static String text(JsonNode node, int max) {
+        return node.isString() ? cut(node.asString(""), max) : "";
+    }
+
+    private static String cut(String value, int max) {
+        String text = value == null ? "" : value.strip();
+        return text.length() <= max ? text : text.substring(0, max);
+    }
+}

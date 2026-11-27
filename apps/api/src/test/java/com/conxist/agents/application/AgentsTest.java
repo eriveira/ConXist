@@ -2,6 +2,7 @@ package com.conxist.agents.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -13,6 +14,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.agents.domain.Agent;
+import com.conxist.agents.AgentBrief;
+import com.conxist.agents.AgentBriefs;
 import com.conxist.agents.AgentModels;
 import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentModel;
@@ -20,6 +23,7 @@ import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.AgentVersion;
 import com.conxist.agents.domain.InputKind;
+import com.conxist.agents.domain.McpToolPick;
 import com.conxist.agents.domain.SkillDefinition;
 import com.conxist.agents.domain.SkillPin;
 import com.conxist.agents.domain.SkillSource;
@@ -43,8 +47,10 @@ class AgentsTest {
     private final SkillBook skills = new SkillBook(new InMemorySkills(), () -> workspace.id(),
             new ImmediateUnitOfWork(), clock);
     private final Models models = new Models();
+    private final java.util.Set<String> allowedMcpTools = new java.util.HashSet<>();
     private final AgentBook book = new AgentBook(repository, () -> workspace.id(),
-            id -> Optional.ofNullable(sources.get(id)), skills, models, new ImmediateUnitOfWork(), clock);
+            id -> Optional.ofNullable(sources.get(id)), skills, models,
+            (serverId, tool) -> allowedMcpTools.contains(serverId + "/" + tool), new ImmediateUnitOfWork(), clock);
     private final AddSkill addSkill = new AddSkill(skills);
     private final SaveSkillDraft saveSkill = new SaveSkillDraft(skills);
     private final PublishSkill publishSkill = new PublishSkill(skills);
@@ -310,6 +316,30 @@ class AgentsTest {
     }
 
     @Test
+    void an_mcp_tool_the_workspace_no_longer_allows_blocks_publishing_and_uses_name_draft_and_live() {
+        UUID server = UUID.randomUUID();
+        allowedMcpTools.add(server + "/search_docs");
+        allowedMcpTools.add(server + "/get_doc");
+        ReadAgentBriefs briefs = new ReadAgentBriefs(book, skills);
+        AgentView created = ready("Researcher");
+        AgentView using = save.save(created.id(), created.revision(), withMcpTools(created.draft(),
+                List.of(new McpToolPick(server, "search_docs"))));
+        AgentView live = publish.publish(using.id(), using.revision());
+        AgentView moved = save.save(live.id(), live.revision(), withMcpTools(live.draft(),
+                List.of(new McpToolPick(server, "get_doc"))));
+
+        assertThat(briefs.mcpToolUses()).extracting(AgentBriefs.McpToolUse::tool, AgentBriefs.McpToolUse::where)
+                .containsExactlyInAnyOrder(tuple("get_doc", "DRAFT"), tuple("search_docs", "LIVE"));
+        assertThat(briefs.draft(moved.id()).orElseThrow().mcpTools())
+                .containsExactly(new AgentBrief.McpTool(server, "get_doc"));
+
+        allowedMcpTools.remove(server + "/get_doc");
+        AgentView blocked = read.get(moved.id());
+        assertThat(blocked.problems()).containsExactly("mcp-tool-unavailable");
+        assertCode(() -> publish.publish(blocked.id(), blocked.revision()), "agent.mcp-tool-unavailable");
+    }
+
+    @Test
     void another_workspaces_agent_is_not_found() {
         AgentView created = ready("Summarizer");
         workspace = new FixedWorkspace(UUID.randomUUID());
@@ -353,6 +383,11 @@ class AgentsTest {
     private static AgentDefinition withSkills(AgentDefinition d, List<SkillPin> skills) {
         return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), skills, d.tools(),
                 d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
+    }
+
+    private static AgentDefinition withMcpTools(AgentDefinition d, List<McpToolPick> tools) {
+        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), d.skills(), d.tools(),
+                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits(), tools);
     }
 
     private static final AgentModel SONNET = new AgentModel("anthropic", "claude-sonnet-5-5", AgentModel.Effort.MEDIUM);

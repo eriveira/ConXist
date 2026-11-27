@@ -14,6 +14,8 @@ import java.util.UUID;
  * @param skills   the skills the agent follows that this workspace can use, in the agent's order
  * @param problems what stops the draft from being published; a run refuses a draft that has any
  * @param archived  whether the agent is archived; a run refuses it
+ * @param mcpTools  the tools of the workspace's MCP servers the agent may use (ADR 0017); a run offers only those the
+ *                  workspace still allows
  */
 public record AgentBrief(
         UUID id,
@@ -32,13 +34,28 @@ public record AgentBrief(
         int maxToolCalls,
         List<Skill> skills,
         List<String> problems,
-        boolean archived) {
+        boolean archived,
+        List<McpTool> mcpTools) {
 
     public AgentBrief {
+        mcpTools = List.copyOf(mcpTools);
         knowledgeSources = List.copyOf(knowledgeSources);
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         problems = List.copyOf(problems);
+    }
+
+    /** A brief without MCP tools. */
+    public AgentBrief(UUID id, String name, String purpose, String instructions, List<UUID> knowledgeSources,
+            List<String> tools, String provider, String model, String effort, String style, String givesBack,
+            int maxSteps, int timeoutSeconds, int maxToolCalls, List<Skill> skills, List<String> problems,
+            boolean archived) {
+        this(id, name, purpose, instructions, knowledgeSources, tools, provider, model, effort, style, givesBack,
+                maxSteps, timeoutSeconds, maxToolCalls, skills, problems, archived, List.of());
+    }
+
+    /** A tool of an MCP server: the server's id and the tool's name as the server lists it. */
+    public record McpTool(UUID serverId, String tool) {
     }
 
     /** @param source YOURS or IMPORTED */

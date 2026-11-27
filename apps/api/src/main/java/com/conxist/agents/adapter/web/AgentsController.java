@@ -17,6 +17,7 @@ import com.conxist.agents.application.SaveAgentDraft;
 import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentTool;
+import com.conxist.agents.domain.McpToolPick;
 import com.conxist.agents.domain.AgentVersion;
 import com.conxist.agents.domain.InputKind;
 import com.conxist.agents.domain.Limits;
@@ -161,7 +162,8 @@ class AgentsController {
             Style style,
             @Size(max = MAX_LIST_INPUT) List<InputKind> accepts,
             OutputKind givesBack,
-            @NotNull LimitsBody limits) {
+            @NotNull LimitsBody limits,
+            @Size(max = MAX_LIST_INPUT) List<@Valid McpToolBody> mcpTools) {
 
         AgentDefinition toDefinition() {
             List<SkillPin> pins = skills == null ? null
@@ -169,13 +171,18 @@ class AgentsController {
                             .toList();
             AgentModel picked = model == null ? null : new AgentModel(model.provider(), model.model(), model.effort());
             return new AgentDefinition(name, purpose, instructions, knowledgeSources, pins, tools, picked, style,
-                    accepts, givesBack, new Limits(limits.maxSteps(), limits.timeoutSeconds(), limits.maxToolCalls()));
+                    accepts, givesBack, new Limits(limits.maxSteps(), limits.timeoutSeconds(), limits.maxToolCalls()),
+                    mcpTools == null ? null : mcpTools.stream()
+                            .map(tool -> tool == null ? null : new McpToolPick(tool.serverId(), tool.tool())).toList());
         }
     }
 
     record ModelBody(@Size(max = AgentModel.MAX_NAME_LENGTH) String provider,
             @Size(max = AgentModel.MAX_NAME_LENGTH) String model,
             AgentModel.Effort effort) {
+    }
+
+    record McpToolBody(@NotNull UUID serverId, @NotNull @Size(max = McpToolPick.MAX_TOOL_LENGTH) String tool) {
     }
 
     record SkillPinBody(@NotNull UUID skillId, int version) {

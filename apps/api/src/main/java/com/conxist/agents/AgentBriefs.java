@@ -15,4 +15,17 @@ public interface AgentBriefs {
      * keeps such a model allowed (ADR 0014).
      */
     List<String> usingModel(String provider, String model);
+
+    /**
+     * Every use of an MCP server's tool by the current workspace's agents, in a draft or a live version, archived agents
+     * too: a server or tool in use can't be removed (ADR 0017).
+     */
+    List<McpToolUse> mcpToolUses();
+
+    /**
+     * @param where    DRAFT, LIVE or BOTH
+     * @param archived whether the agent is archived
+     */
+    record McpToolUse(UUID serverId, String tool, UUID agentId, String agentName, String where, boolean archived) {
+    }
 }

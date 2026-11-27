@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 import com.conxist.agents.AgentBriefs;
 import com.conxist.capture.MeetingLibrary;
+import com.conxist.connectors.McpToolbox;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.runs.adapter.model.ClaudeModel;
 import com.conxist.runs.adapter.model.JsonAnswerReader;
@@ -49,8 +50,8 @@ class RunsConfiguration {
     }
 
     @Bean
-    RunTools runTools(SourceCatalog sources, MeetingLibrary library) {
-        return new RunTools(sources, library);
+    RunTools runTools(SourceCatalog sources, MeetingLibrary library, McpToolbox mcp) {
+        return new RunTools(sources, library, mcp);
     }
 
     @Bean
