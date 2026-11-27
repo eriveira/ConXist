@@ -37,7 +37,7 @@ describe('Settings › MCPs', () => {
     window.location.hash = '';
   });
 
-  it('adds a public server with its read tools ticked, and tools that change things locked', async () => {
+  it('adds a public server with its read tools ticked, and asks first before a tool that changes things', async () => {
     const calls = stubApi({
       'GET /api/mcps': () => ({ body: [] }),
       'POST /api/mcps/connections': () => ({ body: ready() }),
@@ -57,18 +57,30 @@ describe('Settings › MCPs', () => {
     expect(bodyOf(calls, 'POST /api/mcps/connections')).toEqual({ address: 'https://mcp.acme.test/mcp' });
     expect(within(dialog).getByRole('checkbox', { name: 'Allow search_docs' })).toBeChecked();
     expect(within(dialog).getByRole('checkbox', { name: 'Allow get_doc' })).toBeChecked();
-    expect(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' })).toBeDisabled();
-    expect(within(dialog).getByText('2 of 2 read tools ticked')).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' })).not.toBeChecked();
+    expect(within(dialog).getByText('2 of 3 tools ticked')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Name in ConXist')).toHaveValue('Acme Docs');
     expect(await accessibilityViolations(container.ownerDocument.body)).toEqual([]);
+
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' }));
+    const ask = within(dialog).getByRole('group', { name: 'Let agents use create_doc?' });
+    expect(ask).toHaveFocus();
+    expect(ask).toHaveTextContent('ConXist can’t undo what this tool does.');
+    expect(await accessibilityViolations(container.ownerDocument.body)).toEqual([]);
+    await userEvent.click(within(ask).getByRole('button', { name: 'Keep it off' }));
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' })).not.toBeChecked();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Allow this tool' }));
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow create_doc' })).toBeChecked();
+    expect(within(dialog).queryByRole('group', { name: 'Let agents use create_doc?' })).not.toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow get_doc' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
 
-    expect(bodyOf(calls, 'POST /api/mcps')).toEqual({ connectionId: 'c1', name: 'Acme Docs', allowedTools: ['search_docs'] });
+    expect(bodyOf(calls, 'POST /api/mcps')).toEqual({ connectionId: 'c1', name: 'Acme Docs', allowedTools: ['search_docs', 'create_doc'] });
     expect(await screen.findByText(/Added Acme Docs\./)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Use it in an agent' })).toHaveAttribute('href', '#/agents');
-    expect(screen.getByText(/1 of 3 tools allowed/)).toBeInTheDocument();
+    expect(screen.getByText(/2 of 3 tools allowed/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Manage Acme Docs' })).toHaveAttribute('href', `#/settings/mcps/${SERVER_ID}`);
   });
 
@@ -132,10 +144,10 @@ describe('Settings › MCPs', () => {
     expect(bodyOf(calls, 'POST /api/mcps/connections')).toEqual({ address: 'https://mcp.acme.test/mcp', token: 'tok-123' });
   }, 15_000);
 
-  it('goes back to the address, and offers to try again when a server has no read tools', async () => {
+  it('goes back to the address, and offers to try again when a server has no tools', async () => {
     stubApi({
       'GET /api/mcps': () => ({ body: [] }),
-      'POST /api/mcps/connections': () => ({ body: ready({ tools: [tool('create_doc', false)] }) }),
+      'POST /api/mcps/connections': () => ({ body: ready({ tools: [] }) }),
     });
     open('#/settings/mcps');
     await userEvent.click(await screen.findByRole('button', { name: 'Add' }));

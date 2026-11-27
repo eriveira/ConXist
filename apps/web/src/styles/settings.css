@@ -181,3 +181,15 @@
 .danger-zone { margin-top: 28px; padding: 16px; border: 1px solid var(--cx-err-fg); border-radius: var(--cx-radius-md); }
 .danger-zone h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
 .danger-zone p { margin: 0 0 12px; font-size: 14px; color: var(--cx-fg-muted); }
+/* Ticking a tool that changes things asks first, in the table (owner, 2026-11-27). */
+.presets tr.tool-ask-row td { padding: 0 14px 12px; }
+.tool-ask {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; font-size: 13.5px;
+  background: var(--cx-warn-bg); color: var(--cx-warn-fg); border-radius: var(--cx-radius-sm);
+}
+.tool-ask:focus-visible { outline: 2px solid var(--cx-accent); outline-offset: 2px; }
+.tool-ask b { font-size: 14.5px; overflow-wrap: anywhere; }
+.tool-ask-text { display: block; }
+.tool-ask-text.warn { display: flex; gap: 6px; align-items: flex-start; font-weight: 600; }
+.tool-ask-text.warn svg { flex: none; margin-top: 2px; }
+.tool-ask-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 4px; }

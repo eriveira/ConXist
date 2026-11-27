@@ -33,6 +33,8 @@ interface Props {
   block: RunBlock;
   /** The provider the saved draft runs on, such as openai, named where the run's text goes and whose key failed. */
   provider: string | null;
+  /** The names of the picked tools that change things: a run may use them for real. */
+  changes: string[];
 }
 
 /**
@@ -40,7 +42,7 @@ interface Props {
  * draft once and see what it gives back, whether that has
  * the agent's shape, and what it did on the way. Nothing of a run is kept.
  */
-export function AgentTestPanel({ agentId, reads, givesBack, sources, block, provider }: Props) {
+export function AgentTestPanel({ agentId, reads, givesBack, sources, block, provider, changes }: Props) {
   const t = useT();
   const providerName = provider ? providerLabel(t, provider) : null;
   const [status, setStatus] = useState<Status>('checking');
@@ -148,7 +150,16 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
       )}
       {status === 'ready' && (
         <>
-          <p className="test-note"><Icon name="info" size={16} /> {providerName ? t('run.noteTo', { provider: providerName }) : t('run.note')}</p>
+          {changes.length > 0 ? (
+            <p className="alert warn test-changes">
+              <Icon name="alert" size={16} />
+              <span>{t(changes.length === 1 ? 'run.changes_one' : 'run.changes', { tools: changes.join(', ') })}</span>
+            </p>
+          ) : null}
+          <p className="test-note"><Icon name="info" size={16} />{' '}
+            {t(changes.length > 0 ? (providerName ? 'run.noteToChanges' : 'run.noteChanges') : (providerName ? 'run.noteTo' : 'run.note'),
+              { provider: providerName ?? '' })}
+          </p>
           {/* Kept focusable while it runs, so a keyboard user stays on it. */}
           <button type="button" className="btn primary test-run" onClick={() => void start()} disabled={!canRun}
             aria-disabled={running || undefined} aria-describedby={block ? `${pickId}-block` : undefined}>

@@ -55,7 +55,7 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
         return server.allow(allowed);
     }
 
-    /** Exactly these tools are allowed. Every name must be one the server lists, and a tool that changes things can't be. */
+    /** Exactly these tools are allowed. Every name must be one the server lists. */
     public McpServer allow(Set<String> allowed) {
         Map<String, McpTool> byName = byName();
         if (!byName.keySet().containsAll(allowed)) {
@@ -69,15 +69,16 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
     }
 
     /**
-     * The server's tool list as it is now. A tool it still lists keeps its tick while it still only reads; a new tool
-     * starts off, so nothing new reaches agents without the person; a tool it no longer lists is gone.
+     * The server's tool list as it is now. A tool it still lists keeps its tick, unless it only read before and may
+     * change things now, which the person did not allow; a new tool starts off, so nothing new reaches agents without
+     * the person; a tool it no longer lists is gone.
      */
     public McpServer listed(List<McpTool> fresh, String newIcon, Instant now) {
         Map<String, McpTool> known = byName();
         List<McpTool> merged = new ArrayList<>();
         for (McpTool tool : fresh) {
             McpTool before = known.get(tool.name());
-            merged.add(tool.withAllowed(before != null && before.allowed() && tool.readOnly()));
+            merged.add(tool.withAllowed(before != null && before.allowed() && (tool.readOnly() || !before.readOnly())));
         }
         return new McpServer(id, workspaceId, name, address, auth, newIcon == null ? icon : newIcon, merged,
                 Status.WORKS, addedAt, now);
@@ -100,7 +101,7 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
 
     public boolean allows(String tool) {
         McpTool found = byName().get(tool);
-        return found != null && found.allowed() && found.readOnly();
+        return found != null && found.allowed();
     }
 
     public Optional<McpTool> tool(String name) {

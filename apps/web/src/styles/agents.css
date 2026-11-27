@@ -144,3 +144,5 @@
 .tool-group { margin: 0 0 8px; font-size: 14px; font-weight: 800; }
 .mcp-group legend { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 0; font-size: 14px; font-weight: 800; overflow-wrap: anywhere; }
 .mcp-group .mono { font-family: var(--cx-font-mono); overflow-wrap: anywhere; }
+.test-card .alert.test-changes { align-items: flex-start; font-size: 13px; }
+.alert.test-changes svg { flex: none; margin-top: 2px; }

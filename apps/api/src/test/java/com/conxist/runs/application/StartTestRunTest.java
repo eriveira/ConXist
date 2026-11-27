@@ -89,7 +89,7 @@ class StartTestRunTest {
         public List<OfferedTool> offer(List<ToolRef> picks) {
             return picks.stream().filter(pick -> mcpAnswers.containsKey(pick.serverId() + "/" + pick.tool()))
                     .map(pick -> new OfferedTool(pick, "docs__" + pick.tool(), "Searches the docs.",
-                            Map.of("type", "object")))
+                            Map.of("type", "object"), pick.tool().startsWith("create")))
                     .toList();
         }
 
@@ -208,6 +208,7 @@ class StartTestRunTest {
         ModelPort.Request first = model.requests.get(0);
         assertThat(first.tools()).extracting(ModelPort.ToolSpec::name).containsExactly("docs__search", "docs__broken");
         assertThat(first.system()).contains("- docs__search: a read tool of an MCP server")
+                .contains("You can only read.")
                 .doesNotContain("Searches the docs.");
         assertThat(mcpCalls).containsExactly(Map.of("query", "checkout"), Map.of());
         List<ModelPort.ToolResult> results = model.requests.get(1).exchanges().get(0).results();

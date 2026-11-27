@@ -77,9 +77,6 @@ class McpServersIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         String id = JsonPath.read(connection, "$.id");
 
-        add(workspace, id, "Acme Docs", "\"search_docs\",\"create_doc\"")
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("mcp.tool-changes-things"));
         String server = JsonPath.read(add(workspace, id, "Acme Docs", "\"search_docs\"")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("WORKS"))

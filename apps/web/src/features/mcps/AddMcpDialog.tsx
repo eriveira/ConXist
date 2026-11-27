@@ -307,18 +307,20 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
           <input id={ids.name} className="input" value={name} maxLength={MAX_MCP_NAME} disabled={busy}
             onChange={(event) => { setName(event.target.value); setError(null); }} />
         </div>
-        {reads.length === 0 ? (
+        {connection.tools.length === 0 ? (
           <p className="alert info"><Icon name="info" /> {t('mcp.tools.empty')}</p>
         ) : (
           <>
             <p>{t('mcp.tools.help')}</p>
             <div className="mcp-selrow">
-              <span className="hint" aria-live="polite">{t('mcp.tools.ticked', { count: allowed.size, total: reads.length })}</span>
+              <span className="hint" aria-live="polite">{t('mcp.tools.ticked', { count: allowed.size, total: connection.tools.length })}</span>
               <span>
-                <button type="button" className="link" onClick={() => setAllowed(new Set(reads.map((tool) => tool.name)))}>
-                  {t('mcp.tools.all')}
-                </button>
-                {' · '}
+                {reads.length > 0 && (
+                  <button type="button" className="link" onClick={() => setAllowed(new Set(reads.map((tool) => tool.name)))}>
+                    {t('mcp.tools.all')}
+                  </button>
+                )}
+                {reads.length > 0 && ' · '}
                 <button type="button" className="link" onClick={() => setAllowed(new Set())}>{t('mcp.tools.none')}</button>
               </span>
             </div>
@@ -333,10 +335,10 @@ export function AddMcpDialog({ server, onClose, onAdded }: {
     footer = (
       <>
         {back}
-        {reads.length > 0 && allowed.size === 0 && <span className="hint">{t('mcp.tools.pickOne')}</span>}
+        {connection.tools.length > 0 && allowed.size === 0 && <span className="hint">{t('mcp.tools.pickOne')}</span>}
         <span className="grow" />
         <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</button>
-        {reads.length === 0 ? (
+        {connection.tools.length === 0 ? (
           <button type="button" className="btn primary" disabled={busy}
             onClick={() => void connect(null, { kind: 'address' })}>{t('settings.retry')}</button>
         ) : (

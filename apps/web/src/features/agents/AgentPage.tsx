@@ -6,7 +6,7 @@ import { type PinnedSkill, SKILL_PROBLEMS, type SkillSummary, skillRowProblems, 
 import type { Source } from '../../domain/model';
 import { type LlmProviders, modelAvailable } from '../../domain/settings';
 import { asToolServer } from '../../domain/integrations';
-import { type McpServer, pickAllowed } from '../../domain/mcps';
+import { changingPicks, type McpServer, pickAllowed } from '../../domain/mcps';
 import type { Variable } from '../../domain/variables';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
@@ -169,7 +169,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
         <aside className="agent-side">
           <AgentTestPanel agentId={agent.id} reads={draft.knowledgeSources} givesBack={draft.givesBack}
             sources={choices.status === 'ready' ? choices.sources : null} block={runBlock}
-            provider={draft.model?.provider ?? null} />
+            provider={draft.model?.provider ?? null}
+            changes={choices.status === 'ready' && choices.mcps ? changingPicks(choices.mcps, draft.mcpTools) : []} />
         </aside>
       </div>
       {historyOpen && (
