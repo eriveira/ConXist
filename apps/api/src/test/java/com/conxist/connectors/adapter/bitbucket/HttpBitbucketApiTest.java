@@ -47,25 +47,46 @@ class HttpBitbucketApiTest {
     }
 
     @Test
-    void reads_the_account_as_the_email_with_its_repositories_and_refuses_a_wrong_token() {
+    void reads_the_account_by_name_never_the_email_with_its_repositories_and_refuses_a_wrong_token() {
         assertThat(bitbucket.account(CREDENTIAL))
-                .isEqualTo(new IntegrationApi.Account("alex@acme.test", FakeBitbucketServer.REPOSITORIES));
+                .isEqualTo(new IntegrationApi.Account("Alex Acme", FakeBitbucketServer.REPOSITORIES));
         assertThatThrownBy(() -> bitbucket.account("alex@acme.test\nATATTwrong"))
                 .isInstanceOf(IntegrationApi.TokenRefused.class);
         assertThat(fake.requests()).contains("GET /repositories?role=member&sort=full_name&pagelen=100");
     }
 
     @Test
-    void searches_only_the_named_picked_repository_without_the_models_qualifiers() {
+    void searches_only_the_named_picked_repository_without_the_models_qualifiers_or_quotes() {
         JsonNode found = json.readTree(call("search_code", Map.of("query", "refund repo:secret",
                 "repository", "acme/api")));
 
+        assertThat(found.path("files")).hasSize(1);
         assertThat(found.path("files").get(0).path("path").asString()).isEqualTo("src/checkout/Payment.java");
         assertThat(found.path("files").get(0).path("lines").get(0).asString()).isEqualTo("12: void refund(Payment p)");
-        assertThat(fake.requests()).contains("GET /workspaces/acme/search/code?search_query=refund%20repo%3Aapi"
+        assertThat(found.path("total").asInt()).isEqualTo(1);
+        assertThat(fake.requests()).contains("GET /workspaces/acme/search/code?search_query=repo%3Aapi%20refund"
                 + "&pagelen=20");
-        assertThatThrownBy(() -> call("search_code", Map.of("query", "refund", "repository", "acme/web")))
-                .isInstanceOf(IntegrationApi.Problem.class).hasMessageContaining("acme/api");
+    }
+
+    @Test
+    void a_quote_or_a_glued_qualifier_cannot_pull_the_search_out_of_the_picked_repository() {
+        call("search_code", Map.of("query", "password \"", "repository", "acme/api"));
+        call("search_code", Map.of("query", "foo\"repo:mobile\tx", "repository", "acme/api"));
+
+        assertThat(fake.requests()).contains(
+                "GET /workspaces/acme/search/code?search_query=repo%3Aapi%20password&pagelen=20",
+                "GET /workspaces/acme/search/code?search_query=repo%3Aapi%20foo%20x&pagelen=20");
+    }
+
+    @Test
+    void a_repository_the_person_did_not_pick_is_refused_before_anything_is_sent() {
+        for (String tool : List.of("search_code", "get_file", "list_pull_requests", "get_pull_request",
+                "list_commits")) {
+            assertThatThrownBy(() -> call(tool, Map.of("query", "refund", "repository", "acme/web", "path",
+                    "README.md", "number", 7))).isInstanceOf(IntegrationApi.Problem.class)
+                    .hasMessageContaining("acme/api");
+        }
+        assertThat(fake.requests()).isEmpty();
     }
 
     @Test
@@ -76,6 +97,9 @@ class HttpBitbucketApiTest {
                 .path("entries").toString()).isEqualTo("[\"checkout/\",\"App.java\"]");
         assertThatThrownBy(() -> call("get_file", Map.of("repository", "acme/api", "path", "../../user")))
                 .isInstanceOf(IntegrationApi.Problem.class);
+        assertThatThrownBy(() -> call("get_file", Map.of("repository", "acme/api", "path", "big.bin")))
+                .isInstanceOf(IntegrationApi.Problem.class).hasMessageContaining("over 1 MB");
+        assertThat(fake.requests()).noneMatch(request -> request.equals("GET /repositories/acme/api/src/main/big.bin"));
     }
 
     @Test

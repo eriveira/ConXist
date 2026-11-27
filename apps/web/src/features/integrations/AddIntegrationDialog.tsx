@@ -15,6 +15,7 @@ export function AddIntegrationDialog({ connected, onPick, onClose }: {
       icon={<Icon name="plus" size={18} />} closeLabel={t('dialog.close')} onClose={onClose} step="pick"
       focusFirst="button[data-kind]"
       footer={<><span className="grow" /><button type="button" className="btn" onClick={onClose}>{t('dialog.cancel')}</button></>}>
+      <div className="m-body">
       <ul className="vendors kind-picker">
         {INTEGRATION_KINDS.map((kind) => {
           const done = connected.has(kind);
@@ -33,6 +34,7 @@ export function AddIntegrationDialog({ connected, onPick, onClose }: {
           );
         })}
       </ul>
+      </div>
     </Dialog>
   );
 }

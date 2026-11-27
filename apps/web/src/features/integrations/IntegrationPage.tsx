@@ -182,7 +182,9 @@ function CheckResult({ check, name }: { check: Check; name: string }) {
     const count = check.check.integration.repositories.length;
     text = t(count === 1 ? 'integration.check.works_one' : 'integration.check.works', { count, name });
   } else if (check.state === 'done') {
-    text = t(check.check.error === 'sign-in-needed' ? 'integration.check.sign-in-needed' : 'integration.check.unreachable', { name });
+    const error = check.check.error;
+    text = t(error === 'sign-in-needed' || error === 'refused' || error === 'repositories-lost'
+      ? `integration.check.${error}` : 'integration.check.unreachable', { name });
     failed = true;
   }
   return <p className={failed ? 'status-line failed' : 'status-line'} role="status">{text}</p>;

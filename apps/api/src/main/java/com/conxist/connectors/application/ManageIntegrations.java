@@ -135,14 +135,22 @@ public final class ManageIntegrations {
         Integration integration = load(integrationId);
         try {
             IntegrationApi.Account account = api(integration.kind()).account(credential(integration));
-            Integration checked = integration.checked(account.login(), stillReachable(integration, account),
-                    integration.tokenEnding(), clock.instant());
+            List<String> reachable = stillReachable(integration, account);
+            if (reachable.isEmpty()) {
+                log.info("Workspace {} checked integration {}: none of the picked repositories is reachable",
+                        integration.workspaceId(), integrationId);
+                return new IntegrationViews.CheckView(false, "repositories-lost", views.view(integration));
+            }
+            Integration checked = integration.checked(account.login(), reachable, integration.tokenEnding(),
+                    clock.instant());
             integrations.update(checked);
             log.info("Workspace {} checked integration {}: works", integration.workspaceId(), integrationId);
             return new IntegrationViews.CheckView(true, null, views.view(checked));
         } catch (IntegrationApi.TokenRefused refused) {
             return failed(integration, Integration.Status.SIGN_IN_NEEDED, "sign-in-needed");
-        } catch (IntegrationApi.Unreachable | IntegrationApi.Refused | IntegrationApi.Missing unreachable) {
+        } catch (IntegrationApi.Refused refused) {
+            return failed(integration, Integration.Status.UNREACHABLE, "refused");
+        } catch (IntegrationApi.Unreachable | IntegrationApi.Missing unreachable) {
             return failed(integration, Integration.Status.UNREACHABLE, "unreachable");
         }
     }
@@ -152,7 +160,12 @@ public final class ManageIntegrations {
         Integration integration = load(integrationId);
         String credential = IntegrationCredentials.checked(integration.kind(), email, token);
         IntegrationApi.Account account = account(integration.kind(), credential);
-        Integration replaced = integration.checked(account.login(), stillReachable(integration, account),
+        List<String> reachable = stillReachable(integration, account);
+        if (reachable.isEmpty()) {
+            throw new InvalidIntegration(integration.kind().code("repositories-lost"), "This token reaches none of"
+                    + " the picked repositories. Use a token of an account that can see them.");
+        }
+        Integration replaced = integration.checked(account.login(), reachable,
                 Integration.endingOf(IntegrationCredentials.tokenOf(credential)), clock.instant());
         integrations.replaceToken(replaced, credential);
         log.info("Workspace {} replaced the token of integration {}", integration.workspaceId(), integrationId);
@@ -181,11 +194,16 @@ public final class ManageIntegrations {
 
     /**
      * The repositories agents may read after a check: for GitHub all the credential reaches; for Bitbucket the
-     * picked ones it still reaches, so a repository the person lost access to drops out.
+     * picked ones it still reaches, so a repository the person lost access to drops out. When the service's list
+     * was cut at {@link Integration#MAX_REPOSITORIES}, a picked one missing from it may only sort later, so all
+     * picks stay.
      */
     private static List<String> stillReachable(Integration integration, IntegrationApi.Account account) {
         if (!integration.kind().picksRepositories()) {
             return account.repositories();
+        }
+        if (account.repositories().size() >= Integration.MAX_REPOSITORIES) {
+            return integration.repositories();
         }
         return integration.repositories().stream()
                 .filter(picked -> account.repositories().stream().anyMatch(picked::equalsIgnoreCase)).toList();
@@ -221,7 +239,10 @@ public final class ManageIntegrations {
         } catch (IntegrationApi.TokenRefused refused) {
             throw new InvalidIntegration(kind.code("token-refused"), kind.label() + " refused this token. It may"
                     + " have expired or been revoked: make a new one.");
-        } catch (IntegrationApi.Unreachable | IntegrationApi.Refused | IntegrationApi.Missing unreachable) {
+        } catch (IntegrationApi.Refused refused) {
+            throw new InvalidIntegration(kind.code("refused"), kind.label() + " refused what ConXist asked. Check"
+                    + " the token can read repositories, then try again.");
+        } catch (IntegrationApi.Unreachable | IntegrationApi.Missing unreachable) {
             throw new InvalidIntegration(kind.code("unreachable"), kind.label() + " did not answer. Try again in a"
                     + " minute.");
         }

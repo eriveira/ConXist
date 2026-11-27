@@ -20,11 +20,11 @@ type Step = { kind: 'token' } | { kind: 'repositories'; check: TokenCheck } | { 
  * every repository its person can see, so the person picks the ones agents may read, then the tools; all tools come
  * ticked, and no repository does. With {@code integration} it replaces that integration's token instead, in one step.
  */
-export function ConnectBitbucketDialog({ integration, onClose, onDone }: {
-  integration?: Integration; onClose: () => void; onDone: (integration: Integration) => void;
+export function ConnectBitbucketDialog({ integration, onBack, onClose, onDone }: {
+  integration?: Integration; onBack?: () => void; onClose: () => void; onDone: (integration: Integration) => void;
 }) {
   const t = useT();
-  const [email, setEmail] = useState(integration?.account ?? '');
+  const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
   const [step, setStep] = useState<Step>({ kind: 'token' });
   const [repositories, setRepositories] = useState<Set<string>>(new Set());
@@ -121,6 +121,9 @@ export function ConnectBitbucketDialog({ integration, onClose, onDone }: {
     );
     footer = (
       <>
+        {onBack && (
+          <button type="button" className="btn ghost" onClick={onBack} disabled={busy}>{t('dialog.backStep')}</button>
+        )}
         <span className="grow" />
         {cancel}
         <button type="submit" form={ids.form} className="btn primary" disabled={busy}>

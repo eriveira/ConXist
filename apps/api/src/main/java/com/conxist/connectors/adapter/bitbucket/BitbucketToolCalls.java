@@ -73,10 +73,15 @@ final class BitbucketToolCalls {
         String repository = repository(integration, arguments);
         String[] parts = repository.split("/");
         JsonNode found = read(bitbucket.get(credential, "/workspaces/" + encode(parts[0]) + "/search/code",
-                List.of(new String[] {"search_query", words + " repo:" + parts[1]},
+                List.of(new String[] {"search_query", "repo:" + parts[1] + " " + words},
                         new String[] {"pagelen", String.valueOf(MAX_RESULTS)}), HttpBitbucketApi.JSON));
         List<Map<String, Object>> files = new ArrayList<>();
+        int elsewhere = 0;
         for (JsonNode item : found.path("values")) {
+            if (!inRepository(item, repository)) {
+                elsewhere++;
+                continue;
+            }
             List<String> lines = new ArrayList<>();
             for (JsonNode match : item.path("content_matches")) {
                 for (JsonNode line : match.path("lines")) {
@@ -90,8 +95,23 @@ final class BitbucketToolCalls {
             }
             files.add(ordered("path", item.path("file").path("path").asString(""), "lines", lines));
         }
-        int total = found.path("size").asInt(files.size());
+        int total = Math.max(files.size(), found.path("size").asInt(files.size()) - elsewhere);
         return write(ordered("repository", repository, "total", total, "files", files, "cut", total > files.size()));
+    }
+
+    /**
+     * Whether a search hit is in the repository searched: Bitbucket searches a whole workspace, so a hit whose own
+     * address names no repository, or another one, is left out (ADR 0020).
+     */
+    private static boolean inRepository(JsonNode item, String repository) {
+        String self = item.path("file").path("links").path("self").path("href").asString("");
+        int at = self.indexOf("/repositories/");
+        if (at < 0) {
+            return false;
+        }
+        String rest = self.substring(at + "/repositories/".length());
+        String[] parts = rest.split("/", 3);
+        return parts.length == 3 && (parts[0] + "/" + parts[1]).equalsIgnoreCase(repository);
     }
 
     private String file(Integration integration, String credential, Map<String, Object> arguments) {

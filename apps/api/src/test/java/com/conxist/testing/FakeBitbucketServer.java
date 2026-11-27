@@ -70,11 +70,9 @@ public final class FakeBitbucketServer implements AutoCloseable {
                     REPOSITORIES.stream().map(name -> Map.of("full_name", name)).toList()));
             case "/repositories/acme/api", "/repositories/acme/web" ->
                     send(exchange, 200, Map.of("mainbranch", Map.of("name", "main")));
-            case "/workspaces/acme/search/code" -> send(exchange, 200, Map.of("size", 1, "values", List.of(Map.of(
-                    "file", Map.of("path", "src/checkout/Payment.java"),
-                    "content_matches", List.of(Map.of("lines", List.of(Map.of("line", 12, "segments", List.of(
-                            Map.of("text", "void "), Map.of("text", "refund", "match", true),
-                            Map.of("text", "(Payment p)"))))))))));
+            case "/workspaces/acme/search/code" -> send(exchange, 200, Map.of("size", 2, "values", List.of(
+                    hit("acme/api", "src/checkout/Payment.java", "void refund(Payment p)"),
+                    hit("acme/mobile", "secrets/keys.txt", "password = hunter2"))));
             case "/repositories/acme/api/src/main/README.md" -> {
                 if (meta) {
                     send(exchange, 200, Map.of("type", "commit_file", "size", 30, "path", "README.md"));
@@ -82,6 +80,8 @@ public final class FakeBitbucketServer implements AutoCloseable {
                     text(exchange, 200, "# Acme API\n\nCheckout and payments.\n");
                 }
             }
+            case "/repositories/acme/api/src/main/big.bin" -> send(exchange, 200, Map.of("type", "commit_file",
+                    "size", 2_000_000, "path", "big.bin"));
             case "/repositories/acme/api/src/main/src" -> send(exchange, 200, Map.of("type", "commit_directory",
                     "path", "src"));
             case "/repositories/acme/api/src/main/src/" -> send(exchange, 200, Map.of("values", List.of(
@@ -128,6 +128,15 @@ public final class FakeBitbucketServer implements AutoCloseable {
         pull.put("description", "Adds Apple Pay to checkout.");
         pull.put("updated_on", "2026-11-25T10:00:00+00:00");
         return pull;
+    }
+
+    /** A code search hit; Bitbucket searches the whole workspace, so a hit can come from any repository. */
+    private Map<String, Object> hit(String repository, String path, String line) {
+        return Map.of("file", Map.of("path", path, "links", Map.of("self", Map.of("href",
+                        baseUrl() + "/repositories/" + repository + "/src/abc123/" + path))),
+                "content_matches", List.of(Map.of("lines", List.of(Map.of("line", 12, "segments", List.of(
+                        Map.of("text", line.substring(0, 5)), Map.of("text", line.substring(5), "match", true))))))
+        );
     }
 
     private static Map<String, Object> comment(String who, String text, boolean deleted) {

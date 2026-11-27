@@ -165,6 +165,41 @@ class ManageIntegrationsTest {
     }
 
     @Test
+    void bitbucket_keeps_its_picks_when_the_list_was_cut_and_never_ends_with_none() {
+        account = new IntegrationApi.Account("Alex", List.of("acme/api", "acme/web"));
+        UUID id = manage.add(BITBUCKET, EMAIL, ATLASSIAN, List.of("acme/web"), Set.of()).id();
+
+        List<String> first100 = new ArrayList<>();
+        for (int i = 0; i < Integration.MAX_REPOSITORIES; i++) {
+            first100.add("acme/a" + i);
+        }
+        account = new IntegrationApi.Account("Alex", first100);
+        assertThat(manage.check(id).integration().repositories()).containsExactly("acme/web");
+
+        account = new IntegrationApi.Account("Alex", List.of("acme/api"));
+        IntegrationViews.CheckView lost = manage.check(id);
+        assertThat(lost.works()).isFalse();
+        assertThat(lost.error()).isEqualTo("repositories-lost");
+        assertThat(integrations.stored.get(id).repositories()).containsExactly("acme/web");
+        assertThatThrownBy(() -> manage.replaceToken(id, EMAIL, "ATATT3xNewOne0WxYz"))
+                .isInstanceOf(RuleViolation.class).hasMessageContaining("none of the picked repositories");
+        assertThat(integrations.tokens.get(id)).isEqualTo(EMAIL + "\n" + ATLASSIAN);
+    }
+
+    @Test
+    void a_request_the_service_refuses_says_so_instead_of_try_again() {
+        failure = new IntegrationApi.Refused("403");
+        assertThatThrownBy(() -> manage.checkToken(BITBUCKET, EMAIL, ATLASSIAN))
+                .isInstanceOf(RuleViolation.class).hasMessageContaining("Bitbucket refused what ConXist asked")
+                .extracting("code").isEqualTo("integration.bitbucket-refused");
+
+        failure = null;
+        UUID id = addGitHub(Set.of()).id();
+        failure = new IntegrationApi.Refused("403");
+        assertThat(manage.check(id).error()).isEqualTo("refused");
+    }
+
+    @Test
     void github_repositories_are_picked_on_github_not_here() {
         UUID id = addGitHub(Set.of()).id();
 

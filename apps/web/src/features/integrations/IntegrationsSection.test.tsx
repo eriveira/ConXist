@@ -157,7 +157,7 @@ describe('Settings › Integrations', () => {
     await userEvent.clear(within(dialog).getByLabelText('API token'));
     await userEvent.type(within(dialog).getByLabelText('API token'), 'ATATT3xFfGF0Q7f1');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
-    expect(await within(dialog).findByRole('heading', { name: 'Bitbucket is connected' })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('heading', { name: 'Bitbucket accepted the token' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Next' })).toBeDisabled();
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'acme/web' }));
     expect(within(dialog).getByText(/1 of 3 picked/)).toBeInTheDocument();
@@ -198,5 +198,39 @@ describe('Settings › Integrations', () => {
     expect(await screen.findByText('Repositories saved.')).toBeInTheDocument();
     expect(bodyOf(calls, 'PUT /api/integrations/88888888-8888-8888-8888-888888888888/repositories')).toEqual({ repositories: ['acme/web', 'acme/api'] });
     expect(screen.getByText('acme/api')).toBeInTheDocument();
+  });
+
+  it('says which picked repositories the token lost, and can ask again after a failure', async () => {
+    const BITBUCKET: Integration = {
+      ...GITHUB, id: '88888888-8888-8888-8888-888888888888', kind: 'BITBUCKET', name: 'Bitbucket', account: 'Alex Acme',
+      repositories: ['acme/old', 'acme/web'],
+    };
+    let asked = 0;
+    stubApi({
+      'GET /api/integrations/88888888-8888-8888-8888-888888888888': () => ({ body: BITBUCKET }),
+      'GET /api/integrations': () => ({ body: [BITBUCKET] }),
+      'POST /api/integrations/88888888-8888-8888-8888-888888888888/reachable': () => (++asked === 1
+        ? { status: 422, body: { code: 'integration.bitbucket-unreachable', message: 'x' } }
+        : { body: { account: 'Alex Acme', repositories: ['acme/api', 'acme/web'], tools: [] } }),
+    });
+    open('#/settings/integrations/88888888-8888-8888-8888-888888888888');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Change repositories' }));
+    const dialog = screen.getByRole('dialog', { name: 'Change repositories' });
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Try again' }));
+
+    expect(await within(dialog).findByText(/acme\/old is no longer reachable with this token/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'acme/web' })).toBeChecked();
+  });
+
+  it('goes back from Connect Bitbucket to the list of what can be added', async () => {
+    stubApi({ 'GET /api/integrations': () => ({ body: [] }) });
+    open('#/settings/integrations');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
+    await userEvent.click(screen.getByRole('button', { name: /Bitbucket/ }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Connect Bitbucket' })).getByRole('button', { name: 'Back' }));
+
+    expect(screen.getByRole('dialog', { name: 'Add an integration' })).toBeInTheDocument();
   });
 });

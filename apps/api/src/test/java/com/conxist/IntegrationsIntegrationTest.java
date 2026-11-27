@@ -74,7 +74,7 @@ class IntegrationsIntegrationTest {
         bitbucketCheck(workspace, email, "ATATTwrong0123").andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("integration.bitbucket-token-refused"));
         bitbucketCheck(workspace, email, token).andExpect(status().isOk())
-                .andExpect(jsonPath("$.account").value(email))
+                .andExpect(jsonPath("$.account").value("Alex Acme"))
                 .andExpect(jsonPath("$.repositories.length()").value(3))
                 .andExpect(jsonPath("$.tools.length()").value(5))
                 .andExpect(jsonPath("$.tools[2].name").value("list_pull_requests"));
@@ -98,6 +98,14 @@ class IntegrationsIntegrationTest {
         byte[] sealed = jdbc.sql("select token_sealed from integrations where id = cast(:id as uuid)")
                 .param("id", integration).query(byte[].class).single();
         assertThat(new String(sealed, StandardCharsets.ISO_8859_1)).doesNotContain(token).doesNotContain(email);
+        assertThat(jdbc.sql("select account from integrations where id = cast(:id as uuid)").param("id", integration)
+                .query(String.class).single()).isEqualTo("Alex Acme");
+        String other = workspace("Bitbucket outsider");
+        mvc.perform(post("/api/integrations/{id}/reachable", integration).header(HEADER, other))
+                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/integrations/{id}/repositories", integration).header(HEADER, other)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"repositories\":[\"acme/web\"]}"))
+                .andExpect(status().isNotFound());
         mvc.perform(post("/api/integrations/{id}/reachable", integration).header(HEADER, workspace))
                 .andExpect(jsonPath("$.repositories.length()").value(3));
         mvc.perform(put("/api/integrations/{id}/repositories", integration).header(HEADER, workspace)

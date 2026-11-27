@@ -28,6 +28,8 @@ import tools.jackson.databind.json.JsonMapper;
 public final class HttpBitbucketApi implements IntegrationApi {
 
     static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
+    /** The `integrations.account` column holds at most 100 characters. */
+    static final int MAX_ACCOUNT = 100;
     static final String JSON = "application/json";
     static final String ANY = "*/*";
 
@@ -51,11 +53,16 @@ public final class HttpBitbucketApi implements IntegrationApi {
         return tools.call(integration, credential, tool, arguments);
     }
 
-    /** The account is the person's Atlassian email; the repositories are the ones they are a member of. */
+    /**
+     * The account is the person's Bitbucket name, never the email, which stays sealed in the credential (ADR 0004);
+     * the repositories are the ones they are a member of. {@code /user} is also the credential check.
+     */
     @Override
     public Account account(String credential) {
         try {
-            json.readTree(get(credential, "/user", List.of(), JSON));
+            JsonNode user = json.readTree(get(credential, "/user", List.of(), JSON));
+            String login = user.path("display_name").asString("").strip();
+            login = login.isEmpty() ? user.path("nickname").asString("").strip() : login;
             List<String> repositories = new ArrayList<>();
             JsonNode page = json.readTree(get(credential, "/repositories", List.of(
                     new String[] {"role", "member"}, new String[] {"sort", "full_name"},
@@ -66,7 +73,7 @@ public final class HttpBitbucketApi implements IntegrationApi {
                     repositories.add(name);
                 }
             }
-            return new Account(IntegrationCredentials.basic(credential).email(), List.copyOf(repositories));
+            return new Account(login.isEmpty() ? "Bitbucket account" : truncate(login), List.copyOf(repositories));
         } catch (JacksonException unreadable) {
             throw new Unreachable("Bitbucket answered with something that is not JSON");
         }
@@ -115,7 +122,12 @@ public final class HttpBitbucketApi implements IntegrationApi {
             if (answer.body() != null) {
                 return answer.body();
             }
-            URI next = answer.location() == null ? null : address.resolve(answer.location());
+            URI next;
+            try {
+                next = answer.location() == null ? null : address.resolve(answer.location());
+            } catch (IllegalArgumentException malformed) {
+                throw new Unreachable("Bitbucket sent ConXist somewhere else");
+            }
             if (!mayFollow || next == null || !next.toString().startsWith(base + "/")) {
                 throw new Unreachable("Bitbucket sent ConXist somewhere else");
             }
@@ -123,6 +135,10 @@ public final class HttpBitbucketApi implements IntegrationApi {
         } catch (ResourceAccessException | UncheckedIOException failed) {
             throw new Unreachable("Bitbucket could not be reached: " + failed.getClass().getSimpleName());
         }
+    }
+
+    private static String truncate(String name) {
+        return name.length() <= MAX_ACCOUNT ? name : name.substring(0, MAX_ACCOUNT);
     }
 
     private record Answer(String body, String location) {

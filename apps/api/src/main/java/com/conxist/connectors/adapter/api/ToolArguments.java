@@ -17,27 +17,29 @@ import com.conxist.connectors.domain.Integration;
 public final class ToolArguments {
 
     private static final Pattern REF = Pattern.compile("[A-Za-z0-9._/-]{1,200}");
-    /** A search qualifier at the start of a word, such as repo:, ORG: or path:, but not std::vector. */
-    private static final Pattern QUALIFIER = Pattern.compile("^[A-Za-z_]+:(?!:)");
+    /** A colon that is not part of {@code ::}: search syntax such as repo:, ORG: or path:, but not std::vector. */
+    private static final Pattern SINGLE_COLON = Pattern.compile("(?<!:):(?!:)");
     private static final List<String> OPERATORS = List.of("AND", "OR", "NOT");
 
     private ToolArguments() {
     }
 
     /**
-     * The words of a search without anything GitHub or Bitbucket reads as search syntax: qualifiers such as {@code repo:} in any
-     * case (so a search stays in the integration's repositories), and the operators AND, OR and NOT.
+     * The words of a search without anything GitHub or Bitbucket reads as search syntax: qualifiers such as
+     * {@code repo:} in any case and anywhere in a word (so a search stays in the integration's repositories), quotes
+     * (so nothing after the words can be pulled into a phrase), brackets, and the operators AND, OR and NOT. A
+     * symbol such as {@code std::vector} stays.
      */
     public static String plainWords(String query) {
         List<String> kept = new ArrayList<>();
-        for (String word : query.split("\\s+")) {
-            String bare = word.replaceAll("^[-(\"]+", "");
-            if (QUALIFIER.matcher(bare).find() || OPERATORS.contains(word)) {
+        for (String word : query.replace('"', ' ').replace('(', ' ').replace(')', ' ').split("\\s+")) {
+            String bare = word.replaceAll("^-+", "");
+            if (bare.isEmpty() || SINGLE_COLON.matcher(bare).find() || OPERATORS.contains(word)) {
                 continue;
             }
-            kept.add(word.replace("(", " ").replace(")", " ").strip());
+            kept.add(word);
         }
-        return String.join(" ", kept).replaceAll("\\s+", " ").strip();
+        return String.join(" ", kept).strip();
     }
 
     /** The repository the call names, as the integration lists it; never one it doesn't. */

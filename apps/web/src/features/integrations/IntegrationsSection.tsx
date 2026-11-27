@@ -125,7 +125,8 @@ export function IntegrationsSection() {
       )}
       {adding === 'pick' && <AddIntegrationDialog connected={connected} onClose={() => setAdding(null)} onPick={setAdding} />}
       {adding === 'GITHUB' && <ConnectGitHubDialog onClose={() => setAdding(null)} onDone={added} />}
-      {adding === 'BITBUCKET' && <ConnectBitbucketDialog onClose={() => setAdding(null)} onDone={added} />}
+      {adding === 'BITBUCKET' && <ConnectBitbucketDialog onBack={() => setAdding('pick')} onClose={() => setAdding(null)}
+        onDone={added} />}
     </SettingsCard>
     </div>
   );
