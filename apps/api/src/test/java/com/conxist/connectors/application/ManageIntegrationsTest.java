@@ -205,11 +205,11 @@ class ManageIntegrationsTest {
         assertThatThrownBy(() -> manage.checkToken(gmail, null, "x"))
                 .isInstanceOf(RuleViolation.class).hasMessageContaining("Sign in with Google");
 
-        account = new IntegrationApi.Account("al…@acme.test", List.of());
+        account = new IntegrationApi.Account("al…@acme.test", List.of(), "a1b2");
         IntegrationViews.IntegrationView added = manage.addSignedIn(gmail, "1//refresh-abcd", List.of("*"),
                 Set.of("search_emails"));
         assertThat(added.repositories()).containsExactly("*");
-        assertThat(added.tokenEnding()).isEqualTo("abcd");
+        assertThat(added.tokenEnding()).as("the mailbox's mark, never part of the refresh token").isEqualTo("a1b2");
         assertThat(manage.check(added.id()).integration().repositories()).containsExactly("*");
 
         account = new IntegrationApi.Account("al…@acme.test", List.of("Customers", "Personal"));
@@ -219,6 +219,22 @@ class ManageIntegrationsTest {
                 .isInstanceOf(RuleViolation.class).hasMessageContaining("not both");
         assertThatThrownBy(() -> manage.pickRepositories(added.id(), List.of()))
                 .isInstanceOf(RuleViolation.class).hasMessageContaining("at least one label");
+    }
+
+    @Test
+    void gmail_signing_in_again_keeps_the_same_mailbox_and_its_labels() {
+        account = new IntegrationApi.Account("al…@acme.test", List.of("Customers"), "a1b2");
+        IntegrationViews.IntegrationView added = manage.addSignedIn(Integration.Kind.GMAIL, "1//one", List.of("Customers"),
+                Set.of("search_emails"));
+
+        account = new IntegrationApi.Account("sa…@other.test", List.of("Customers"), "ffff");
+        assertThatThrownBy(() -> manage.replaceSignedIn(added.id(), "1//other"))
+                .isInstanceOf(RuleViolation.class).hasMessageContaining("not the mailbox al…@acme.test");
+        account = new IntegrationApi.Account("al…@acme.test", List.of("Personal"), "a1b2");
+        assertThatThrownBy(() -> manage.replaceSignedIn(added.id(), "1//two"))
+                .isInstanceOf(RuleViolation.class).hasMessageContaining("none of the picked labels");
+        account = new IntegrationApi.Account("al…@acme.test", List.of("Customers", "Personal"), "a1b2");
+        assertThat(manage.replaceSignedIn(added.id(), "1//three").repositories()).containsExactly("Customers");
     }
 
     @Test

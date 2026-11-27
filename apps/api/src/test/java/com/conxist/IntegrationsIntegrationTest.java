@@ -143,6 +143,9 @@ class IntegrationsIntegrationTest {
                 .andExpect(content().string(Matchers.not(Matchers.containsString("fake-refresh"))));
 
         String body = "{\"signInId\":\"" + signIn + "\",\"labels\":%s,\"allowedTools\":[\"search_emails\"]}";
+        mvc.perform(post("/api/integrations/gmail").header(HEADER, workspace("Gmail outsider"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body.formatted("[\"Customers\"]")))
+                .andExpect(status().isNotFound());
         mvc.perform(post("/api/integrations/gmail").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
                         .content(body.formatted("[\"Secret\"]")))
                 .andExpect(status().isUnprocessableContent())
@@ -173,12 +176,53 @@ class IntegrationsIntegrationTest {
         mvc.perform(put("/api/integrations/{id}/google", integration).header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"signInId\":\"" + again + "\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.repositories[0]").value("*"));
+        google.mailbox("sam@other.test");
+        String other = signInWithGoogle(workspace, "{\"integrationId\":\"" + integration + "\"}");
+        mvc.perform(put("/api/integrations/{id}/google", integration).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"signInId\":\"" + other + "\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("integration.gmail-other-account"));
+        google.mailbox(FakeGoogleServer.EMAIL);
+        mvc.perform(get("/api/integrations/{id}", integration).header(HEADER, workspace))
+                .andExpect(jsonPath("$.account").value("al…@acme.test"));
         mvc.perform(get("/api/integrations/gmail/callback?state=unknown&code=x"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(Matchers.containsString("Back to ConXist")));
         assertThat(google.requests()).filteredOn(request -> request.contains("/gmail/"))
                 .allMatch(request -> request.startsWith("GET "));
     }
+
+    @Test
+    void a_google_sign_in_that_allows_more_than_reading_fails_and_its_answer_works_once() throws Exception {
+        String workspace = workspace("Gmail scopes");
+        google.grant(FakeGoogleServer.READONLY + " https://www.googleapis.com/auth/gmail.send");
+        try {
+            String signIn = signInWithGoogle(workspace, "{}");
+            mvc.perform(get("/api/integrations/gmail/sign-in/{id}", signIn).header(HEADER, workspace))
+                    .andExpect(jsonPath("$.status").value("FAILED"))
+                    .andExpect(jsonPath("$.error").value("scope-refused"));
+        } finally {
+            google.grant(FakeGoogleServer.READONLY);
+        }
+        String signIn = signInWithGoogle(workspace, "{}");
+        mvc.perform(get(lastCallback)).andExpect(status().isOk());
+        mvc.perform(get("/api/integrations/gmail/sign-in/{id}", signIn).header(HEADER, workspace))
+                .andExpect(jsonPath("$.status").value("READY"));
+
+        String denied = mvc.perform(post("/api/integrations/gmail/sign-in").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andReturn().getResponse().getContentAsString();
+        String state = org.springframework.web.util.UriComponentsBuilder
+                .fromUriString(JsonPath.read(denied, "$.signInUrl")).build().getQueryParams().getFirst("state");
+        mvc.perform(get("/api/integrations/gmail/callback?state=" + state + "&error=access_denied"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/integrations/gmail/sign-in/{id}", (String) JsonPath.read(denied, "$.id"))
+                        .header(HEADER, workspace))
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.error").value("sign-in-refused"));
+    }
+
+    private String lastCallback;
 
     /** Starts Sign in with Google, follows Google's page as a browser would, and lands on the callback. */
     private String signInWithGoogle(String workspace, String body) throws Exception {
@@ -190,7 +234,8 @@ class IntegrationsIntegrationTest {
                 java.net.http.HttpRequest.newBuilder(java.net.URI.create(JsonPath.read(started, "$.signInUrl")))
                         .build(), java.net.http.HttpResponse.BodyHandlers.discarding());
         java.net.URI back = java.net.URI.create(page.headers().firstValue("Location").orElseThrow());
-        mvc.perform(get(back.getPath() + "?" + back.getRawQuery()))
+        lastCallback = back.getPath() + "?" + back.getRawQuery();
+        mvc.perform(get(lastCallback))
                 .andExpect(status().isOk())
                 .andExpect(content().string(Matchers.containsString("Back to ConXist")));
         return JsonPath.read(started, "$.id");

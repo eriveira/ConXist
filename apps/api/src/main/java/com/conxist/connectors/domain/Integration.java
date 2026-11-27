@@ -19,7 +19,8 @@ import java.util.stream.Collectors;
  * @param repositories the repositories agents may read, as {@code owner/name}: for GitHub all the token reached when
  *                     last checked (the person picks them on GitHub), for Bitbucket the ones the person picked here;
  *                     for Gmail the labels agents may read, by name, or {@link GmailTools#ALL_MAIL} alone
- * @param tokenEnding  the token's last 4 characters, to tell tokens apart
+ * @param tokenEnding  the token's last 4 characters, to tell tokens apart; for Gmail the mailbox's mark instead
+ *                     (4 hex characters of its address's SHA-256), so no part of the refresh token is kept
  */
 public record Integration(UUID id, UUID workspaceId, Kind kind, String account, List<String> repositories,
         String tokenEnding, Set<String> allowedTools, Status status, Instant addedAt, Instant checkedAt) {

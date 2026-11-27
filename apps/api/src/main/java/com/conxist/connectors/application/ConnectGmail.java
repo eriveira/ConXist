@@ -1,6 +1,7 @@
 package com.conxist.connectors.application;
 
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -43,9 +44,10 @@ public final class ConnectGmail {
         this.workspace = workspace;
     }
 
-    /** Whether Gmail can be offered: only with a Google OAuth client set up. */
-    public boolean available() {
-        return google.configured();
+    /** The kinds this ConXist can connect: Gmail only with a Google OAuth client set up. */
+    public List<Integration.Kind> offeredKinds() {
+        return Arrays.stream(Integration.Kind.values())
+                .filter(kind -> kind != Integration.Kind.GMAIL || google.configured()).toList();
     }
 
     /** Starts a Google sign-in, for a new Gmail or for {@code integrationId} signing in again. */
@@ -89,11 +91,12 @@ public final class ConnectGmail {
                 signIns.save(signIn.ready(credential, gmail.account(credential)));
                 log.info("Workspace {} signed in to Google for Gmail", signIn.workspaceId());
             } catch (IntegrationApi.TokenRefused refused) {
-                signIns.save(signIn.failed("sign-in-refused"));
+                fail(signIn, "sign-in-refused", refused);
             } catch (IntegrationApi.Refused refused) {
-                signIns.save(signIn.failed("scope-refused"));
-            } catch (IntegrationApi.Unreachable | IntegrationApi.Missing unreachable) {
-                signIns.save(signIn.failed("unreachable"));
+                fail(signIn, "scope-refused", refused);
+            } catch (RuntimeException unreachable) {
+                // Missing, Unreachable, or anything unexpected: the app stops waiting instead of asking for 15 minutes.
+                fail(signIn, "unreachable", unreachable);
             }
         });
     }
@@ -119,6 +122,13 @@ public final class ConnectGmail {
         IntegrationViews.IntegrationView replaced = manage.replaceSignedIn(integrationId, signIn.credential());
         signIns.forget(signInId);
         return replaced;
+    }
+
+    /** Never logs the code, the token or Google's answer: only the workspace and what went wrong. */
+    private void fail(SignIn signIn, String error, RuntimeException cause) {
+        log.warn("Workspace {} could not finish signing in to Google: {} ({})", signIn.workspaceId(), error,
+                cause.getClass().getSimpleName());
+        signIns.save(signIn.failed(error));
     }
 
     private IntegrationApi.Account account(String credential) {

@@ -28,7 +28,17 @@ public interface IntegrationApi {
      */
     String call(Integration integration, String credential, String tool, Map<String, Object> arguments);
 
-    record Account(String login, List<String> repositories) {
+    /**
+     * What a credential reaches.
+     *
+     * @param tag a short mark that stays the same for the same account and differs for another one (Gmail's mailbox,
+     *            ADR 0021), kept in place of a token's ending; {@code null} keeps the token's last 4 characters
+     */
+    record Account(String login, List<String> repositories, String tag) {
+
+        public Account(String login, List<String> repositories) {
+            this(login, repositories, null);
+        }
     }
 
     /** A wrong argument: the words tell the model what to send instead. */

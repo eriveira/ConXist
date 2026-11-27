@@ -1,6 +1,5 @@
 package com.conxist.connectors.adapter.web;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -61,8 +60,7 @@ class IntegrationsController {
     /** What this ConXist can connect: Gmail only once a Google OAuth client is set up (ADR 0021). */
     @GetMapping("/kinds")
     List<Integration.Kind> kinds() {
-        return Arrays.stream(Integration.Kind.values())
-                .filter(kind -> kind != Integration.Kind.GMAIL || gmail.available()).toList();
+        return gmail.offeredKinds();
     }
 
     /** Starts Sign in with Google, for a new Gmail or for {@code integrationId} signing in again. */

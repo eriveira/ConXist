@@ -94,6 +94,8 @@ class HttpGmailApiTest {
         IntegrationApi.Account account = gmail.account(signIn());
 
         assertThat(account.login()).isEqualTo("al…@acme.test");
+        assertThat(account.tag()).isEqualTo(HttpGmailApi.tagOf("Alex@acme.test ")).hasSize(4)
+                .isNotEqualTo(HttpGmailApi.tagOf("sam@acme.test"));
         assertThat(account.repositories()).containsExactly("Customers", "Personal", "Product feedback");
     }
 
@@ -120,6 +122,31 @@ class HttpGmailApiTest {
                 Map.of("query", "refund"));
 
         assertThat(found.path("emails").findValuesAsString("id")).containsExactly("m5", "m3", "m2", "m1");
+        assertThat(call(integration(List.of(GmailTools.ALL_MAIL)), credential, "list_labels", Map.of())
+                .path("labels").toString()).isEqualTo("[\"Customers\",\"Personal\",\"Product feedback\"]");
+        assertThatThrownBy(() -> call(integration(List.of(GmailTools.ALL_MAIL)), credential, "search_emails",
+                Map.of("label", "SPAM"))).isInstanceOf(IntegrationApi.Problem.class)
+                .hasMessage("Use one of the allowed labels: Customers, Personal, Product feedback.");
+    }
+
+    @Test
+    void drops_in_words_in_any_form_and_reads_the_newest_of_each_label_in_turn_up_to_fifty() {
+        assertThat(GmailToolCalls.plainQuery(" refund -in:inbox (in:spam {in:trash IN:anywhere from:sam ")).isEqualTo("refund from:sam");
+        List<String> many = java.util.stream.IntStream.range(0, 60).mapToObj(i -> "a" + i).toList();
+        assertThat(GmailToolCalls.newestOfEach(List.of(List.of("b0", "b1"), many, List.of())))
+                .hasSize(GmailToolCalls.MAX_FETCHED).startsWith("b0", "a0", "b1", "a1", "a2");
+    }
+
+    @Test
+    void html_becomes_text_in_one_pass_even_when_it_is_hostile() {
+        assertThat(GmailToolCalls.fromHtml("<HEAD><title>x</title></HEAD><p>Caf&eacute; &#8217;ok&#x2019; &amp; "
+                + "<b>bold</b></p><SCRIPT>alert(1)</SCRIPT>\n\n\n<p>end"))
+                .isEqualTo("Caf&eacute; \u2019ok\u2019 & bold\n\nend");
+        String hostile = "<".repeat(1_000_000) + "<script" + "<a".repeat(500_000);
+        long started = System.nanoTime();
+        GmailToolCalls.fromHtml(hostile);
+        GmailToolCalls.fromHtml("<p>" + "<script>".repeat(200_000));
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - started)).isLessThan(java.time.Duration.ofSeconds(2));
     }
 
     @Test

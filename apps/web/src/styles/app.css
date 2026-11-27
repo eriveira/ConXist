@@ -183,8 +183,12 @@ a.btn.ghost { color: var(--cx-accent-text); }
 .m-body { overflow: auto; padding: 18px 20px; flex: 1; }
 .m-body h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
 .m-body .lead { margin: 0 0 14px; color: var(--cx-fg-muted); font-size: 14px; }
-.m-foot { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--cx-border); }
+.m-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--cx-border); }
 .m-foot .grow { flex: 1; }
+@media (max-width: 560px) {
+  .m-foot > .hint { flex-basis: 100%; order: -1; }
+  .m-foot > .btn.primary { flex-grow: 1; }
+}
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
 .field label { font-size: 13px; font-weight: 700; }
 .field input[type=text], .field input[type=password] {
@@ -203,6 +207,7 @@ a.btn.ghost { color: var(--cx-accent-text); }
 .alert.error { background: var(--cx-err-bg); color: var(--cx-err-fg); }
 .alert.ok { background: var(--cx-ok-bg); color: var(--cx-ok-fg); align-items: center; }
 .alert.info { background: var(--cx-accent-soft); color: var(--cx-accent-text); align-items: center; }
+.alert.warn { background: var(--cx-warn-bg); color: var(--cx-warn-fg); }
 .spin { flex: none; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }

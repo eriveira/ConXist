@@ -42,6 +42,7 @@ public final class FakeGoogleServer implements AutoCloseable {
     private final Set<String> refreshTokens = ConcurrentHashMap.newKeySet();
     private final Set<String> accessTokens = ConcurrentHashMap.newKeySet();
     private volatile String grantedScope = READONLY;
+    private volatile String mailbox = EMAIL;
 
     public FakeGoogleServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -68,6 +69,11 @@ public final class FakeGoogleServer implements AutoCloseable {
     /** What the next sign-ins grant, to try a person who allowed more than read-only Gmail. */
     public void grant(String scope) {
         grantedScope = scope;
+    }
+
+    /** The mailbox Gmail answers for from now on, to try signing in again with another one. */
+    public void mailbox(String address) {
+        mailbox = address;
     }
 
     /** Refuses every refresh token given so far, as when the person removes ConXist's access in Google. */
@@ -154,7 +160,7 @@ public final class FakeGoogleServer implements AutoCloseable {
             return;
         }
         if (path.equals("/profile")) {
-            send(exchange, 200, Map.of("emailAddress", EMAIL, "messagesTotal", 6));
+            send(exchange, 200, Map.of("emailAddress", mailbox, "messagesTotal", 6));
         } else if (path.equals("/labels")) {
             send(exchange, 200, Map.of("labels", List.of(
                     label("INBOX", "INBOX", "system"), label("SPAM", "SPAM", "system"),

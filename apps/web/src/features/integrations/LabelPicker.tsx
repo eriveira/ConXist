@@ -22,12 +22,13 @@ export function LabelPicker({ labels, choice, onChange, onCheckAgain, checking, 
   const name = useId();
   const ids = { some: useId(), all: useId() };
   return (
-    <div className="label-choice">
+    <fieldset className="label-choice">
+      <legend className="sr-only">{t('labels.legend')}</legend>
       <div className={`label-option${choice.all ? '' : ' on'}`}>
         <label className="radio">
           <input type="radio" name={name} checked={!choice.all} disabled={disabled} aria-describedby={ids.some}
             onChange={() => onChange({ ...choice, all: false })} />
-          <span><strong>{t('labels.some')}</strong> <Pill tone="info">{t('labels.recommended')}</Pill></span>
+          <span><strong>{t('labels.some')}</strong> <Pill tone="live">{t('labels.recommended')}</Pill></span>
         </label>
         <p id={ids.some} className="hint">{t('labels.some.help')}</p>
         {!choice.all && labels.length > 0 && (
@@ -47,11 +48,11 @@ export function LabelPicker({ labels, choice, onChange, onCheckAgain, checking, 
         <label className="radio">
           <input type="radio" name={name} checked={choice.all} disabled={disabled} aria-describedby={ids.all}
             onChange={() => onChange({ ...choice, all: true })} />
-          <strong>{t('labels.all')}</strong>
+          <span><strong>{t('labels.all')}</strong></span>
         </label>
         <p id={ids.all} className="hint">{t('labels.all.help')}</p>
       </div>
-    </div>
+    </fieldset>
   );
 }
 

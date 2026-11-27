@@ -85,10 +85,10 @@ export function ConnectGmailDialog({ integration, workspaceName, onBack, onClose
   const alert = problem && <p className="alert error" role="alert"><Icon name="alert" /> {problem}</p>;
   const cancel = <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</button>;
   const picked = choice.all || choice.picked.size > 0;
+  const waiting = google.state.phase === 'waiting' ? google.state : null;
   let body;
   let footer;
   if (step === 'connect') {
-    const waiting = google.state.phase === 'waiting' ? google.state : null;
     body = (
       <div className="m-body">
         <div className="mcp-found">
@@ -96,17 +96,30 @@ export function ConnectGmailDialog({ integration, workspaceName, onBack, onClose
           <h3>Gmail</h3>
         </div>
         <p>{t('gmail.connect.help')}</p>
-        {!integration && <p className="alert info"><Icon name="info" /> {t('gmail.connect.own', { workspace: workspaceName })}</p>}
-        <p className="hint">{t('gmail.connect.window')}</p>
-        {(waiting || (integration && busy)) && (
-          <p className="gmail-wait" role="status">
-            <span className="spin" aria-hidden="true" /> {t('gmail.connect.waiting')}
+        {!integration && (
+          <p className="alert warn">
+            <Icon name="alert" />
+            <span>
+              {t('gmail.connect.own.before')}<strong>{t('gmail.connect.own.strong')}</strong>
+              {t('gmail.connect.own.after', { workspace: workspaceName })}
+            </span>
           </p>
         )}
+        <p className="hint">{t('gmail.connect.window')}</p>
+        <div role="status">
+          {waiting && !waiting.blocked && (
+            <p className="gmail-wait"><span className="spin" aria-hidden="true" /> {t('gmail.connect.waiting')}</p>
+          )}
+          {waiting?.blocked && <p className="gmail-wait">{t('gmail.connect.blocked')}</p>}
+          {integration && busy && (
+            <p className="gmail-wait"><span className="spin" aria-hidden="true" /> {t('gmail.saving')}</p>
+          )}
+        </div>
         {waiting?.blocked && waiting.signIn.signInUrl && (
-          <p className="hint">
-            {t('gmail.connect.blocked')}{' '}
-            <a href={waiting.signIn.signInUrl} target="_blank" rel="noreferrer noopener">{t('gmail.connect.openLink')}</a>
+          <p>
+            <a className="btn primary" href={waiting.signIn.signInUrl} target="_blank" rel="noreferrer noopener">
+              {t('gmail.connect.openLink')}
+            </a>
           </p>
         )}
         {alert}
@@ -116,12 +129,19 @@ export function ConnectGmailDialog({ integration, workspaceName, onBack, onClose
       <>
         {onBack && <button type="button" className="btn ghost" onClick={onBack} disabled={busy}>{t('dialog.backStep')}</button>}
         <span className="grow" />
-        {cancel}
-        <button type="button" className="btn primary" disabled={busy || google.starting || google.state.phase === 'waiting'}
-          onClick={() => { setError(null); google.start(); }}>
-          <McpLogo name="Gmail" icon={GMAIL_ICON} size="sm" />{' '}
-          {google.starting ? t('gmail.connect.starting') : t('gmail.connect.go')}
-        </button>
+        {waiting ? (
+          <>
+            <button type="button" className="btn" onClick={() => google.reset()}>{t('gmail.connect.cancel')}</button>
+          </>
+        ) : (
+          <>
+            {!onBack && cancel}
+            <button type="button" className="btn primary" disabled={busy || google.starting}
+              onClick={() => { setError(null); google.start(); }}>
+              {google.starting ? t('gmail.connect.starting') : t('gmail.connect.go')}
+            </button>
+          </>
+        )}
       </>
     );
   } else if (step === 'labels' && signIn) {
@@ -203,7 +223,7 @@ export function ConnectGmailDialog({ integration, workspaceName, onBack, onClose
       footer={footer}
     >
       {!integration && (
-        <Stepper steps={[t('github.step.connect'), t('gmail.step.labels'), t('github.step.tools')]} current={current} />
+        <Stepper steps={[t('github.step.connect'), t('gmail.step.labelsShort'), t('github.step.tools')]} current={current} />
       )}
       {body}
     </Dialog>

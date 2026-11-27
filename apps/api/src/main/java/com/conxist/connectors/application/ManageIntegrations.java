@@ -90,7 +90,7 @@ public final class ManageIntegrations {
         List<String> reachable = kind.picksRepositories() ? picked(kind, repositories, account.repositories())
                 : account.repositories();
         Integration integration = new Integration(UUID.randomUUID(), workspaceId, kind, account.login(), reachable,
-                Integration.endingOf(IntegrationCredentials.tokenOf(credential)), allowed, Integration.Status.WORKS,
+                ending(credential, account), allowed, Integration.Status.WORKS,
                 clock.instant(), clock.instant());
         if (!integrations.insertIfKindFree(integration, credential)) {
             throw taken(kind);
@@ -180,6 +180,13 @@ public final class ManageIntegrations {
 
     private IntegrationViews.IntegrationView replace(Integration integration, String credential) {
         IntegrationApi.Account account = account(integration.kind(), credential);
+        if (account.tag() != null && !account.tag().equals(integration.tokenEnding())) {
+            log.info("Workspace {} signed in again to integration {} with another account; nothing changed",
+                    integration.workspaceId(), integration.id());
+            throw new InvalidIntegration(integration.kind().code("other-account"), "This is not the mailbox "
+                    + integration.account() + ". Sign in with that one, or remove " + integration.name()
+                    + " and connect the other.");
+        }
         List<String> reachable = stillReachable(integration, account);
         if (reachable.isEmpty()) {
             throw new InvalidIntegration(integration.kind().code("repositories-lost"),
@@ -188,8 +195,8 @@ public final class ManageIntegrations {
                             : "This token reaches none of the picked repositories. Use a token of an account that can"
                                     + " see them.");
         }
-        Integration replaced = integration.checked(account.login(), reachable,
-                Integration.endingOf(IntegrationCredentials.tokenOf(credential)), clock.instant());
+        Integration replaced = integration.checked(account.login(), reachable, ending(credential, account),
+                clock.instant());
         integrations.replaceToken(replaced, credential);
         log.info("Workspace {} replaced the token of integration {}", integration.workspaceId(), integration.id());
         return views.view(replaced);
@@ -255,6 +262,11 @@ public final class ManageIntegrations {
             picked.add(found);
         }
         return List.copyOf(picked);
+    }
+
+    /** The token's last 4 characters, or the account's own mark when it has one (Gmail: never part of a token). */
+    private static String ending(String credential, IntegrationApi.Account account) {
+        return account.tag() != null ? account.tag() : Integration.endingOf(IntegrationCredentials.tokenOf(credential));
     }
 
     private IntegrationApi.Account account(Integration.Kind kind, String credential) {

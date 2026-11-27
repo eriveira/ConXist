@@ -159,8 +159,10 @@
 .label-choice { display: grid; gap: 10px; }
 .label-option { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); padding: 8px 14px 12px; min-width: 0; }
 .label-option.on { border-color: var(--cx-accent); }
-.label-option .radio { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; flex-wrap: wrap; }
-.label-option .radio input { width: 18px; height: 18px; accent-color: var(--cx-accent); flex: none; margin: 0; }
+.label-choice { border: 0; margin: 0; padding: 0; min-width: 0; }
+.label-option .radio { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding-top: 12px; cursor: pointer; }
+.label-option .radio > span { min-width: 0; }
+.label-option .radio input { width: 18px; height: 18px; accent-color: var(--cx-accent); flex: none; margin: 2px 0 0; }
 .label-option > .hint { margin: 0 0 8px 28px; }
 .label-option .repo-picker { margin-top: 6px; }
 .gmail-wait { display: flex; align-items: center; gap: 10px; }

@@ -79,6 +79,26 @@ describe('Settings › Integrations › Gmail', () => {
     expect(bodyOf(calls, 'POST /api/integrations/gmail')).toEqual({ signInId: 's1', labels: ['Customers'], allowedTools: NAMES });
   }, 10_000);
 
+  it('stops waiting when the Google window is closed before the sign-in ends, and can cancel', async () => {
+    stubApi({
+      'GET /api/integrations/kinds': () => ({ body: ['GMAIL'] }),
+      'GET /api/integrations': () => ({ body: [] }),
+      'POST /api/integrations/gmail/sign-in': () => ({ body: SIGNING_IN }),
+      'GET /api/integrations/gmail/sign-in/s1': () => ({ body: SIGNING_IN }),
+    });
+    open('#/settings/integrations');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
+    await userEvent.click(screen.getByRole('button', { name: /Gmail/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Connect Gmail' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sign in with Google' }));
+    expect(await within(dialog).findByRole('button', { name: 'Cancel sign-in' })).toBeInTheDocument();
+
+    (popup as unknown as { closed: boolean }).closed = true;
+    expect(await within(dialog).findByRole('alert', {}, { timeout: 5000 }))
+      .toHaveTextContent('The Google window was closed before you finished. Try again.');
+    expect(within(dialog).getByRole('button', { name: 'Sign in with Google' })).toBeEnabled();
+  }, 10_000);
+
   it('says so when Google allowed more than reading email', async () => {
     stubApi({
       'GET /api/integrations/kinds': () => ({ body: ['GITHUB', 'BITBUCKET', 'GMAIL'] }),

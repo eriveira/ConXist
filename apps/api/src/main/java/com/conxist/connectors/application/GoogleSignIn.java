@@ -17,8 +17,8 @@ public interface GoogleSignIn {
     /**
      * Trades the code Google sent back for a refresh token, the credential ConXist keeps.
      *
-     * @throws IntegrationApi.TokenRefused when Google refuses the code, or the person allowed more or less than
-     *                                     read-only Gmail
+     * @throws IntegrationApi.TokenRefused when Google refuses the code, or sends no refresh token
+     * @throws IntegrationApi.Refused      when the person allowed more or less than read-only Gmail
      * @throws IntegrationApi.Unreachable  when Google can't be reached
      */
     String exchange(String code, String verifier);

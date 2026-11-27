@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
 import {
-  INTEGRATION_KINDS, type Integration, type IntegrationKind, integrationUsers, kindIcon,
+  INTEGRATION_KINDS, type Integration, type IntegrationKind, integrationUsers, kindIcon, readsAllMail,
 } from '../../domain/integrations';
 import { allowedTools } from '../../domain/mcps';
 import { type Translate, useT } from '../../i18n/i18n';
@@ -140,14 +140,22 @@ export function IntegrationsSection({ workspaceName }: { workspaceName: string }
   );
 }
 
+/** Gmail's labels by name, the first three and how many more, or all email. */
+function labelNames(integration: Integration, t: Translate): string {
+  if (readsAllMail(integration)) return t('integration.allMail');
+  const names = integration.repositories;
+  const more = names.length > 3 ? ` +${names.length - 3}` : '';
+  return t('integration.labelNames', { names: names.slice(0, 3).join(', ') + more });
+}
+
 /** Whose token, what it reaches, how many tools agents may use, and who uses them. */
 export function summary(integration: Integration, t: Translate): string {
   const users = integrationUsers(integration);
   const gmail = integration.kind === 'GMAIL';
   return [
     integration.account,
-    reach(integration, t),
-    gmail ? t('integration.readOnly') : t('integration.tokenEnding', { ending: integration.tokenEnding }),
+    gmail ? labelNames(integration, t) : reach(integration, t),
+    ...(gmail ? [] : [t('integration.tokenEnding', { ending: integration.tokenEnding })]),
     t('mcp.allowedCount', { count: allowedTools(integration).length, total: integration.tools.length }),
     users.length ? t('mcp.usedBy', { names: users.join(', ') }) : t('mcp.unused'),
   ].join(' · ');

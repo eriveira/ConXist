@@ -75,7 +75,7 @@ export function PickLabelsDialog({ integration, onClose, onDone }: {
           </>
         )}
         {lost.length > 0 && (
-          <p className="alert info" role="status">
+          <p className="alert warn" role="status">
             <Icon name="alert" /> {t(lost.length === 1 ? 'integration.labels.lost_one' : 'integration.labels.lost', { names: lost.join(', ') })}
           </p>
         )}

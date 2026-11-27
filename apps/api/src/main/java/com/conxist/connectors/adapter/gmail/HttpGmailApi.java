@@ -72,12 +72,20 @@ public final class HttpGmailApi implements IntegrationApi {
         }
         labels.sort(String.CASE_INSENSITIVE_ORDER);
         return new Account(masked(address), List.copyOf(labels.size() > Integration.MAX_REPOSITORIES
-                ? labels.subList(0, Integration.MAX_REPOSITORIES) : labels));
+                ? labels.subList(0, Integration.MAX_REPOSITORIES) : labels), tagOf(address));
     }
 
     @Override
     public String call(Integration integration, String credential, String tool, Map<String, Object> arguments) {
         return tools.call(integration, credential, tool, arguments);
+    }
+
+    /**
+     * The mailbox's mark: 4 hex characters of the SHA-256 of its address. Signing in again with another mailbox shows
+     * a different mark (1 in 65,536 could match), so ConXist never keeps any part of the refresh token in the clear.
+     */
+    static String tagOf(String address) {
+        return hash(address.strip().toLowerCase(java.util.Locale.ROOT)).substring(0, 4);
     }
 
     /** {@code alex@acme.test} as {@code al…@acme.test}: enough to tell mailboxes apart. */

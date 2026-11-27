@@ -59,8 +59,15 @@ export function useGoogleSignIn(t: Translate, integrationId?: string) {
         stop(t('gmail.failed.sign-in-refused'));
         return;
       }
+      // Google's window closes only after ConXist has its answer, so one asked after it closed and still waiting means
+      // the person closed it before finishing.
+      const closedBefore = popup.current?.closed === true;
       void api.gmailSignIn(waitingId).then((signIn) => {
-        if (stopped || signIn.status === 'SIGNING_IN') return;
+        if (stopped) return;
+        if (signIn.status === 'SIGNING_IN') {
+          if (closedBefore) stop(t('gmail.connect.closed'));
+          return;
+        }
         if (signIn.status === 'READY') {
           stopped = true;
           window.clearInterval(timer);
