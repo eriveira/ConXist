@@ -173,7 +173,7 @@ describe('Settings › MCPs', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
     const dialog = screen.getByRole('dialog', { name: 'Remove Acme Docs?' });
-    expect(within(dialog).getByText(/Researcher use its tools/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Researcher uses its tools/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeDisabled();
   });
 });

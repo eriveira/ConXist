@@ -94,6 +94,7 @@ export const mcpEn = {
   'mcp.remove.subtitle': 'ConXist forgets its sign-in and its tools.',
   'mcp.remove.unused': 'No agent uses it.',
   'mcp.remove.used': '{names} use its tools. Turn them off in those agents first.',
+  'mcp.remove.used_one': '{names} uses its tools. Turn them off in that agent first.',
   'mcp.remove.go': 'Remove',
   'mcp.remove.busy': 'Removing…',
 
@@ -225,6 +226,7 @@ export const mcpEs: Record<keyof typeof mcpEn, string> = {
   'mcp.remove.subtitle': 'ConXist olvida su inicio de sesión y sus herramientas.',
   'mcp.remove.unused': 'Ningún agente lo usa.',
   'mcp.remove.used': '{names} usan sus herramientas. Desactívalas primero en esos agentes.',
+  'mcp.remove.used_one': '{names} usa sus herramientas. Desactívalas primero en ese agente.',
   'mcp.remove.go': 'Quitar',
   'mcp.remove.busy': 'Quitando…',
 

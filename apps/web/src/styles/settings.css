@@ -116,7 +116,7 @@
 .mcp-head h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 19px; font-weight: 800; overflow-wrap: anywhere; }
 .mcp-address { overflow-wrap: anywhere; }
 .mcp-actions { justify-content: flex-start; margin: 0 0 8px; }
-.mcp-found { display: flex; align-items: center; gap: 12px; }
+.mcp-found { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .mcp-found h3 { margin: 0; overflow-wrap: anywhere; }
 .mcp-selrow { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 13.5px; }
 .mcp-wait { display: flex; gap: 8px; align-items: center; }

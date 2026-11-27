@@ -50,7 +50,7 @@ export function RemoveMcpDialog({ server, onClose, onRemoved }: {
       <div className="m-body">
         {error && <p className="alert error" role="alert"><Icon name="alert" /> {error}</p>}
         {users.length > 0
-          ? <p className="alert info"><Icon name="alert" /> {t('mcp.remove.used', { names: users.join(', ') })}</p>
+          ? <p className="alert info"><Icon name="alert" /> {t(users.length === 1 ? 'mcp.remove.used_one' : 'mcp.remove.used', { names: users.join(', ') })}</p>
           : <p>{t('mcp.remove.unused')}</p>}
       </div>
     </Dialog>
