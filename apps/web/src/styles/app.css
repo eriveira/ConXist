@@ -39,7 +39,9 @@ button { cursor: pointer; }
 /* dotted canvas behind every page, as in the agreed mock (the old canvas drew 22 px dots) */
 :root { --canvas-dot-gap: 22px; --canvas-dot-size: 1.2px; }
 .stage {
-  position: relative; min-height: 0; overflow: auto; padding-bottom: 72px;
+  position: relative; min-height: 0; overflow: auto;
+  /* room under the last control for the Ask ConXist button (56 px, 24 px from the bottom) */
+  padding-bottom: 104px;
   background-image: radial-gradient(circle, var(--cx-canvas-dot) var(--canvas-dot-size), transparent calc(var(--canvas-dot-size) + .4px));
   background-size: var(--canvas-dot-gap) var(--canvas-dot-gap);
 }

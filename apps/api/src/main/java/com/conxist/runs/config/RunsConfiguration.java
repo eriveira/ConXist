@@ -7,6 +7,7 @@ import com.conxist.capture.MeetingLibrary;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.runs.adapter.model.ClaudeModel;
 import com.conxist.runs.adapter.model.JsonAnswerReader;
+import com.conxist.runs.adapter.model.OpenAiModel;
 import com.conxist.runs.application.AllowModel;
 import com.conxist.runs.application.AllowedModelsRepository;
 import com.conxist.runs.application.AnswerReader;
@@ -20,18 +21,25 @@ import com.conxist.runs.application.ProviderModelLists;
 import com.conxist.runs.application.RunTools;
 import com.conxist.runs.application.StartTestRun;
 import com.conxist.sources.SourceCatalog;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 
-/** Wires test runs and LLM providers: the read tools, Claude as the model, keys, model lists, and the use cases. */
+/** Wires test runs and LLM providers: the read tools, Claude and OpenAI as the models, keys, model lists, and the use cases. */
 @Configuration(proxyBeanMethods = false)
 class RunsConfiguration {
 
+    /** The providers, in the order Settings lists them (ADR 0014). */
     @Bean
-    @ConditionalOnMissingBean(ModelPort.class)
+    @Order(1)
     ModelPort claudeModel(RunsProperties properties) {
         return new ClaudeModel(properties.anthropicBaseUrl());
+    }
+
+    @Bean
+    @Order(2)
+    ModelPort openAiModel(RunsProperties properties) {
+        return new OpenAiModel(properties.openaiBaseUrl());
     }
 
     /** A workspace's own key first; else the key set on this computer, when there is one. */

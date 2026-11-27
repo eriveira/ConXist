@@ -9,10 +9,11 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 
 /**
  * Points the API at a {@link FakePlaudServer} (Teams) and a {@link FakePlaudMcpServer} (Sign in with Plaud, which
- * approves at once) on localhost, test runs at a {@link FakeClaudeServer}, and gives it a throwaway secrets key. Used
+ * approves at once) on localhost, test runs at a {@link FakeClaudeServer} and a {@link FakeOpenAiServer}, and gives it a throwaway secrets key. Used
  * by the integration tests and by {@code mvn spring-boot:test-run} (Client ID {@code demo-team} works with any key).
  * The fake Claude takes any key that starts with {@code sk-ant-fake-}; it is also this computer's key unless
- * {@code CONXIST_FAKE_COMPUTER_KEY=false}, to try Settings with no key at all.
+ * {@code CONXIST_FAKE_COMPUTER_KEY=false}, to try Settings with no key at all. The fake OpenAI takes any key that
+ * starts with {@code sk-fake-} and is never this computer's key.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class FakePlaudConfiguration {
@@ -32,9 +33,14 @@ public class FakePlaudConfiguration {
         return new FakeClaudeServer();
     }
 
+    @Bean(destroyMethod = "close")
+    FakeOpenAiServer fakeOpenAi() throws IOException {
+        return new FakeOpenAiServer();
+    }
+
     @Bean
     DynamicPropertyRegistrar fakePlaudProperties(FakePlaudServer fake, FakePlaudMcpServer mcp,
-            FakeClaudeServer claude) {
+            FakeClaudeServer claude, FakeOpenAiServer openAi) {
         byte[] key = new byte[32];
         new SecureRandom().nextBytes(key);
         String secretsKey = Base64.getEncoder().encodeToString(key);
@@ -47,6 +53,9 @@ public class FakePlaudConfiguration {
             registry.add("conxist.runs.anthropic-base-url", () -> claude.baseUrl().toString());
             registry.add("conxist.runs.anthropic-api-key",
                     () -> "false".equals(System.getenv("CONXIST_FAKE_COMPUTER_KEY")) ? "" : FakeClaudeServer.KEY);
+            // OpenAI has no key on this computer, so a workspace connects its own (any key that starts with sk-fake-).
+            registry.add("conxist.runs.openai-base-url", () -> openAi.baseUrl().toString());
+            registry.add("conxist.runs.openai-api-key", () -> "");
         };
     }
 }

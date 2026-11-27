@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A model that takes one turn of a run. Vendor-neutral: the only adapter today is Claude (ADR 0012), and another
- * provider plugs in here without touching the run.
+ * A model that takes one turn of a run. Vendor-neutral: Claude (ADR 0012) and OpenAI (ADR 0014) plug in here without
+ * touching the run.
  */
 public interface ModelPort {
 
