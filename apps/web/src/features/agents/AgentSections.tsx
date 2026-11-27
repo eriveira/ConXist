@@ -13,6 +13,7 @@ import { type Translate, toolDescription, toolLabel, useT } from '../../i18n/i18
 import { MESSAGES, type MessageKey } from '../../i18n/messages';
 import { SOURCES_HREF } from '../../navigation';
 import type { Choices } from './AgentPage';
+import { AgentMcpTools } from './AgentMcpTools';
 import { AgentModelPicker } from './AgentModelPicker';
 import { AgentSkills } from './AgentSkills';
 import { Counter, FieldError, Section } from './FormParts';
@@ -115,9 +116,12 @@ export function AgentSections({ draft, pinned, onChange, disabled, choices, onRe
 
       <Section number={6} title={t('agent.section.tools')} lead={t('agent.section.tools.lead')}>
         <ChoicesState choices={choices} onRetry={onRetryChoices}>
-          {({ tools, skills }) => {
+          {({ tools, skills, mcps }) => {
             const rows = skillRows(draft.skills, pinned, skills);
+            const grouped = mcps.some((server) => server.tools.some((tool) => tool.allowed));
             return (
+          <>
+          {grouped && <h4 className="tool-group">{t('agent.tools.conxist')}</h4>}
           <div className="choice">
             {tools.map((tool) => {
               const on = draft.tools.includes(tool.id);
@@ -141,6 +145,8 @@ export function AgentSections({ draft, pinned, onChange, disabled, choices, onRe
               );
             })}
           </div>
+          <AgentMcpTools draft={draft} servers={mcps} onChange={onChange} />
+          </>
             );
           }}
         </ChoicesState>

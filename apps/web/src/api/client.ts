@@ -4,6 +4,7 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
+import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
 import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels, Topic } from '../domain/settings';
 import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
@@ -98,6 +99,10 @@ export interface NewAgent {
 const agentPath = (agentId: string) => `/api/agents/${encodeURIComponent(agentId)}`;
 const skillPath = (skillId: string) => `/api/skills/${encodeURIComponent(skillId)}`;
 
+function mcpPath(serverId: string): string {
+  return `/api/mcps/${encodeURIComponent(serverId)}`;
+}
+
 export const api = {
   workspaces: () => request<Workspace[]>('/api/workspaces'),
   createWorkspace: (workspace: NewWorkspace) => postJson<Workspace>('/api/workspaces', workspace),
@@ -108,6 +113,20 @@ export const api = {
   addTopic: (topic: Omit<Topic, 'id'>) => postJson<Topic>('/api/topics', topic),
   changeTopic: (topicId: string, topic: Omit<Topic, 'id'>) => putJson<Topic>(`/api/topics/${encodeURIComponent(topicId)}`, topic),
   removeTopic: (topicId: string) => request<void>(`/api/topics/${encodeURIComponent(topicId)}`, { method: 'DELETE' }),
+  mcps: () => request<McpServer[]>('/api/mcps'),
+  mcp: (serverId: string) => request<McpServer>(mcpPath(serverId)),
+  /** Checks the address and finds how to sign in; with a token, checks it. `serverId` signs an added server in again. */
+  startMcpConnection: (start: { address?: string; token?: string; serverId?: string }) =>
+    postJson<McpConnection>('/api/mcps/connections', start),
+  mcpConnection: (connectionId: string) => request<McpConnection>(`/api/mcps/connections/${encodeURIComponent(connectionId)}`),
+  addMcp: (connectionId: string, name: string, allowedTools: string[]) =>
+    postJson<McpServer>('/api/mcps', { connectionId, name, allowedTools }),
+  updateMcp: (serverId: string, name: string, allowedTools: string[]) =>
+    putJson<McpServer>(mcpPath(serverId), { name, allowedTools }),
+  checkMcp: (serverId: string) => postJson<McpCheck>(`${mcpPath(serverId)}/check`, {}),
+  mcpSignedIn: (serverId: string, connectionId: string) =>
+    postJson<McpServer>(`${mcpPath(serverId)}/credential`, { connectionId }),
+  removeMcp: (serverId: string) => request<void>(mcpPath(serverId), { method: 'DELETE' }),
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
   /** Where this workspace's new blank agents start; agents already made keep their own pick. */
   setDefaultModel: (pick: AgentModel) => putJson<LlmProviders>('/api/llm-providers/default', pick),

@@ -5,6 +5,7 @@ import { type AgentDefinition, type AgentToolInfo, localProblems } from '../../d
 import { type PinnedSkill, SKILL_PROBLEMS, type SkillSummary, skillRowProblems, skillRows } from '../../domain/skills';
 import type { Source } from '../../domain/model';
 import { type LlmProviders, modelAvailable } from '../../domain/settings';
+import { type McpServer, pickAllowed } from '../../domain/mcps';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { AGENTS_HREF, goWithNotice } from '../../navigation';
@@ -20,7 +21,7 @@ import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
 export type Choices =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[]; providers: LlmProviders };
+  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[]; providers: LlmProviders; mcps: McpServer[] };
 
 type Busy = 'publish' | 'archive' | null;
 
@@ -43,8 +44,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
 
   const loadChoices = useCallback(() => {
     setChoices({ status: 'loading' });
-    Promise.all([api.sources(), api.agentTools(), api.skills(), api.llmProviders()])
-      .then(([sources, tools, skills, providers]) => setChoices({ status: 'ready', sources, tools, skills, providers }))
+    Promise.all([api.sources(), api.agentTools(), api.skills(), api.llmProviders(), api.mcps()])
+      .then(([sources, tools, skills, providers, mcps]) => setChoices({ status: 'ready', sources, tools, skills, providers, mcps }))
       .catch(() => setChoices({ status: 'error' }));
   }, []);
 
@@ -180,14 +181,16 @@ export function AgentPage({ agentId }: { agentId: string }) {
 }
 
 const MODEL_PROBLEMS = ['model-required', 'model-unavailable'];
+const MCP_PROBLEM = 'mcp-tool-unavailable';
 
 /**
- * The server's problems describe the saved draft. Once the choices are in, the skill and model problems are worked
- * out from what is on screen instead, so adding a tool, removing a skill or picking a model clears them at once.
+ * The server's problems describe the saved draft. Once the choices are in, the skill, model and MCP tool problems are
+ * worked out from what is on screen instead, so adding a tool, removing a skill or picking a model clears them at once.
  */
 function currentProblems(saved: string[], draft: AgentDefinition, pinned: PinnedSkill[], choices: Choices): string[] {
   if (choices.status !== 'ready') return saved;
   const modelProblem = draft.model && !modelAvailable(choices.providers, draft.model) ? ['model-unavailable'] : [];
-  return [...saved.filter((code) => !SKILL_PROBLEMS.includes(code) && !MODEL_PROBLEMS.includes(code)),
-    ...modelProblem, ...skillRowProblems(skillRows(draft.skills, pinned, choices.skills), draft.tools)];
+  const mcpProblem = draft.mcpTools.some((pick) => !pickAllowed(choices.mcps, pick)) ? [MCP_PROBLEM] : [];
+  return [...saved.filter((code) => !SKILL_PROBLEMS.includes(code) && !MODEL_PROBLEMS.includes(code) && code !== MCP_PROBLEM),
+    ...modelProblem, ...mcpProblem, ...skillRowProblems(skillRows(draft.skills, pinned, choices.skills), draft.tools)];
 }

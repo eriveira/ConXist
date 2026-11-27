@@ -1,3 +1,4 @@
+import type { McpToolPick } from './mcps';
 import type { PinnedSkill, SkillPin } from './skills';
 
 /** What an agent accepts and gives back; a flow connects agents whose shapes match. */
@@ -33,6 +34,8 @@ export interface AgentDefinition {
   /** The skills it follows, each at a fixed version. */
   skills: SkillPin[];
   tools: string[];
+  /** Tools of the workspace's MCP servers (ADR 0017). */
+  mcpTools: McpToolPick[];
   /** Null only for an agent saved before agents picked their own model, until someone picks one. */
   model: AgentModel | null;
   style: Style;

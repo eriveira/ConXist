@@ -6,8 +6,9 @@ import { SETTINGS_SECTIONS, settingsHref, useSettingsSection } from '../../navig
 import { GeneralSection } from './GeneralSection';
 import { LlmProvidersSection } from './LlmProvidersSection';
 import { TopicsSection } from './TopicsSection';
+import { McpsSection } from '../mcps/McpsSection';
 
-/** A workspace's Settings, opened from the workspace menu: General, LLM providers and Topics. */
+/** A workspace's Settings, opened from the workspace menu: General, LLM providers, MCPs and Topics. */
 export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onSaved: (workspace: Workspace) => void }) {
   const t = useT();
   const section = useSettingsSection();
@@ -33,6 +34,7 @@ export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onS
         <div className="settings-content">
           {section === 'general' && <GeneralSection workspace={workspace} onSaved={onSaved} />}
           {section === 'llm' && <LlmProvidersSection />}
+          {section === 'mcps' && <McpsSection />}
           {section === 'topics' && <TopicsSection />}
         </div>
       </div>

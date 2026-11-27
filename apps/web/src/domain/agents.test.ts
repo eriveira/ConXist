@@ -1,7 +1,7 @@
 import { type AgentDefinition, type AgentSummary, limitInRange, localProblems, sortAgents, stateOf, toggled } from './agents';
 
 const DRAFT: AgentDefinition = {
-  name: 'Summarizer', purpose: '', instructions: 'Summarize.', knowledgeSources: [], skills: [], tools: [], model: { provider: 'anthropic', model: 'claude-sonnet-5-5', effort: 'MEDIUM' },
+  name: 'Summarizer', purpose: '', instructions: 'Summarize.', knowledgeSources: [], skills: [], tools: [], mcpTools: [], model: { provider: 'anthropic', model: 'claude-sonnet-5-5', effort: 'MEDIUM' },
   style: 'PRECISE', accepts: ['TRANSCRIPT'], givesBack: 'SUMMARY', limits: { maxSteps: 6, timeoutSeconds: 120, maxToolCalls: 10 },
 };
 

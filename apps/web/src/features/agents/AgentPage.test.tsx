@@ -22,7 +22,7 @@ const SKILLS: SkillSummary[] = [
 ];
 const DRAFT: AgentDefinition = {
   name: 'Summarizer', purpose: 'Summarizes meetings.', instructions: 'Summarize the meeting.', knowledgeSources: [], skills: [],
-  tools: ['GET_TRANSCRIPT'], model: { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }, style: 'PRECISE', accepts: ['TRANSCRIPT'], givesBack: 'SUMMARY',
+  tools: ['GET_TRANSCRIPT'], mcpTools: [], model: { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }, style: 'PRECISE', accepts: ['TRANSCRIPT'], givesBack: 'SUMMARY',
   limits: { maxSteps: 6, timeoutSeconds: 120, maxToolCalls: 10 },
 };
 const AGENT: Agent = {
@@ -37,6 +37,7 @@ function api(agent: Agent, routes: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/agents/tools': () => ({ body: TOOLS }),
     'GET /api/skills': () => ({ body: SKILLS }),
     'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
+    'GET /api/mcps': () => ({ body: [] }),
     'GET /api/test-runs/status': () => ({ body: { ready: true } }),
     [`GET /api/sources/${SOURCE.id}/documents`]: () => ({ body: [] }),
     ...routes,
@@ -310,6 +311,35 @@ describe('AgentPage', () => {
     await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
     expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.skills).toEqual([{ skillId: STYLE_ID, version: 3 }]);
     expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
+  });
+
+  it('offers the tools each MCP server allows, saves a pick, and flags one the workspace no longer allows', async () => {
+    const serverId = '66666666-6666-6666-6666-666666666666';
+    const server = {
+      id: serverId, name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'NONE', icon: null, status: 'WORKS',
+      addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
+      tools: [
+        { name: 'search_docs', title: 'Search', description: 'Finds docs.', readOnly: true, allowed: true, usedBy: [] },
+        { name: 'create_doc', title: 'Create', description: 'Makes a doc.', readOnly: false, allowed: false, usedBy: [] },
+      ],
+    };
+    const calls = api({ ...AGENT, draft: { ...DRAFT, mcpTools: [{ serverId, tool: 'old_tool' }] }, problems: ['mcp-tool-unavailable'] }, {
+      'GET /api/mcps': () => ({ body: [server] }),
+      [`PUT /api/agents/${ID}/draft`]: (init) => ({ body: { ...AGENT, revision: 2, draft: JSON.parse(String(init?.body)).draft } }),
+    });
+    const { container } = render(<AgentPage agentId={ID} />);
+
+    const group = await screen.findByRole('group', { name: /Acme Docs/ });
+    expect(within(group).queryByRole('checkbox', { name: /create_doc/ })).not.toBeInTheDocument();
+    expect(screen.getByText('old_tool from an MCP server is no longer allowed.')).toBeInTheDocument();
+    expect(screen.getByText('Before you publish').parentElement).toHaveTextContent('Remove the MCP tools that are no longer allowed.');
+    expect(screen.getByRole('link', { name: 'Settings › MCPs' })).toHaveAttribute('href', '#/settings/mcps');
+    expect(await accessibilityViolations(container)).toEqual([]);
+
+    await userEvent.click(within(group).getByRole('checkbox', { name: /search_docs/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
+    expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.mcpTools).toEqual([{ serverId, tool: 'search_docs' }]);
   });
 
   it('says why a save was refused', async () => {
