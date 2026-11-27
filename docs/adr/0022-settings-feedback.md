@@ -43,9 +43,14 @@ when ticked; the tick is the approval (no approval per change).
   asked for it, and to say what it changed (`2026-11-27.5`). A later Check keeps a tick only while the tool stays what
   it was when ticked: a read tool that now changes things, or a tool that changes things whose description or input
   schema changed, is unticked.
-- **The site's icon for a server with no logo.** When `serverInfo` names no usable icon, ConXist tries
-  `/apple-touch-icon.png`, then `/favicon.ico`, on the server's host and then on its parent domain, through the same
-  address guard, with no redirects, image types only and up to 100 KB. Check refreshes it for servers already added.
+- **The site's icon for a server with no logo.** When `serverInfo` names no usable icon, ConXist reads the home page of
+  the server's host, then of its parent domain (mcp.acme.com, then acme.com), for the icons it links
+  (`<link rel="…icon…">`, touch icons first), then tries `/apple-touch-icon.png` and `/favicon.ico` there. It follows
+  up to 3 redirects (sites often send acme.com to www.acme.com), and every address passes the same guard as the
+  server's; a page is read up to 512 KB, and an icon only when it is an image up to 100 KB. When neither site has an
+  icon (gmailmcp.googleapis.com), ConXist asks Google's public favicon service with the host name only (owner's
+  choice, 2026-11-27; `CONXIST_FAVICON_SERVICE=false` turns it off). Check refreshes the logo for servers
+  already added; icon requests carry no token.
 
 ## Consequences
 
@@ -56,6 +61,7 @@ when ticked; the tick is the approval (no approval per change).
 - The only guard against data that asks for a change is the prompt rule and the person's tick. Eval cases where a
   meeting, pasted text or a tool answer asks for a write call are REFACTOR LATER (TOOL_CALLING_STANDARDS §6).
 - The site icon's parent-domain try can reach a public suffix (`a.co.uk` → `co.uk`); the worst case is a wrong logo.
+- The favicon service learns the host name of a server whose site has no icon.
 - The API trusts the screen to warn before a tool that changes things is ticked; it has no extra confirm flag.
 - Deleting a workspace does not revoke Plaud or Google sign-ins at the provider; it only forgets them (REFACTOR LATER).
 - Sign-in (not yet built) will decide who may delete a workspace and who may allow tools that change things.

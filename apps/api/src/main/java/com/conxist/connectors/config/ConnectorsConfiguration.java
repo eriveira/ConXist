@@ -45,7 +45,7 @@ class ConnectorsConfiguration {
                 .build());
         requests.setReadTimeout(properties.readTimeout());
         return new HttpMcpGateway(RestClient.builder().requestFactory(requests).build(), properties.allowLoopback(),
-                properties.redirectUri(), clock);
+                properties.faviconService(), properties.redirectUri(), clock);
     }
 
     /** GET only, with timeouts and no redirects, so the token reaches only GitHub's API. */

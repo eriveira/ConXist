@@ -30,7 +30,16 @@ public final class BoundedBody {
         return read(body, maxBytes, DEADLINE);
     }
 
+    /** Up to {@code maxBytes}, cutting a longer answer there instead of refusing it, such as a page's head. */
+    public static byte[] read(InputStream body, int maxBytes, boolean cut) throws IOException {
+        return read(body, maxBytes, DEADLINE, cut);
+    }
+
     static byte[] read(InputStream body, int maxBytes, Duration deadline) throws IOException {
+        return read(body, maxBytes, deadline, false);
+    }
+
+    private static byte[] read(InputStream body, int maxBytes, Duration deadline, boolean cut) throws IOException {
         AtomicBoolean late = new AtomicBoolean();
         ScheduledFuture<?> closing = CLOSER.schedule(() -> {
             late.set(true);
@@ -55,6 +64,9 @@ public final class BoundedBody {
             throw new McpGateway.Unreachable("answer too slow");
         }
         if (bytes.length > maxBytes) {
+            if (cut) {
+                return java.util.Arrays.copyOf(bytes, maxBytes);
+            }
             throw new McpGateway.Unreachable("answer too large");
         }
         return bytes;

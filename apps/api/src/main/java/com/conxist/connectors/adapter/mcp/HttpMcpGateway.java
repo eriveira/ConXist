@@ -47,21 +47,29 @@ public final class HttpMcpGateway implements McpGateway {
             Pattern.compile("data:(image/(?:png|jpeg|webp|svg\\+xml));base64,([A-Za-z0-9+/=]+)");
     private static final Set<String> ICON_TYPES = Set.of("image/png", "image/jpeg", "image/webp", "image/svg+xml",
             "image/x-icon", "image/vnd.microsoft.icon");
-    /** Where sites keep their icon, most useful first. */
-    private static final List<String> SITE_ICON_PATHS = List.of("/apple-touch-icon.png", "/favicon.ico");
+    private static final int MAX_REDIRECTS = 3;
+    private static final int MAX_PAGE_BYTES = 512 * 1024;
+    private static final Pattern LINK_TAG = Pattern.compile("<link\\b[^<>]{0,2000}>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern REL = Pattern.compile("\\brel\\s*=\\s*[\"']([^\"']{0,200})[\"']", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HREF = Pattern.compile("\\bhref\\s*=\\s*[\"']([^\"']{1,2000})[\"']", Pattern.CASE_INSENSITIVE);
+    /** The last resort for a site with no icon: a public favicon service, asked with the host name only. */
+    private static final String FAVICON_SERVICE = "https://www.google.com/s2/favicons?sz=64&domain=";
 
     private final RestClient http;
     private final AddressGuard guard;
+    private final boolean faviconService;
     private final McpOAuth oauth;
     private final JsonMapper json = JsonMapper.builder().build();
 
     /**
      * @param http          must not follow redirects, so a token is never sent to another host
      * @param allowLoopback lets plain http on this computer through, for tests and the local fake only
+     * @param faviconService asks a public favicon service, with the host name only, when a server's site has no icon
      * @param redirectUri   ConXist's callback for the servers' sign-in pages
      */
-    public HttpMcpGateway(RestClient http, boolean allowLoopback, URI redirectUri, Clock clock) {
+    public HttpMcpGateway(RestClient http, boolean allowLoopback, boolean faviconService, URI redirectUri, Clock clock) {
         this.http = http;
+        this.faviconService = faviconService;
         this.guard = new AddressGuard(allowLoopback);
         this.oauth = new McpOAuth(http, guard, redirectUri, json, clock);
     }
@@ -211,7 +219,7 @@ public final class HttpMcpGateway implements McpGateway {
             }
             String src = icon.path("src").asString("");
             try {
-                String found = src.startsWith("data:") ? dataIcon(src) : fetched(src);
+                String found = src.startsWith("data:") ? dataIcon(src) : followed(guard.check(src), (at, answer) -> image(answer));
                 if (found != null) {
                     return found;
                 }
@@ -223,25 +231,44 @@ public final class HttpMcpGateway implements McpGateway {
     }
 
     /**
-     * The site's own icon, for a server that names no logo: the touch icon, then the favicon, on the server's host and
-     * then on its parent domain (mcp.acme.com, then acme.com). Each address passes the same guard as the server's, is
-     * read only when it is a small image, and no redirect is followed. Null when none is found.
+     * The site's own icon, for a server that names no logo. For the server's host, then its parent domain (mcp.acme.com,
+     * then acme.com), ConXist reads the home page for the icons it links, then tries the touch icon and the favicon.
+     * Every address, redirects included (up to {@value #MAX_REDIRECTS}), passes the same guard as the server's; a page
+     * is read up to {@value #MAX_PAGE_BYTES} bytes and an icon only when it is a small image. When neither site has one,
+     * a public favicon service is asked with the host name only (owner, 2026-11-27), unless turned off. Null when none
+     * is found.
      */
     private String siteIcon(URI address) {
-        for (URI candidate : siteIconAddresses(address)) {
+        for (URI home : siteHomes(address)) {
             try {
-                String found = fetched(candidate.toString());
+                Page page = followed(home, (at, answer) -> page(at, answer));
+                URI base = page == null ? home : page.at();
+                List<URI> candidates = new ArrayList<>(page == null ? List.of() : page.icons());
+                candidates.add(base.resolve("/apple-touch-icon.png"));
+                candidates.add(base.resolve("/favicon.ico"));
+                for (URI candidate : candidates) {
+                    String found = imageAt(candidate);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            } catch (RuntimeException unusable) {
+                log.debug("No site icon on a candidate site: {}", unusable.getClass().getSimpleName());
+            }
+        }
+        if (faviconService) {
+            for (URI home : siteHomes(address)) {
+                String found = imageAt(URI.create(FAVICON_SERVICE + home.getHost()));
                 if (found != null) {
                     return found;
                 }
-            } catch (RuntimeException unusable) {
-                log.debug("No site icon at a candidate address: {}", unusable.getClass().getSimpleName());
             }
         }
         return null;
     }
 
-    static List<URI> siteIconAddresses(URI address) {
+    /** The home pages to look on: the server's host, then its parent domain. */
+    static List<URI> siteHomes(URI address) {
         String host = address.getHost();
         if (host == null) {
             return List.of();
@@ -252,15 +279,99 @@ public final class HttpMcpGateway implements McpGateway {
         if (name) {
             hosts.add(host.substring(host.indexOf('.') + 1));
         }
-        String origin = address.getScheme() + "://";
         String port = address.getPort() < 0 ? "" : ":" + address.getPort();
-        List<URI> addresses = new ArrayList<>();
-        for (String each : hosts) {
-            for (String path : SITE_ICON_PATHS) {
-                addresses.add(URI.create(origin + each + port + path));
+        return hosts.stream().map(each -> URI.create(address.getScheme() + "://" + each + port + "/")).toList();
+    }
+
+    private String imageAt(URI candidate) {
+        try {
+            return candidate.getScheme() != null && candidate.getScheme().equals("data")
+                    ? dataIcon(candidate.toString()) : followed(candidate, (at, answer) -> image(answer));
+        } catch (RuntimeException unusable) {
+            log.debug("No site icon at a candidate address: {}", unusable.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    /** What a page gives: where it ended up after redirects, and the icons it links, best first. */
+    record Page(URI at, List<URI> icons) {
+    }
+
+    @FunctionalInterface
+    private interface Reader<T> {
+        T read(URI at, org.springframework.http.client.ClientHttpResponse answer) throws java.io.IOException;
+    }
+
+    private record Hop<T>(URI next, T value) {
+    }
+
+    /** Fetches an address, following up to {@value #MAX_REDIRECTS} redirects, each checked by the guard. */
+    private <T> T followed(URI start, Reader<T> reader) {
+        URI at = guard.check(start.toString());
+        for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
+            URI here = at;
+            Hop<T> answered = http.get().uri(here).accept(MediaType.ALL).exchange((sent, answer) -> {
+                int code = answer.getStatusCode().value();
+                if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                    String location = answer.getHeaders().getFirst("Location");
+                    return new Hop<T>(location == null || location.length() > 2_000 ? null : here.resolve(location), null);
+                }
+                return new Hop<T>(null, code == 200 ? reader.read(here, answer) : null);
+            });
+            if (answered == null || answered.next() == null) {
+                return answered == null ? null : answered.value();
+            }
+            at = guard.check(answered.next().toString());
+        }
+        return null;
+    }
+
+    private static Page page(URI at, org.springframework.http.client.ClientHttpResponse answer) throws java.io.IOException {
+        MediaType type = answer.getHeaders().getContentType();
+        if (type == null || !"text".equals(type.getType()) || !"html".equals(type.getSubtype())) {
+            return new Page(at, List.of());
+        }
+        String html = new String(BoundedBody.read(answer.getBody(), MAX_PAGE_BYTES, true),
+                java.nio.charset.StandardCharsets.UTF_8);
+        return new Page(at, linkedIcons(html, at));
+    }
+
+    /** The icons a page links in its {@code <link rel="...icon...">} tags, touch icons first, at most four. */
+    static List<URI> linkedIcons(String html, URI at) {
+        List<URI> touch = new ArrayList<>();
+        List<URI> other = new ArrayList<>();
+        var tags = LINK_TAG.matcher(html);
+        int seen = 0;
+        while (tags.find() && seen++ < 200) {
+            String tag = tags.group();
+            var rel = REL.matcher(tag);
+            var href = HREF.matcher(tag);
+            if (!rel.find() || !href.find()) {
+                continue;
+            }
+            String kind = rel.group(1).toLowerCase(java.util.Locale.ROOT);
+            if (!kind.contains("icon") || kind.contains("mask")) {
+                continue;
+            }
+            try {
+                URI icon = at.resolve(href.group(1).strip().replace("&amp;", "&"));
+                (kind.contains("apple-touch") ? touch : other).add(icon);
+            } catch (IllegalArgumentException unusable) {
+                // A link ConXist can't read is skipped.
             }
         }
-        return addresses;
+        touch.addAll(other);
+        return touch.stream().limit(4).toList();
+    }
+
+    private static String image(org.springframework.http.client.ClientHttpResponse answer) throws java.io.IOException {
+        MediaType type = answer.getHeaders().getContentType();
+        String kind = type == null ? "" : type.getType() + "/" + type.getSubtype();
+        if (!ICON_TYPES.contains(kind)) {
+            return null;
+        }
+        byte[] bytes = BoundedBody.read(answer.getBody(), MAX_ICON_BYTES);
+        return "data:" + kind + ";base64," + Base64.getEncoder().encodeToString(bytes);
     }
 
     private static String dataIcon(String src) {
@@ -273,20 +384,6 @@ public final class HttpMcpGateway implements McpGateway {
         }
         Base64.getDecoder().decode(match.group(2));
         return src;
-    }
-
-    private String fetched(String src) {
-        URI uri = guard.check(src);
-        return http.get().uri(uri).accept(MediaType.IMAGE_PNG, MediaType.IMAGE_JPEG, MediaType.valueOf("image/*"))
-                .exchange((sent, answer) -> {
-                    MediaType type = answer.getHeaders().getContentType();
-                    String kind = type == null ? "" : type.getType() + "/" + type.getSubtype();
-                    if (answer.getStatusCode().value() != 200 || !ICON_TYPES.contains(kind)) {
-                        return null;
-                    }
-                    byte[] bytes = BoundedBody.read(answer.getBody(), MAX_ICON_BYTES);
-                    return "data:" + kind + ";base64," + Base64.getEncoder().encodeToString(bytes);
-                });
     }
 
     private static String text(JsonNode node, int max) {
