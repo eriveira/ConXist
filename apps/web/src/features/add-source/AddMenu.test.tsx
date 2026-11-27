@@ -21,6 +21,18 @@ describe('AddMenu', () => {
     expect(onChoose).toHaveBeenCalledWith(PROVIDERS[0]);
   });
 
+  it('keeps its read-only promise, and closes with one Escape, giving focus back to the Add button', async () => {
+    render(<AddMenu providers={PROVIDERS} onChoose={vi.fn()} />);
+    const add = screen.getByRole('button', { name: 'Add source' });
+
+    await userEvent.click(add);
+    expect(screen.getByRole('group')).toHaveTextContent(/only reads/);
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('group')).not.toBeInTheDocument();
+    expect(add).toHaveFocus();
+  });
+
   it('has no accessibility violations with the menu open', async () => {
     const { container } = render(<AddMenu providers={PROVIDERS} onChoose={vi.fn()} />);
 

@@ -55,6 +55,15 @@ describe('App', () => {
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
+  it('opens Sources for an old address of a page that is gone', async () => {
+    window.location.hash = '#/flow';
+    api([ACME]);
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Sources', level: 1 })).toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Sources' })).toHaveAttribute('aria-current', 'page');
+  });
+
   it('opens Skills from the menu, and keeps Skills marked on its page', async () => {
     api([ACME], { 'GET /api/skills': () => ({ body: [] }) });
     render(<App />);

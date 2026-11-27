@@ -100,9 +100,9 @@ export function AddMenu({ providers, onChoose, open: openFromPage, onOpenChange 
                   <span className="chev"><Icon name="chevron" size={18} /></span>
                 </button>
               ))}
-              <div className="menu-foot">{t('add.footer')}</div>
             </>
           )}
+          <div className="menu-foot">{t('add.footer')}</div>
         </div>
       )}
     </div>

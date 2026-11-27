@@ -38,7 +38,7 @@ export function NewSkillDialog({ onClose, onCreated }: NewSkillDialogProps) {
 
   return (
     <Dialog title={t('skills.new.title')} subtitle={t('skills.new.subtitle')} icon={<Icon name="skill" />}
-      closeLabel={t('ask.close')} onClose={onClose} step="name" closable={!busy} focusFirst="input"
+      closeLabel={t('dialog.close')} onClose={onClose} step="name" closable={!busy} focusFirst="input"
       footer={(
         <>
           <span className="grow" />

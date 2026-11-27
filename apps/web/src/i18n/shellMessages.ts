@@ -40,7 +40,6 @@ export const shellEn = {
   'account.you': 'You',
   'account.local': 'ConXist runs only on this computer, without sign-in.',
 
-  'ask.close': 'Close',
 };
 
 export const shellEs: Record<keyof typeof shellEn, string> = {
@@ -84,5 +83,4 @@ export const shellEs: Record<keyof typeof shellEn, string> = {
   'account.you': 'Tú',
   'account.local': 'ConXist solo funciona en esta computadora, sin inicio de sesión.',
 
-  'ask.close': 'Cerrar',
 };

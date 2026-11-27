@@ -16,7 +16,7 @@ export const settingsEn = {
   'settings.retry': 'Retry',
   'settings.general.lead': 'The name and description everyone in this workspace sees.',
 
-  'settings.topics.lead': 'The topics ConXist sorts meetings into. The Topic classifier reads this list, and so will the Knowledge editor.',
+  'settings.topics.lead': 'The topics ConXist sorts meetings into. The Topic classifier reads this list.',
   'settings.topics.add': 'Add',
   'settings.topics.count': '{count} of {max} topics',
   'settings.topics.full': 'This workspace has {max} topics, the most it can keep. Remove one to add another.',
@@ -146,7 +146,7 @@ export const settingsEs: Record<keyof typeof settingsEn, string> = {
   'settings.retry': 'Reintentar',
   'settings.general.lead': 'El nombre y la descripción que ve todo el mundo en este espacio.',
 
-  'settings.topics.lead': 'Los temas en los que ConXist clasifica las reuniones. El clasificador de temas lee esta lista, y también lo hará el editor de Conocimiento.',
+  'settings.topics.lead': 'Los temas en los que ConXist clasifica las reuniones. El clasificador de temas lee esta lista.',
   'settings.topics.add': 'Añadir',
   'settings.topics.count': '{count} de {max} temas',
   'settings.topics.full': 'Este espacio tiene {max} temas, el máximo. Quita uno para añadir otro.',

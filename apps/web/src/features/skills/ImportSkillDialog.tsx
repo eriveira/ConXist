@@ -54,7 +54,7 @@ export function ImportSkillDialog({ onClose, onImported }: ImportSkillDialogProp
 
   return (
     <Dialog title={t('skills.import.title')} subtitle={t('skills.import.subtitle')} icon={<Icon name="upload" />}
-      closeLabel={t('ask.close')} onClose={onClose} step="file" closable={!busy} focusFirst="input"
+      closeLabel={t('dialog.close')} onClose={onClose} step="file" closable={!busy} focusFirst="input"
       footer={(
         <>
           <span className="grow" />

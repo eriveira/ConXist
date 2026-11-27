@@ -40,7 +40,7 @@ export function NewAgentDialog({ onClose, onCreated }: NewAgentDialogProps) {
 
   return (
     <Dialog title={t('agents.new.title')} subtitle={t('agents.new.subtitle')} icon={<Icon name="agents" />}
-      closeLabel={t('ask.close')} onClose={onClose} step="name" closable={!busy} focusFirst="input"
+      closeLabel={t('dialog.close')} onClose={onClose} step="name" closable={!busy} focusFirst="input"
       footer={(
         <>
           <span className="grow" />

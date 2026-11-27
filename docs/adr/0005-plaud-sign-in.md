@@ -52,8 +52,8 @@ sign-in; the directory clients that use it today are AI apps.
    SHA-256 key), not by the email; a sign-in without a user id fails.
 5. **Preview, and ask Plaud.** The source is marked Preview in the app and on the
    product page, and we ask Plaud (dev.plaud.ai) to confirm a third-party server
-   app may use this sign-in. If Plaud says no, the personal door goes back to
-   "coming soon" and imported meetings stay.
+   app may use this sign-in. If Plaud says no, the personal door is removed
+   (the app shows only what works, owner 2026-11-27) and imported meetings stay.
 
 ## Data
 
