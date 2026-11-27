@@ -62,7 +62,7 @@ class McpServersIntegrationTest {
     JdbcClient jdbc;
 
     @Test
-    void a_public_server_is_added_with_its_logo_and_only_its_read_tools_can_be_allowed() throws Exception {
+    void a_public_server_is_added_with_its_logo_and_only_the_tools_a_person_ticked() throws Exception {
         String workspace = workspace("Public MCP");
         String connection = connect(workspace, "{\"address\":\"" + fakes.open().mcpUrl() + "\"}")
                 .andExpect(jsonPath("$.status").value("READY"))
@@ -118,6 +118,8 @@ class McpServersIntegrationTest {
                 + "\"}")
                 .andExpect(jsonPath("$.status").value("READY"))
                 .andExpect(jsonPath("$.auth").value("TOKEN"))
+                // It names no logo, so the site's own icon stands in.
+                .andExpect(jsonPath("$.icon").value(Matchers.startsWith("data:image/png;base64,")))
                 .andExpect(content().string(Matchers.not(Matchers.containsString(FakeMcpServer.TOKEN))))
                 .andReturn().getResponse().getContentAsString();
 

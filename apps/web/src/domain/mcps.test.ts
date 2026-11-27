@@ -24,6 +24,7 @@ describe('MCP servers', () => {
 
   it('shows a logo only when it is an inline image', () => {
     expect(safeIcon('data:image/png;base64,iVBORw0K')).toBe('data:image/png;base64,iVBORw0K');
+    expect(safeIcon('data:image/x-icon;base64,AAABAAEA')).toBe('data:image/x-icon;base64,AAABAAEA');
     expect(safeIcon('https://evil.test/logo.png')).toBeNull();
     expect(safeIcon('data:text/html;base64,PHNjcmlwdD4=')).toBeNull();
     expect(safeIcon(null)).toBeNull();

@@ -63,6 +63,10 @@ public final class FakeMcpServer implements AutoCloseable {
             server.createContext("/authorize", this::authorize);
             server.createContext("/token", this::token);
         }
+        if (mode == Mode.TOKEN) {
+            // This one names no logo, so ConXist falls back to the site's own icon.
+            server.createContext("/apple-touch-icon.png", this::siteIcon);
+        }
         server.start();
     }
 
@@ -211,8 +215,10 @@ public final class FakeMcpServer implements AutoCloseable {
             case "initialize" -> {
                 exchange.getResponseHeaders().set("Mcp-Session-Id", "session-" + counter.incrementAndGet());
                 result = Map.of("protocolVersion", "2025-06-18", "capabilities", Map.of("tools", Map.of()),
-                        "serverInfo", Map.of("name", "acme-docs", "title", "Acme Docs", "version", "1",
-                                "icons", List.of(Map.of("src", ICON, "mimeType", "image/png"))));
+                        "serverInfo", mode == Mode.TOKEN
+                                ? Map.of("name", "acme-docs", "title", "Acme Docs", "version", "1")
+                                : Map.of("name", "acme-docs", "title", "Acme Docs", "version", "1",
+                                        "icons", List.of(Map.of("src", ICON, "mimeType", "image/png"))));
             }
             case "tools/list" -> result = Map.of("tools", tools());
             case "tools/call" -> result = call(request.path("params"));
@@ -280,6 +286,15 @@ public final class FakeMcpServer implements AutoCloseable {
                     parts.length > 1 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "");
         }
         return values;
+    }
+
+    private void siteIcon(HttpExchange exchange) throws IOException {
+        byte[] bytes = Base64.getDecoder().decode(ICON.substring(ICON.indexOf(',') + 1));
+        exchange.getResponseHeaders().set("Content-Type", "image/png");
+        exchange.sendResponseHeaders(200, bytes.length);
+        try (OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+        }
     }
 
     private static void send(HttpExchange exchange, int status, String type, String body) throws IOException {

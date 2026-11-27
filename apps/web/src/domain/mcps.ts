@@ -89,7 +89,7 @@ export function addressProblem(address: string): 'empty' | 'invalid' | null {
   }
 }
 
-const ICON = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
+const ICON = /^data:image\/(png|jpeg|webp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,[A-Za-z0-9+/=]+$/;
 
 /** The logo only when it is an inline image, so nothing is fetched from the server's host. */
 export function safeIcon(icon: string | null | undefined): string | null {
