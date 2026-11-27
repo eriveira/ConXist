@@ -14,8 +14,8 @@ import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.RuleViolation;
 
 /**
- * The LLM providers a workspace can use, the models it allows agents to pick, and where its new blank agents start
- * (ADR 0014). A workspace connects its own key (ConnectProvider); the key never comes back out of the API. Agents pick
+ * The LLM providers a workspace can use, the models it allows agents to pick, each provider's default model, and the
+ * provider new blank agents start on (ADR 0014). A workspace connects its own key (ConnectProvider); the key never comes back out of the API. Agents pick
  * their own model; this answers whether that choice can run.
  */
 public final class LlmProviders implements AgentModels {
@@ -46,13 +46,21 @@ public final class LlmProviders implements AgentModels {
 
     /** Each provider ConXist can call, with the models this workspace allows. Nothing is asked of the provider. */
     public View view() {
-        List<ProviderView> providers = ports.stream().map(ModelPort::provider).map(this::providerView).toList();
-        return new View(providers, defaultForNewAgents());
+        ModelDefaultsRepository.Saved saved = defaults.find(workspace.id());
+        List<ProviderView> providers = ports.stream().map(ModelPort::provider)
+                .map(provider -> providerView(provider, saved)).toList();
+        return new View(providers, defaultForNewAgents(saved));
     }
 
     ProviderView providerView(String provider) {
+        return providerView(provider, defaults.find(workspace.id()));
+    }
+
+    private ProviderView providerView(String provider, ModelDefaultsRepository.Saved saved) {
+        List<ProviderModel> models = allowedModels(provider);
         return new ProviderView(provider, connected(provider), keys.connection(provider),
-                allowedModels(provider).stream().map(m -> new ModelView(m.id(), m.label())).toList());
+                models.stream().map(m -> new ModelView(m.id(), m.label())).toList(),
+                defaultFor(provider, models, saved).orElse(null));
     }
 
     /**
@@ -78,13 +86,29 @@ public final class LlmProviders implements AgentModels {
         return new Offered(provider, true, List.copyOf(rows.values()), listing.error());
     }
 
-    /** Where this workspace's new blank agents start. Agents already made keep their own choice. */
+    /**
+     * The provider's default model: where an agent starts when it switches to this provider, and where new agents start
+     * when they start on it. Agents already made keep their own choice.
+     */
     public View setDefault(String provider, String model, String effort) {
         ModelChoice.Effort level = effortOf(effort);
         if (!available(provider, model)) {
             throw new RuleViolation("model.unavailable", "Pick an allowed model of a connected provider.");
         }
         defaults.save(workspace.id(), new ModelStart(provider, model, level), clock.instant());
+        return view();
+    }
+
+    /** The provider new blank agents start on, at its default model. */
+    public View startNewAgentsOn(String provider) {
+        if (port(provider).isEmpty()) {
+            throw unknownProvider();
+        }
+        ModelStart start = defaultFor(provider, allowedModels(provider), defaults.find(workspace.id()))
+                .filter(s -> available(s.provider(), s.model()))
+                .orElseThrow(() -> new RuleViolation("model.unavailable",
+                        "Connect this provider and allow one of its models first."));
+        defaults.startNewAgentsOn(workspace.id(), start, clock.instant());
         return view();
     }
 
@@ -112,10 +136,46 @@ public final class LlmProviders implements AgentModels {
         }
     }
 
-    /** The workspace's saved default while it can still run; else where the settings start new agents. */
+    /** Where new blank agents start: the default of the provider they start on, while it can run. */
     ModelStart defaultForNewAgents() {
-        return defaults.find(workspace.id()).filter(s -> available(s.provider(), s.model()))
+        return defaultForNewAgents(defaults.find(workspace.id()));
+    }
+
+    /**
+     * The provider the workspace picked, else the settings' provider, else the first connected one, while it is
+     * connected; its default while that can run, else the settings' start.
+     */
+    private ModelStart defaultForNewAgents(ModelDefaultsRepository.Saved saved) {
+        List<String> order = new ArrayList<>();
+        if (saved.newAgents() != null) {
+            order.add(saved.newAgents());
+        }
+        order.add(catalog.newAgents().provider());
+        ports.stream().map(ModelPort::provider).forEach(order::add);
+        return order.stream().filter(this::connected).findFirst()
+                .flatMap(provider -> defaultFor(provider, allowedModels(provider), saved))
+                .filter(s -> available(s.provider(), s.model()))
                 .orElseGet(catalog::newAgents);
+    }
+
+    /**
+     * The provider's default among the models it allows: the one the workspace saved, else the settings' start when
+     * it is this provider's, else its first allowed model at medium effort. Empty when it allows none.
+     */
+    Optional<ModelStart> defaultFor(String provider) {
+        return defaultFor(provider, allowedModels(provider), defaults.find(workspace.id()));
+    }
+
+    private Optional<ModelStart> defaultFor(String provider, List<ProviderModel> models,
+            ModelDefaultsRepository.Saved saved) {
+        Set<String> allows = models.stream().map(ProviderModel::id).collect(Collectors.toSet());
+        ModelStart settings = catalog.newAgents();
+        return saved.providers().stream().filter(s -> s.provider().equals(provider) && allows.contains(s.model()))
+                .findFirst()
+                .or(() -> Optional.of(settings)
+                        .filter(s -> s.provider().equals(provider) && allows.contains(s.model())))
+                .or(() -> models.stream().findFirst()
+                        .map(m -> new ModelStart(provider, m.id(), ModelChoice.Effort.MEDIUM)));
     }
 
     /**
@@ -195,16 +255,17 @@ public final class LlmProviders implements AgentModels {
     record Call(ModelPort port, ApiKey key, ModelChoice choice) {
     }
 
-    /** {@code models} are the ones this workspace allows. */
+    /** {@code models} are the ones this workspace allows; {@code defaultForNewAgents} is where new agents start. */
     public record View(List<ProviderView> providers, ModelStart defaultForNewAgents) {
     }
 
     /**
      * {@code connected} is true when the workspace has a key for it, its own or this computer's; {@code connection}
-     * says which and how its last check went. The key itself never leaves the API.
+     * says which and how its last check went. The key itself never leaves the API. {@code defaultModel} is null when
+     * the workspace allows none of its models.
      */
     public record ProviderView(String id, boolean connected, ProviderKeys.Connection connection,
-            List<ModelView> models) {
+            List<ModelView> models, ModelStart defaultModel) {
     }
 
     public record ModelView(String id, String label) {

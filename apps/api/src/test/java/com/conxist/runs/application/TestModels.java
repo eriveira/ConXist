@@ -88,18 +88,25 @@ final class TestModels {
         }
     }
 
-    /** Defaults kept in memory, one per workspace. */
+    /** Each provider's default and the provider new agents start on, kept in memory for one workspace. */
     static final class Defaults implements ModelDefaultsRepository {
-        final Map<UUID, ModelStart> saved = new HashMap<>();
+        final Map<String, ModelStart> saved = new java.util.LinkedHashMap<>();
+        String newAgents;
 
         @Override
-        public Optional<ModelStart> find(UUID workspaceId) {
-            return Optional.ofNullable(saved.get(workspaceId));
+        public Saved find(UUID workspaceId) {
+            return new Saved(List.copyOf(saved.values()), newAgents);
         }
 
         @Override
         public void save(UUID workspaceId, ModelStart start, Instant at) {
-            saved.put(workspaceId, start);
+            saved.put(start.provider(), start);
+        }
+
+        @Override
+        public void startNewAgentsOn(UUID workspaceId, ModelStart start, Instant at) {
+            save(workspaceId, start, at);
+            newAgents = start.provider();
         }
     }
 }

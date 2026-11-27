@@ -62,16 +62,20 @@ function ProvidersCard({ providers, agents, onChanged }: Loaded & { onChanged: (
       <ul className="vendors">
         {providers.providers.map((provider) => (
           <ProviderRow key={provider.id} provider={provider} users={providerUsers(agents, provider.id)}
-            onConnected={(next) => connected(next)} onDisconnected={onChanged} />
+            onConnected={(next) => connected(next)} onDisconnected={onChanged}>
+            {provider.connected && (
+              <div className="vendor-models"
+                key={`${provider.id}-${provider.connection.source}-${provider.connection.addedAt ?? ''}`}>
+                {provider.defaultModel && <DefaultPick provider={provider} providers={providers} onSaved={onChanged} />}
+                {live.length > 1 && <NewAgentsStart provider={provider} providers={providers} onSaved={onChanged} />}
+                <ModelsTable provider={provider} providers={providers} agents={agents}
+                  onAllowedChanged={() => void reload()} />
+              </div>
+            )}
+          </ProviderRow>
         ))}
       </ul>
-      {live.map((provider) => (
-        <ModelsTable key={`${provider.id}-${provider.connection.source}-${provider.connection.addedAt ?? ''}`}
-          provider={provider} providers={providers} agents={agents} onAllowedChanged={() => void reload()} />
-      ))}
-      {live.length > 0
-        ? <DefaultPick providers={providers} connected={live} onSaved={onChanged} />
-        : <p className="alert info"><Icon name="info" /> {t('settings.noProvider')}</p>}
+      {live.length === 0 && <p className="alert info"><Icon name="info" /> {t('settings.noProvider')}</p>}
     </SettingsCard>
   );
 }
@@ -80,7 +84,7 @@ type Offered = { status: 'loading' } | { status: 'error' } | { status: 'ready'; 
 
 /**
  * Every model the provider offers, each with an Allowed box saved on its own, and which agents run on it at what
- * effort. A model agents run on, or new agents start on, stays ticked.
+ * effort. A model agents run on, or the provider's default, stays ticked. The list starts closed, with its count shown.
  */
 function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
   provider: LlmProvider; providers: LlmProviders; agents: AgentSummary[]; onAllowedChanged: () => void;
@@ -91,6 +95,7 @@ function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const name = providerBrand(t, provider.id);
 
   const load = useCallback(async (refresh: boolean) => {
@@ -133,21 +138,47 @@ function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
     }
   }
 
-  if (state.status === 'loading') return <LoadingState />;
-  if (state.status === 'error') return <ErrorState onRetry={() => void load(false)} />;
-  const { offered } = state;
-  const allowedCount = offered.models.filter((model) => model.allowed).length;
+  const list = `models-list-${provider.id}`;
+  const count = state.status === 'ready'
+    ? t('settings.models.count', { offered: state.offered.models.length,
+      allowed: state.offered.models.filter((model) => model.allowed).length })
+    : '';
 
   return (
     <section className="models" aria-labelledby={`models-${provider.id}`}>
       <div className="models-head">
-        <h3 id={`models-${provider.id}`}>{t('settings.provider.models', { provider: name })}</h3>
-        <span className="muted">{t('settings.models.count', { offered: offered.models.length, allowed: allowedCount })}</span>
+        <h3 id={`models-${provider.id}`}>
+          <button type="button" className="disclosure" aria-expanded={open} aria-controls={list}
+            onClick={() => setOpen(!open)}>
+            <Icon name={open ? 'down' : 'chevron'} size={16} />
+            {t('settings.provider.models', { provider: name })}
+          </button>
+        </h3>
+        <span className="muted">{count}</span>
         <SavedStatus saved={saved} />
-        <button type="button" className="btn sm" disabled={refreshing} onClick={() => void load(true)}>
-          {refreshing ? t('settings.models.refreshing') : t('settings.models.refresh')}
-        </button>
+        {open && state.status === 'ready' && (
+          <button type="button" className="btn sm" disabled={refreshing} onClick={() => void load(true)}>
+            {refreshing ? t('settings.models.refreshing') : t('settings.models.refresh')}
+          </button>
+        )}
       </div>
+      <div id={list} hidden={!open}>
+        {state.status === 'loading' && <LoadingState />}
+        {state.status === 'error' && <ErrorState onRetry={() => void load(false)} />}
+        {state.status === 'ready' && <ModelRows offered={state.offered} provider={provider} providers={providers}
+          agents={agents} saving={saving} error={error} name={name} onToggle={(model) => void toggle(model)} />}
+      </div>
+    </section>
+  );
+}
+
+function ModelRows({ offered, provider, providers, agents, saving, error, name, onToggle }: {
+  offered: OfferedModels; provider: LlmProvider; providers: LlmProviders; agents: AgentSummary[];
+  saving: string | null; error: string | null; name: string; onToggle: (model: OfferedModel) => void;
+}) {
+  const t = useT();
+  return (
+    <>
       <p className="hint">{providerModelsLead(t, provider.id)}</p>
       {offered.listError && (
         <p className="alert error" role="alert"><Icon name="alert" /> {t('settings.models.listFailed')} {t(`settings.models.listFailed.${offered.listError}`)}</p>
@@ -180,7 +211,7 @@ function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
                     <input type="checkbox" id={box} checked={model.allowed}
                       disabled={lock !== null} aria-busy={saving === model.id || undefined}
                       aria-describedby={lock ? `${box}-lock` : undefined}
-                      onChange={() => void toggle(model)} />
+                      onChange={() => onToggle(model)} />
                   </td>
                   <th scope="row">
                     <label htmlFor={box}><b>{model.label}</b></label>
@@ -201,21 +232,23 @@ function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
         </table>
       </div>
       )}
-    </section>
+    </>
   );
 }
 
-/** Where a new blank agent starts: an allowed model of a connected provider and an effort. Saved on its own button. */
-function DefaultPick({ providers, connected, onSaved }: {
-  providers: LlmProviders; connected: LlmProvider[]; onSaved: (providers: LlmProviders) => void;
+/** The provider's default model and effort, where an agent that switches to it starts. Saved on its own button. */
+function DefaultPick({ provider, providers, onSaved }: {
+  provider: LlmProvider; providers: LlmProviders; onSaved: (providers: LlmProviders) => void;
 }) {
   const t = useT();
-  const saved = providers.defaultForNewAgents;
+  const saved = provider.defaultModel as AgentModel;
   const [pick, setPick] = useState<AgentModel>(saved);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const changed = !samePick(pick, saved);
+  const name = providerBrand(t, provider.id);
+  const id = `default-${provider.id}`;
 
   function change(next: AgentModel) {
     setDone(false);
@@ -229,7 +262,7 @@ function DefaultPick({ providers, connected, onSaved }: {
     try {
       const next = await api.setDefaultModel(pick);
       onSaved(next);
-      setPick(next.defaultForNewAgents);
+      setPick(next.providers.find((each) => each.id === provider.id)?.defaultModel ?? pick);
       setDone(true);
     } catch (problem) {
       setError(problemMessage(problem, t));
@@ -242,37 +275,60 @@ function DefaultPick({ providers, connected, onSaved }: {
     <fieldset className="default-pick">
       <legend>{t('settings.default')}</legend>
       <div className="default-fields">
-        <select value={`${pick.provider}/${pick.model}`} disabled={busy} aria-label={t('settings.default.model')}
-          onChange={(event) => {
-            const [provider, ...model] = event.target.value.split('/');
-            change({ ...pick, provider, model: model.join('/') });
-          }}>
+        <select id={`${id}-model`} value={pick.model} disabled={busy} aria-describedby={`${id}-hint`}
+          aria-label={t('settings.default.model', { provider: name })}
+          onChange={(event) => change({ ...pick, model: event.target.value })}>
           {!modelAvailable(providers, pick) && (
-            <option value={`${pick.provider}/${pick.model}`} disabled>
+            <option value={pick.model} disabled>
               {t('agent.model.gone', { model: modelLabel(providers, pick.provider, pick.model) })}
             </option>
           )}
-          {connected.map((provider) => (
-            <optgroup key={provider.id} label={providerBrand(t, provider.id)}>
-              {provider.models.map((model) => (
-                <option key={`${provider.id}/${model.id}`} value={`${provider.id}/${model.id}`}>{model.label}</option>
-              ))}
-            </optgroup>
-          ))}
+          {provider.models.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}
         </select>
-        <select value={pick.effort} disabled={busy} aria-label={t('settings.default.effort')}
+        <select value={pick.effort} disabled={busy} aria-label={t('settings.default.effort', { provider: name })}
           onChange={(event) => change({ ...pick, effort: event.target.value as Effort })}>
           {EFFORTS.map((effort) => <option key={effort} value={effort}>{t(`agent.effort.${effort}` as MessageKey)}</option>)}
         </select>
-      </div>
-      <small className="hint">{t('settings.default.hint')}</small>
-      {error && <p className="alert error" role="alert"><Icon name="alert" /> {error}</p>}
-      <div className="settings-actions">
         <SavedStatus saved={done && !changed} />
-        <button type="button" className="btn primary" disabled={busy || !changed} onClick={() => void save()}>
+        <button type="button" className="btn sm primary" disabled={busy || !changed} onClick={() => void save()}>
           {busy ? t('settings.saving') : t('settings.save')}
         </button>
       </div>
+      <small className="hint" id={`${id}-hint`}>{t('settings.default.hint', { provider: name })}</small>
+      {error && <p className="alert error" role="alert"><Icon name="alert" /> {error}</p>}
     </fieldset>
+  );
+}
+
+/** Whether new blank agents start on this provider. Saved as soon as it is picked; only one provider holds it. */
+function NewAgentsStart({ provider, providers, onSaved }: {
+  provider: LlmProvider; providers: LlmProviders; onSaved: (providers: LlmProviders) => void;
+}) {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const here = providers.defaultForNewAgents.provider === provider.id;
+
+  async function pick() {
+    setBusy(true);
+    setError(null);
+    try {
+      onSaved(await api.startNewAgentsOn(provider.id));
+    } catch (problem) {
+      setError(problemMessage(problem, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="new-agents">
+      <label>
+        <input type="radio" name="new-agents" checked={here} disabled={busy || !provider.defaultModel}
+          onChange={() => void pick()} />
+        {t('settings.newAgents', { provider: providerBrand(t, provider.id) })}
+      </label>
+      {error && <p className="alert error" role="alert"><Icon name="alert" /> {error}</p>}
+    </div>
   );
 }

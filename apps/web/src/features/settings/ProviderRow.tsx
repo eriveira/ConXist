@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { api } from '../../api/client';
 import { Pill } from '../../components/Pill';
 import type { ConnectionCheck, LlmProvider, LlmProviders } from '../../domain/settings';
@@ -14,9 +14,9 @@ type Test = { state: 'idle' } | { state: 'testing' } | { state: 'done'; check: C
  * One provider and its key: not connected (Connect), on this computer's key (Test, Connect), on the workspace's own
  * key (Test, Replace, Disconnect), or with a key the provider refused (Replace, Disconnect).
  */
-export function ProviderRow({ provider, users, onConnected, onDisconnected }: {
+export function ProviderRow({ provider, users, onConnected, onDisconnected, children }: {
   provider: LlmProvider; users: string[]; onConnected: (provider: LlmProvider) => void;
-  onDisconnected: (providers: LlmProviders) => void;
+  onDisconnected: (providers: LlmProviders) => void; children?: ReactNode;
 }) {
   const t = useT();
   const language = useLanguage();
@@ -78,6 +78,7 @@ export function ProviderRow({ provider, users, onConnected, onDisconnected }: {
         </span>
       </div>
       <TestResult test={test} brand={brand} />
+      {children}
       {(dialog === 'connect' || dialog === 'replace') && (
         <ConnectDialog provider={provider.id} replacing={dialog === 'replace'} onClose={() => setDialog(null)}
           onConnected={(next) => { setDialog(null); setTest({ state: 'idle' }); onConnected(next); }} />

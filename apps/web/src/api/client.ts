@@ -161,8 +161,10 @@ export const api = {
   replaceGoogleSignIn: (id: string, signInId: string) => putJson<Integration>(`${integrationPath(id)}/google`, { signInId }),
   removeIntegration: (id: string) => request<void>(integrationPath(id), { method: 'DELETE' }),
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
-  /** Where this workspace's new blank agents start; agents already made keep their own pick. */
+  /** The provider's default model, where agents that switch to it start; agents already made keep their own pick. */
   setDefaultModel: (pick: AgentModel) => putJson<LlmProviders>('/api/llm-providers/default', pick),
+  /** The provider new blank agents start on, at its default model. */
+  startNewAgentsOn: (provider: string) => putJson<LlmProviders>('/api/llm-providers/new-agents', { provider }),
   /** Every model the provider offers; `refresh` asks the provider now instead of using the list the API kept. */
   offeredModels: (provider: string, refresh = false) =>
     request<OfferedModels>(`/api/llm-providers/${encodeURIComponent(provider)}/models${refresh ? '?refresh=true' : ''}`),

@@ -68,9 +68,8 @@ public final class AllowModel {
             throw new RuleViolation("model.in-use", "Agents run on this model: " + String.join(", ", users)
                     + ". Switch them to another model first.");
         }
-        ModelStart start = providers.defaultForNewAgents();
-        if (start.provider().equals(provider) && start.model().equals(model)) {
-            throw new RuleViolation("model.is-default", "New agents start on this model. Pick another default first.");
+        if (providers.defaultFor(provider).filter(start -> start.model().equals(model)).isPresent()) {
+            throw new RuleViolation("model.is-default", "This is the provider's default model. Pick another default first.");
         }
         return current;
     }

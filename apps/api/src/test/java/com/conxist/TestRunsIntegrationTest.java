@@ -94,7 +94,13 @@ class TestRunsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"openai\",\"model\":\"gpt-5.2\",\"effort\":\"MEDIUM\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("openai"));
+                .andExpect(jsonPath("$.providers[1].defaultModel.model").value("gpt-5.2"))
+                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("anthropic"));
+        mvc.perform(put("/api/llm-providers/new-agents").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"openai\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("openai"))
+                .andExpect(jsonPath("$.defaultForNewAgents.model").value("gpt-5.2"));
 
         String source = source(workspace, "Specs");
         String meeting = upload(workspace, source,
