@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './components/Icon';
+import { useNotice } from './components/useNotice';
 import { AgentPage } from './features/agents/AgentPage';
 import { AgentsPage } from './features/agents/AgentsPage';
 import { SkillPage } from './features/skills/SkillPage';
@@ -19,9 +20,6 @@ import { I18nProvider, translator } from './i18n/i18n';
 import { LANGUAGES, type Language } from './i18n/messages';
 import { type AgentsRoute, useAgentsRoute, useRoute as useSourceRoute } from './navigation';
 import { readPreference, savePreference } from './preferences';
-
-/** How long "Acme is ready" stays after creating a workspace. */
-const CREATED_NOTICE_MS = 8_000;
 
 export function App() {
   const [language, setLanguage] = useState<Language>(() => readPreference('language', LANGUAGES, 'en'));
@@ -59,13 +57,7 @@ function Workspaces(settings: SettingsProps) {
   const sourceRoute = useSourceRoute();
   const agentsRoute = useAgentsRoute();
   const [newOpen, setNewOpen] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), CREATED_NOTICE_MS);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
+  const [notice, setNotice] = useNotice();
 
   function onCreated(workspace: Workspace) {
     setNewOpen(false);

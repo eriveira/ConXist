@@ -1,4 +1,5 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { NOTICE_MS } from './components/useNotice';
 import { goWithNotice, useArrivalNotice } from './navigation';
 
 describe('goWithNotice', () => {
@@ -12,5 +13,22 @@ describe('goWithNotice', () => {
 
     const again = renderHook(() => useArrivalNotice());
     expect(again.result.current).toBeNull();
+  });
+});
+
+describe('useArrivalNotice', () => {
+  it('clears the notice after a while, so it does not stay on the page', () => {
+    vi.useFakeTimers();
+    try {
+      goWithNotice('#/agents', 'Classifier was deleted.');
+      const { result } = renderHook(() => useArrivalNotice());
+      expect(result.current).toBe('Classifier was deleted.');
+
+      act(() => { vi.advanceTimersByTime(NOTICE_MS); });
+
+      expect(result.current).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
+import { useNotice } from '../../components/useNotice';
 import { type AgentDefinition, type AgentToolInfo, localProblems } from '../../domain/agents';
 import { type PinnedSkill, SKILL_PROBLEMS, type SkillSummary, skillRowProblems, skillRows } from '../../domain/skills';
 import type { Source } from '../../domain/model';
@@ -39,7 +40,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
   const [choices, setChoices] = useState<Choices>({ status: 'loading' });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useNotice();
   const [actionProblem, setActionProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);

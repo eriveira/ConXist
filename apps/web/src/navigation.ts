@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNotice } from './components/useNotice';
 
 /** The page the address shows: the Sources page, or one source's page at #/sources/{id}. */
 export type Route = { page: 'sources' } | { page: 'source'; sourceId: string };
@@ -137,10 +138,10 @@ export function goWithNotice(href: string, notice: string): void {
 
 /**
  * The notice the last page left for this one, if any, shown on this visit only. It arrives just after the page
- * mounts, so a live region already on the page announces it.
+ * mounts, so a live region already on the page announces it, and clears itself like any other notice.
  */
 export function useArrivalNotice(): string | null {
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useNotice();
   useEffect(() => {
     if (arrivalNotice === null) return;
     setNotice(arrivalNotice);
