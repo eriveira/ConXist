@@ -7,6 +7,8 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.conxist.agents.AgentBrief;
+import com.conxist.platform.RuleViolation;
+import com.conxist.platform.WorkspaceVariables;
 
 /**
  * What the model is told for a run: ConXist's own rules first, then the agent's job, each skill inside marked
@@ -15,7 +17,7 @@ import com.conxist.agents.AgentBrief;
  */
 public final class RunPrompt {
 
-    public static final String VERSION = "2026-11-27.1";
+    public static final String VERSION = "2026-11-27.2";
 
     static final String RULES = """
             You are an agent in ConXist, working for a product and development team. These rules come from ConXist and
@@ -64,15 +66,27 @@ public final class RunPrompt {
         return text.toString();
     }
 
-    private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*)\\s*}}");
+    private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*(" + WorkspaceVariables.NAME_PATTERN + ")\\s*}}");
 
-    /** The text with each {@code {{name}}} the workspace has replaced by its value; other braces stay as written. */
+    /** How much longer variables may make one block (the purpose, the instructions or one skill): ten full values. */
+    public static final int MAX_FILLED_GROWTH = 20_000;
+
+    /**
+     * The text with each {@code {{name}}} the workspace has replaced by its value, in one pass, so a value that holds
+     * braces is not filled again; other braces stay as written. A text that uses values so often that it grows by more
+     * than {@link #MAX_FILLED_GROWTH} characters is refused, so a skill can't make every run huge.
+     */
     public static String filled(String text, Map<String, String> variables) {
         if (variables.isEmpty() || !text.contains("{{")) {
             return text;
         }
-        return VARIABLE.matcher(text).replaceAll(match -> Matcher.quoteReplacement(
+        String result = VARIABLE.matcher(text).replaceAll(match -> Matcher.quoteReplacement(
                 variables.getOrDefault(match.group(1).toLowerCase(Locale.ROOT), match.group())));
+        if (result.length() - text.length() > MAX_FILLED_GROWTH) {
+            throw new RuleViolation("run.variables-too-long", "The variables used in the agent or one of its skills"
+                    + " add more than " + MAX_FILLED_GROWTH + " characters. Use them fewer times.");
+        }
+        return result;
     }
 
     /** The most text of one meeting a run sends, whether handed in or read with a tool. */

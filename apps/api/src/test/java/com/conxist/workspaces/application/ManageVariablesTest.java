@@ -85,6 +85,15 @@ class ManageVariablesTest {
     }
 
     @Test
+    void runs_get_one_workspaces_values_keyed_by_lower_case_name() {
+        variables.add("Company_Name", "Acme Inc.");
+        manage(OTHER).add("topics", "Theirs");
+
+        assertThat(variables.of(FixedWorkspace.standard().id())).isEqualTo(java.util.Map.of("company_name", "Acme Inc."));
+        assertThat(variables.of(OTHER.id())).isEqualTo(java.util.Map.of("topics", "Theirs"));
+    }
+
+    @Test
     void a_removed_variable_is_gone() {
         Variable company = variables.add("company_name", "Acme");
 

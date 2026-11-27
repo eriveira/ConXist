@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JdbcVariableRepository implements VariableRepository {
 
-    private static final RowMapper<Variable> TOPIC = (row, rowNumber) -> new Variable(
+    private static final RowMapper<Variable> VARIABLE = (row, rowNumber) -> new Variable(
             row.getObject("id", UUID.class),
             row.getObject("workspace_id", UUID.class),
             row.getString("name"),
@@ -32,7 +32,7 @@ class JdbcVariableRepository implements VariableRepository {
     public List<Variable> findAll(UUID workspaceId) {
         return jdbc.sql("select id, workspace_id, name, value, created_at from workspace_variables where workspace_id = :workspaceId order by lower(name), id")
                 .param("workspaceId", workspaceId)
-                .query(TOPIC)
+                .query(VARIABLE)
                 .list();
     }
 
@@ -41,7 +41,7 @@ class JdbcVariableRepository implements VariableRepository {
         return jdbc.sql("select id, workspace_id, name, value, created_at from workspace_variables where workspace_id = :workspaceId and id = :id")
                 .param("workspaceId", workspaceId)
                 .param("id", variableId)
-                .query(TOPIC)
+                .query(VARIABLE)
                 .optional();
     }
 

@@ -1,6 +1,7 @@
 -- A workspace's variables (ADR 0018): names and values its agents and skills use as {{name}}. They replace topics,
--- which nothing read yet: a workspace that had topics gets one variable, "topics", listing them. Names are unique in a
--- workspace, ignoring case. The 100-variable limit and the name rule are kept by the app.
+-- which nothing read yet: a workspace that had topics gets one variable, "topics", listing them (cut at 2,000
+-- characters). The old table is kept, renamed, until a later migration drops it, so nothing is lost if the list was
+-- longer. Names are unique in a workspace, ignoring case. The 100-variable limit and the name rule are kept by the app.
 
 create table workspace_variables (
     id           uuid        primary key,
@@ -19,4 +20,4 @@ select gen_random_uuid(), workspace_id, 'topics',
 from workspace_topics
 group by workspace_id;
 
-drop table workspace_topics;
+alter table workspace_topics rename to workspace_topics_v13;

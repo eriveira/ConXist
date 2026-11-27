@@ -40,11 +40,6 @@ public final class StartTestRun {
     private final Clock clock;
 
     public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
-            AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
-        this(agents, library, tools, providers, reader, workspace, WorkspaceVariables.none(), clock);
-    }
-
-    public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
             AnswerReader reader, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
         this.variables = variables;
         this.agents = agents;

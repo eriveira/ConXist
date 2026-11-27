@@ -319,6 +319,13 @@ describe('SettingsPage', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('company_name saved.')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Variables' })).toHaveTextContent('Acme Corporation');
+    expect(screen.getByRole('button', { name: 'Edit company_name' })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit company_name' }));
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('form', { name: 'Edit company_name' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit company_name' })).toHaveFocus();
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete company_name' }));
     const confirm = screen.getByRole('dialog', { name: 'Delete company_name?' });

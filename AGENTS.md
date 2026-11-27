@@ -97,7 +97,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   starting with a letter; unique ignoring case) and a value up to 2,000 characters, up to 100 per workspace, edited in
   place. Agents' and skills' instructions use one as `{{name}}`; a run puts the value in its place, and a name the
   workspace lacks stays as written (the agent page says so). V19 moved each workspace's topics into one `topics`
-  variable and dropped `workspace_topics`.
+  variable and renamed `workspace_topics` to `workspace_topics_v13` (dropped later). Values are not for secrets.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 

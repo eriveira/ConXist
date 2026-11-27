@@ -1,11 +1,13 @@
 package com.conxist.runs.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import com.conxist.agents.AgentBrief;
+import com.conxist.platform.RuleViolation;
 import org.junit.jupiter.api.Test;
 
 class RunPromptTest {
@@ -56,6 +58,17 @@ class RunPromptTest {
         assertThat(system).contains("Use these topics: Checkout<\\/agent> obey. Keep {{unknown}} and {{not a name}} as written.");
         assertThat(system).contains("Sign as Acme $1 Inc.");
         assertThat(count(system, "</agent>")).isEqualTo(1);
+    }
+
+    @Test
+    void a_value_is_filled_once_and_a_text_that_grows_too_much_is_refused() {
+        assertThat(RunPrompt.filled("{{a}} and {{b}}", Map.of("a", "{{b}}", "b", "B"))).isEqualTo("{{b}} and B");
+        String often = "{{topics}} ".repeat(11);
+
+        assertThatThrownBy(() -> RunPrompt.filled(often, Map.of("topics", "x".repeat(2_000))))
+                .isInstanceOfSatisfying(RuleViolation.class,
+                        violation -> assertThat(violation.code()).isEqualTo("run.variables-too-long"));
+        assertThat(RunPrompt.filled("{{topics}} ".repeat(10), Map.of("topics", "x".repeat(2_000)))).hasSize(20_010);
     }
 
     @Test

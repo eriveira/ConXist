@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import com.conxist.platform.RuleViolation;
+import com.conxist.platform.WorkspaceVariables;
 
 /**
  * A name and a value the workspace's agents and skills share, such as {@code company_name} or {@code topics}
@@ -15,9 +16,7 @@ public record Variable(UUID id, UUID workspaceId, String name, String value, Ins
     public static final int MAX_NAME_LENGTH = 60;
     public static final int MAX_VALUE_LENGTH = 2_000;
     public static final int MAX_PER_WORKSPACE = 100;
-    /** Letters, digits and underscores, starting with a letter, so {@code {{name}}} reads the same everywhere. */
-    public static final String NAME_PATTERN = "[A-Za-z][A-Za-z0-9_]*";
-    private static final Pattern NAME = Pattern.compile(NAME_PATTERN);
+    private static final Pattern NAME = Pattern.compile(WorkspaceVariables.NAME_PATTERN);
 
     /** Builds a variable, enforcing the rules every variable must meet. Lengths count characters as seen. */
     public static Variable create(UUID id, UUID workspaceId, String name, String value, Instant createdAt) {

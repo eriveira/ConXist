@@ -46,18 +46,10 @@
 .default-pick .settings-actions { margin-top: 10px; }
 .preset-users { color: var(--cx-fg-muted); min-width: 160px; }
 
-.topics { list-style: none; margin: 0; padding: 0; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); }
-.topic { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 14px; border-bottom: 1px solid var(--cx-border); }
-.topic:last-child { border-bottom: 0; }
-.topic .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.topic-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--cx-accent); }
-.topic-name { font-weight: 800; overflow-wrap: anywhere; }
-.topic-desc { font-size: 13.5px; color: var(--cx-fg-muted); overflow-wrap: anywhere; }
-.topic .icon-btn { width: 44px; height: 44px; }
-.topics-count { margin: 10px 0 0; font-size: 13px; color: var(--cx-fg-muted); }
-.topics-empty { padding: 20px; border: 1px dashed var(--cx-input-border); border-radius: var(--cx-radius-md); text-align: center; }
-.topics-empty h3, .topics-empty h4 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
-.topics-empty p { margin: 0 auto; max-width: 52ch; color: var(--cx-fg-muted); font-size: 14px; }
+.variables-count { margin: 10px 0 0; font-size: 13px; color: var(--cx-fg-muted); }
+.topics-empty, .variables-empty { padding: 20px; border: 1px dashed var(--cx-input-border); border-radius: var(--cx-radius-md); text-align: center; }
+.topics-empty h3, .topics-empty h4, .variables-empty h3, .variables-empty h4 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
+.topics-empty p, .variables-empty p { margin: 0 auto; max-width: 52ch; color: var(--cx-fg-muted); font-size: 14px; }
 .settings-card > .save-status { display: flex; min-height: 0; margin: 0 0 8px; }
 .settings-card > .save-status:empty { margin: 0; }
 

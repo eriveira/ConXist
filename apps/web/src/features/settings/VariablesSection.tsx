@@ -25,6 +25,18 @@ export function VariablesSection() {
   const [editing, setEditing] = useState<Editing>(null);
   const [removing, setRemoving] = useState<Variable | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Where focus goes once a form or a row it was in goes away: a row's Edit button, or Add.
+  const [focusAfter, setFocusAfter] = useState<{ id: string | null } | null>(null);
+  const card = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!focusAfter) return;
+    const target = focusAfter.id
+      ? card.current?.querySelector<HTMLElement>(`[data-edit="${CSS.escape(focusAfter.id)}"]`)
+      : card.current?.querySelector<HTMLElement>('[data-add]');
+    (target ?? card.current?.querySelector<HTMLElement>('h2'))?.focus();
+    setFocusAfter(null);
+  }, [focusAfter]);
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -42,24 +54,30 @@ export function VariablesSection() {
 
   function saved(variable: Variable, isNew: boolean) {
     setEditing(null);
+    setFocusAfter({ id: variable.id });
     setState({ status: 'ready', variables: [...variables.filter((other) => other.id !== variable.id), variable].sort(byVariableName) });
     setNotice(t(isNew ? 'settings.variable.added' : 'settings.variable.changed', { name: variable.name }));
   }
 
   function removed(variable: Variable) {
     setRemoving(null);
+    const rest = variables.filter((other) => other.id !== variable.id);
+    const next = rest[Math.min(variables.findIndex((other) => other.id === variable.id), rest.length - 1)];
+    setFocusAfter({ id: next?.id ?? null });
     setState({ status: 'ready', variables: variables.filter((other) => other.id !== variable.id) });
     setNotice(t('settings.variable.removed', { name: variable.name }));
   }
 
   const form = (variable?: Variable) => (
-    <VariableForm variable={variable} onCancel={() => setEditing(null)} onSaved={(next) => saved(next, !variable)} />
+    <VariableForm variable={variable} onSaved={(next) => saved(next, !variable)}
+      onCancel={() => { setEditing(null); setFocusAfter({ id: variable?.id ?? null }); }} />
   );
 
   return (
+    <div ref={card}>
     <SettingsCard id="settings-variables" title={t('settings.variables')} lead={t('settings.variables.lead')}
-      action={state.status === 'ready' && editing?.kind !== 'new' && (
-        <button type="button" className="btn primary sm" disabled={full}
+      action={state.status === 'ready' && editing === null && (
+        <button type="button" className="btn primary sm" disabled={full} data-add
           onClick={() => { setNotice(null); setEditing({ kind: 'new' }); }}>
           <Icon name="plus" size={16} /> {t('settings.variables.add')}
         </button>
@@ -68,7 +86,7 @@ export function VariablesSection() {
       {state.status === 'loading' && <LoadingState />}
       {state.status === 'error' && <ErrorState onRetry={() => void load()} />}
       {state.status === 'ready' && variables.length === 0 && editing?.kind !== 'new' && (
-        <div className="topics-empty">
+        <div className="variables-empty">
           <h3>{t('settings.variables.empty.title')}</h3>
           <p>{t('settings.variables.empty.body')}</p>
         </div>
@@ -88,8 +106,8 @@ export function VariablesSection() {
                   <>
                     <code className="variable-name">{variable.name}</code>
                     <span className="variable-value">{variable.value}</span>
-                    <span className="variable-actions">
-                      <button type="button" className="btn sm" aria-label={t('settings.variables.edit', { name: variable.name })}
+                    <span className="variable-actions" hidden={editing !== null}>
+                      <button type="button" className="btn sm" data-edit={variable.id} aria-label={t('settings.variables.edit', { name: variable.name })}
                         onClick={() => { setNotice(null); setEditing({ kind: 'edit', variable }); }}>
                         {t('settings.variable.editShort')}
                       </button>
@@ -104,13 +122,14 @@ export function VariablesSection() {
             ))}
             </div>
           </div>
-          <p className="topics-count">
+          <p className="variables-count">
             {full ? t('settings.variables.full', { max: MAX_VARIABLES }) : t('settings.variables.count', { count: variables.length, max: MAX_VARIABLES })}
           </p>
         </>
       )}
       {removing && <RemoveVariableDialog variable={removing} onClose={() => setRemoving(null)} onRemoved={() => removed(removing)} />}
     </SettingsCard>
+    </div>
   );
 }
 
@@ -173,6 +192,7 @@ function VariableForm({ variable, onCancel, onSaved }: {
 
   return (
     <form className="variable-form" noValidate onSubmit={(event) => void submit(event)}
+      onKeyDown={(event) => { if (event.key === 'Escape' && !busy) { event.stopPropagation(); onCancel(); } }}
       aria-label={variable ? t('settings.variables.edit', { name: variable.name }) : t('settings.variable.new')}>
       {formError && <p className="alert error" role="alert"><Icon name="alert" /> {formError}</p>}
       <div className="field">
@@ -193,7 +213,7 @@ function VariableForm({ variable, onCancel, onSaved }: {
           aria-describedby={valueError ? `${ids.valueError} ${ids.valueHint}` : ids.valueHint} />
         {valueError && <span id={ids.valueError} className="field-error"><Icon name="alert" size={16} /> {valueError}</span>}
         <span id={ids.valueHint} className={count >= MAX_VARIABLE_VALUE ? 'hint full' : 'hint'}>
-          {t('settings.variable.value.hint', { max: MAX_VARIABLE_VALUE.toLocaleString() })}{' '}
+          {t('settings.variable.value.hint')}{' '}
           <span aria-label={t('workspace.count.label', { count, max: MAX_VARIABLE_VALUE })}>
             {t('workspace.count', { count, max: MAX_VARIABLE_VALUE })}
           </span>

@@ -9,9 +9,8 @@ import java.util.UUID;
  */
 public interface WorkspaceVariables {
 
-    Map<String, String> of(UUID workspaceId);
+    /** A variable's name: letters, digits and underscores, starting with a letter, so it reads the same in braces. */
+    String NAME_PATTERN = "[A-Za-z][A-Za-z0-9_]*";
 
-    static WorkspaceVariables none() {
-        return workspaceId -> Map.of();
-    }
+    Map<String, String> of(UUID workspaceId);
 }
