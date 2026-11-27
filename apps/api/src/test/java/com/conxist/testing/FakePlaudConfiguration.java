@@ -14,8 +14,9 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
  * The fake Claude takes any key that starts with {@code sk-ant-fake-}; it is also this computer's key unless
  * {@code CONXIST_FAKE_COMPUTER_KEY=false}, to try Settings with no key at all. The fake OpenAI takes any key that
  * starts with {@code sk-fake-} and is never this computer's key. Three fake MCP servers ({@link FakeMcpServers}) log
- * their addresses at start, and a fake GitHub API ({@link FakeGitHubServer}) takes any token that starts with
- * {@code github_pat_fake}.
+ * their addresses at start, a fake GitHub API ({@link FakeGitHubServer}) takes any token that starts with
+ * {@code github_pat_fake}, and a fake Bitbucket API ({@link FakeBitbucketServer}) any email with an API token that
+ * starts with {@code ATATTfake}.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class FakePlaudConfiguration {
@@ -52,9 +53,16 @@ public class FakePlaudConfiguration {
         return new FakeGitHubServer();
     }
 
+    /** Bitbucket's API for Settings › Integrations: any email, with an API token that starts with ATATTfake. */
+    @Bean(destroyMethod = "close")
+    FakeBitbucketServer fakeBitbucket() throws IOException {
+        return new FakeBitbucketServer();
+    }
+
     @Bean
     DynamicPropertyRegistrar fakePlaudProperties(FakePlaudServer fake, FakePlaudMcpServer mcp,
-            FakeClaudeServer claude, FakeOpenAiServer openAi, FakeGitHubServer github) {
+            FakeClaudeServer claude, FakeOpenAiServer openAi, FakeGitHubServer github,
+            FakeBitbucketServer bitbucket) {
         byte[] key = new byte[32];
         new SecureRandom().nextBytes(key);
         String secretsKey = Base64.getEncoder().encodeToString(key);
@@ -73,6 +81,7 @@ public class FakePlaudConfiguration {
             // The fake MCP servers run on this computer, over plain http.
             registry.add("conxist.connectors.allow-loopback", () -> "true");
             registry.add("conxist.connectors.github-api", () -> github.baseUrl().toString());
+            registry.add("conxist.connectors.bitbucket-api", () -> bitbucket.baseUrl().toString());
         };
     }
 }

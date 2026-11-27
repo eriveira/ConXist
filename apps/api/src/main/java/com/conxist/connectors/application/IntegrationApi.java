@@ -5,21 +5,27 @@ import java.util.Map;
 import com.conxist.connectors.domain.Integration;
 
 /**
- * Reads GitHub's REST API with a person's token (ADR 0019). It only sends GET requests. Everything GitHub answers is
- * untrusted customer data. Failures are the exceptions below.
+ * Reads one service's API with a person's credential: GitHub (ADR 0019) or Bitbucket (ADR 0020). It only reads.
+ * Everything the service answers is untrusted customer data. Failures are the exceptions below.
  */
-public interface GitHubApi {
+public interface IntegrationApi {
 
-    /** The token's account and the repositories it reaches, as {@code owner/name}, by name, at most 100. */
-    Account account(String token);
+    /** The service this reads. */
+    Integration.Kind kind();
 
     /**
-     * Calls one of ConXist's GitHub tools ({@link com.conxist.connectors.domain.GitHubTools}) for the integration's
-     * repositories only, and returns GitHub's answer as short text.
+     * The credential's account and the repositories it reaches, as {@code owner/name}, by name, at most
+     * {@link Integration#MAX_REPOSITORIES}.
+     */
+    Account account(String credential);
+
+    /**
+     * Calls one of ConXist's tools for this service ({@link Integration.Kind#tools()}) for the integration's
+     * repositories only, and returns the service's answer as short text.
      *
      * @throws Problem when an argument is wrong, before anything is sent
      */
-    String call(Integration integration, String token, String tool, Map<String, Object> arguments);
+    String call(Integration integration, String credential, String tool, Map<String, Object> arguments);
 
     record Account(String login, List<String> repositories) {
     }
@@ -31,21 +37,21 @@ public interface GitHubApi {
         }
     }
 
-    /** GitHub refused the token (401). */
+    /** The service refused the credential (401). */
     final class TokenRefused extends RuntimeException {
         public TokenRefused(String reason) {
             super(reason);
         }
     }
 
-    /** GitHub has nothing there, or the token can't see it (404). */
+    /** The service has nothing there, or the credential can't see it (404). */
     final class Missing extends RuntimeException {
         public Missing(String reason) {
             super(reason);
         }
     }
 
-    /** GitHub refused the request itself (403, 422), for example a rate limit or a query it can't run. */
+    /** The service refused the request itself (403, 422, 429), for example a rate limit or a query it can't run. */
     final class Refused extends RuntimeException {
         public Refused(String reason) {
             super(reason);

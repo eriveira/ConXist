@@ -2,12 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
-import { GITHUB_ICON, type Integration, integrationUsers } from '../../domain/integrations';
+import {
+  INTEGRATION_KINDS, type Integration, type IntegrationKind, integrationUsers, kindIcon,
+} from '../../domain/integrations';
 import { allowedTools } from '../../domain/mcps';
 import { type Translate, useT } from '../../i18n/i18n';
 import { AGENTS_HREF, integrationHref, settingsHref, useIntegrationId } from '../../navigation';
 import { ErrorState, LoadingState, SettingsCard } from '../settings/SettingsParts';
 import { McpLogo } from '../mcps/McpParts';
+import { AddIntegrationDialog } from './AddIntegrationDialog';
+import { ConnectBitbucketDialog } from './ConnectBitbucketDialog';
 import { ConnectGitHubDialog } from './ConnectGitHubDialog';
 import { IntegrationPage } from './IntegrationPage';
 
@@ -15,14 +19,15 @@ type ListState = { status: 'loading' } | { status: 'error' } | { status: 'ready'
 type Notice = { kind: 'added' | 'removed'; name: string } | null;
 
 /**
- * Settings › Integrations (ADR 0019): the tools this workspace connected through their own API, and one integration's
- * page at #/settings/integrations/{id}. GitHub is the only one, so Add shows only until it is connected.
+ * Settings › Integrations (ADR 0019, ADR 0020): the tools this workspace connected through their own API, and one
+ * integration's page at #/settings/integrations/{id}. Add lists what can be added, each service once, so it shows only
+ * while one is left.
  */
 export function IntegrationsSection() {
   const t = useT();
   const integrationId = useIntegrationId();
   const [state, setState] = useState<ListState>({ status: 'loading' });
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<'pick' | IntegrationKind | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const card = useRef<HTMLDivElement>(null);
 
@@ -60,20 +65,23 @@ export function IntegrationsSection() {
   const integrations = state.status === 'ready' ? state.integrations : [];
 
   function added(integration: Integration) {
-    setAdding(false);
+    setAdding(null);
     setState({ status: 'ready', integrations: [...integrations, integration] });
     setNotice({ kind: 'added', name: integration.name });
   }
 
+  const connected = new Set(integrations.map((integration) => integration.kind));
+  const left = INTEGRATION_KINDS.filter((kind) => !connected.has(kind));
   const add = (
-    <button type="button" className="btn primary sm" onClick={() => { setNotice(null); setAdding(true); }}>
+    <button type="button" className="btn primary sm" onClick={() => { setNotice(null); setAdding('pick'); }}>
       <Icon name="plus" size={16} /> {t('integration.add')}
     </button>
   );
 
   return (
     <div ref={card}>
-    <SettingsCard id="settings-integrations" title={t('settings.integrations')} lead={t('integration.lead')}>
+    <SettingsCard id="settings-integrations" title={t('settings.integrations')} lead={t('integration.lead')}
+      action={integrations.length > 0 && left.length > 0 && add}>
       <p className="save-status" role="status">
         {notice && (
           <>
@@ -96,7 +104,7 @@ export function IntegrationsSection() {
           {integrations.map((integration) => (
             <li key={integration.id} className="vendor-item">
               <div className="vendor">
-                <McpLogo name={integration.name} icon={GITHUB_ICON} />
+                <McpLogo name={integration.name} icon={kindIcon(integration.kind)} />
                 <span className="grow">
                   <span className="vendor-name">
                     {integration.name} <Pill tone="info">{t('integration.kind')}</Pill>{' '}
@@ -115,7 +123,9 @@ export function IntegrationsSection() {
           ))}
         </ul>
       )}
-      {adding && <ConnectGitHubDialog onClose={() => setAdding(false)} onDone={added} />}
+      {adding === 'pick' && <AddIntegrationDialog connected={connected} onClose={() => setAdding(null)} onPick={setAdding} />}
+      {adding === 'GITHUB' && <ConnectGitHubDialog onClose={() => setAdding(null)} onDone={added} />}
+      {adding === 'BITBUCKET' && <ConnectBitbucketDialog onClose={() => setAdding(null)} onDone={added} />}
     </SettingsCard>
     </div>
   );

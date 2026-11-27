@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.conxist.connectors.application.IntegrationViews;
 import com.conxist.connectors.application.ManageIntegrations;
 import com.conxist.connectors.application.McpViews;
+import com.conxist.connectors.domain.Integration;
 import com.conxist.connectors.domain.McpTool;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -24,13 +25,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Settings › Integrations: connect GitHub with a token, tick the tools agents may use (ADR 0019). */
+/**
+ * Settings › Integrations: connect GitHub (ADR 0019) or Bitbucket (ADR 0020) with a token, tick the tools agents may
+ * use and, for Bitbucket, the repositories they may read.
+ */
 @RestController
 @RequestMapping("/api/integrations")
 class IntegrationsController {
 
-    private static final int MAX_TOKEN = 255;
+    /** Atlassian API tokens are longer than GitHub's. */
+    private static final int MAX_TOKEN = 500;
     private static final int MAX_TOOLS = 20;
+    private static final int MAX_EMAIL = 254;
+    private static final int MAX_REPOSITORY = 141;
 
     private final ManageIntegrations integrations;
 
@@ -45,15 +52,26 @@ class IntegrationsController {
 
     /** What the token reaches; nothing is saved. */
     @PostMapping("/github/check")
-    ResponseEntity<IntegrationViews.TokenCheckView> checkToken(@Valid @RequestBody TokenRequest request) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(integrations.checkGitHubToken(request.token()));
+    ResponseEntity<IntegrationViews.TokenCheckView> checkGitHub(@Valid @RequestBody TokenRequest request) {
+        return check(Integration.Kind.GITHUB, request);
     }
 
     @PostMapping("/github")
     @ResponseStatus(HttpStatus.CREATED)
     IntegrationViews.IntegrationView addGitHub(@Valid @RequestBody AddRequest request) {
-        return integrations.addGitHub(request.token(), Set.copyOf(request.allowedTools()));
+        return add(Integration.Kind.GITHUB, request);
+    }
+
+    /** What the email and API token reach; nothing is saved. */
+    @PostMapping("/bitbucket/check")
+    ResponseEntity<IntegrationViews.TokenCheckView> checkBitbucket(@Valid @RequestBody TokenRequest request) {
+        return check(Integration.Kind.BITBUCKET, request);
+    }
+
+    @PostMapping("/bitbucket")
+    @ResponseStatus(HttpStatus.CREATED)
+    IntegrationViews.IntegrationView addBitbucket(@Valid @RequestBody AddRequest request) {
+        return add(Integration.Kind.BITBUCKET, request);
     }
 
     @GetMapping("/{integrationId}")
@@ -76,7 +94,19 @@ class IntegrationsController {
     @PutMapping("/{integrationId}/token")
     IntegrationViews.IntegrationView replaceToken(@PathVariable UUID integrationId,
             @Valid @RequestBody TokenRequest request) {
-        return integrations.replaceToken(integrationId, request.token());
+        return integrations.replaceToken(integrationId, request.email(), request.token());
+    }
+
+    /** The repositories the token reaches now, to pick from again (Bitbucket). */
+    @PostMapping("/{integrationId}/reachable")
+    IntegrationViews.TokenCheckView reachable(@PathVariable UUID integrationId) {
+        return integrations.reachable(integrationId);
+    }
+
+    @PutMapping("/{integrationId}/repositories")
+    IntegrationViews.IntegrationView pickRepositories(@PathVariable UUID integrationId,
+            @Valid @RequestBody RepositoriesRequest request) {
+        return integrations.pickRepositories(integrationId, request.repositories());
     }
 
     @GetMapping("/{integrationId}/uses")
@@ -90,11 +120,28 @@ class IntegrationsController {
         integrations.remove(integrationId);
     }
 
-    record TokenRequest(@Size(max = MAX_TOKEN) String token) {
+    private ResponseEntity<IntegrationViews.TokenCheckView> check(Integration.Kind kind, TokenRequest request) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(integrations.checkToken(kind, request.email(), request.token()));
     }
 
-    record AddRequest(@Size(max = MAX_TOKEN) String token,
+    private IntegrationViews.IntegrationView add(Integration.Kind kind, AddRequest request) {
+        return integrations.add(kind, request.email(), request.token(), request.repositories(),
+                Set.copyOf(request.allowedTools()));
+    }
+
+    /** @param email the Atlassian email, for Bitbucket only */
+    record TokenRequest(@Size(max = MAX_EMAIL) String email, @Size(max = MAX_TOKEN) String token) {
+    }
+
+    /** @param repositories the ones agents may read, for Bitbucket only */
+    record AddRequest(@Size(max = MAX_EMAIL) String email, @Size(max = MAX_TOKEN) String token,
+            @Size(max = Integration.MAX_REPOSITORIES) List<@NotNull @Size(max = MAX_REPOSITORY) String> repositories,
             @NotNull @Size(max = MAX_TOOLS) List<@NotNull @Pattern(regexp = McpTool.NAME_PATTERN) String> allowedTools) {
+    }
+
+    record RepositoriesRequest(@NotNull @Size(max = Integration.MAX_REPOSITORIES)
+            List<@NotNull @Size(max = MAX_REPOSITORY) String> repositories) {
     }
 
     record UpdateRequest(

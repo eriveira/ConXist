@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
-import { GITHUB_ICON, type Integration, integrationUsers } from '../../domain/integrations';
+import { type Integration, integrationUsers, kindIcon } from '../../domain/integrations';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { McpLogo } from '../mcps/McpParts';
@@ -32,7 +32,7 @@ export function RemoveIntegrationDialog({ integration, onClose, onRemoved }: {
     <Dialog
       title={t('github.remove.title', { name: integration.name })}
       subtitle={t('github.remove.subtitle')}
-      icon={<McpLogo name={integration.name} icon={GITHUB_ICON} size="sm" />}
+      icon={<McpLogo name={integration.name} icon={kindIcon(integration.kind)} size="sm" />}
       closeLabel={t('dialog.close')}
       onClose={onClose}
       step="remove-integration"

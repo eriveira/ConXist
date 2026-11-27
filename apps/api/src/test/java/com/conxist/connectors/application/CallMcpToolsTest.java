@@ -61,7 +61,10 @@ class CallMcpToolsTest {
         public void replaceToken(com.conxist.connectors.domain.Integration integration, String token) { }
         public boolean delete(UUID workspaceId, UUID id) { return false; }
     };
-    private final GitHubApi noGitHub = new GitHubApi() {
+    private final IntegrationApi noGitHub = new IntegrationApi() {
+        public com.conxist.connectors.domain.Integration.Kind kind() {
+            return com.conxist.connectors.domain.Integration.Kind.GITHUB;
+        }
         public Account account(String token) { throw new UnsupportedOperationException(); }
         public String call(com.conxist.connectors.domain.Integration integration, String token, String tool,
                 Map<String, Object> arguments) {
@@ -69,7 +72,7 @@ class CallMcpToolsTest {
         }
     };
     private final CallMcpTools toolbox = new CallMcpTools(servers, new McpCredentials(servers, gateway, CLOCK), gateway,
-            noIntegrations, noGitHub, () -> WORKSPACE, CLOCK);
+            noIntegrations, List.of(noGitHub), () -> WORKSPACE, CLOCK);
 
     @Test
     void a_tool_unticked_after_it_was_offered_is_not_called() {

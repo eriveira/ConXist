@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import com.conxist.testing.FakeBitbucketServer;
 import com.conxist.testing.FakeGitHubServer;
 import com.conxist.testing.FakePlaudConfiguration;
 import com.jayway.jsonpath.JsonPath;
@@ -31,7 +32,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-/** The GitHub integration end to end (ADR 0019): a real PostgreSQL, the real HTTP adapter and a fake GitHub API. */
+/**
+ * The GitHub (ADR 0019) and Bitbucket (ADR 0020) integrations end to end: a real PostgreSQL, the real HTTP adapters
+ * and fake GitHub and Bitbucket APIs.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({PostgresContainerConfiguration.class, FakePlaudConfiguration.class})
@@ -55,7 +59,61 @@ class IntegrationsIntegrationTest {
     FakeGitHubServer github;
 
     @Autowired
+    FakeBitbucketServer bitbucket;
+
+    @Autowired
     JdbcClient jdbc;
+
+    @Test
+    void bitbucket_is_added_with_an_email_and_api_token_for_the_repositories_the_person_picks() throws Exception {
+        String workspace = workspace("Bitbucket");
+        String email = FakeBitbucketServer.EMAIL;
+        String token = FakeBitbucketServer.TOKEN;
+        bitbucketCheck(workspace, "", token).andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("integration.email-required"));
+        bitbucketCheck(workspace, email, "ATATTwrong0123").andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("integration.bitbucket-token-refused"));
+        bitbucketCheck(workspace, email, token).andExpect(status().isOk())
+                .andExpect(jsonPath("$.account").value(email))
+                .andExpect(jsonPath("$.repositories.length()").value(3))
+                .andExpect(jsonPath("$.tools.length()").value(5))
+                .andExpect(jsonPath("$.tools[2].name").value("list_pull_requests"));
+
+        String body = "{\"email\":\"" + email + "\",\"token\":\"" + token + "\",\"repositories\":%s,"
+                + "\"allowedTools\":[\"get_file\",\"list_commits\"]}";
+        mvc.perform(post("/api/integrations/bitbucket").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(body.formatted("[\"other/secret\"]")))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("integration.repository-unknown"));
+        String integration = JsonPath.read(mvc.perform(post("/api/integrations/bitbucket").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(body.formatted("[\"acme/api\"]")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.kind").value("BITBUCKET"))
+                .andExpect(jsonPath("$.name").value("Bitbucket"))
+                .andExpect(jsonPath("$.repositories.length()").value(1))
+                .andExpect(jsonPath("$.tokenEnding").value("Q7f1"))
+                .andExpect(content().string(Matchers.not(Matchers.containsString(token))))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+
+        byte[] sealed = jdbc.sql("select token_sealed from integrations where id = cast(:id as uuid)")
+                .param("id", integration).query(byte[].class).single();
+        assertThat(new String(sealed, StandardCharsets.ISO_8859_1)).doesNotContain(token).doesNotContain(email);
+        mvc.perform(post("/api/integrations/{id}/reachable", integration).header(HEADER, workspace))
+                .andExpect(jsonPath("$.repositories.length()").value(3));
+        mvc.perform(put("/api/integrations/{id}/repositories", integration).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"repositories\":[\"acme/web\",\"acme/api\"]}"))
+                .andExpect(jsonPath("$.repositories[0]").value("acme/web"))
+                .andExpect(jsonPath("$.repositories[1]").value("acme/api"));
+        mvc.perform(put("/api/integrations/{id}/token", integration).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"token\":\"" + FakeBitbucketServer.TOKEN_PREFIX
+                                + "NewOneWxYz\"}"))
+                .andExpect(jsonPath("$.tokenEnding").value("WxYz"))
+                .andExpect(jsonPath("$.repositories.length()").value(2));
+        mvc.perform(post("/api/integrations/{id}/check", integration).header(HEADER, workspace))
+                .andExpect(jsonPath("$.works").value(true));
+        assertThat(bitbucket.requests()).allMatch(request -> request.startsWith("GET "));
+    }
 
     @Test
     void a_fine_grained_token_is_checked_then_github_is_added_with_its_token_sealed() throws Exception {
@@ -65,7 +123,7 @@ class IntegrationsIntegrationTest {
         check(workspace, "ghp_classic0123456789").andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("integration.token-not-fine-grained"));
         check(workspace, "github_pat_wrong0123456789").andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("integration.token-refused"));
+                .andExpect(jsonPath("$.code").value("integration.github-token-refused"));
         check(workspace, TOKEN).andExpect(status().isOk())
                 .andExpect(jsonPath("$.account").value("alex-acme"))
                 .andExpect(jsonPath("$.repositories[0]").value("acme/api"))
@@ -147,7 +205,7 @@ class IntegrationsIntegrationTest {
                 .andExpect(jsonPath("$[0].tools[0].usedBy[0].agentName").value("Code reader"));
         mvc.perform(delete("/api/integrations/{id}", integration).header(HEADER, workspace))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("integration.in-use"));
+                .andExpect(jsonPath("$.code").value("integration.github-in-use"));
 
         mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON).content(draft(2, integration, "get_file")))
@@ -169,6 +227,12 @@ class IntegrationsIntegrationTest {
                 "style":"PRECISE","accepts":["TRANSCRIPT"],"givesBack":"FREE_TEXT",
                 "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
                 """.formatted(revision, tools);
+    }
+
+    private ResultActions bitbucketCheck(String workspace, String email, String token) throws Exception {
+        return mvc.perform(post("/api/integrations/bitbucket/check").header(HEADER, workspace)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\",\"token\":\"" + token + "\"}"));
     }
 
     private ResultActions check(String workspace, String token) throws Exception {

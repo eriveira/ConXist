@@ -2,6 +2,7 @@ package com.conxist.connectors.application;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -20,8 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The current workspace's MCP tools, and its integrations' tools (ADR 0019), as a run offers and calls them (ADR 0017). A tool is offered and called only while
- * the workspace allows it and the server marks it read-only, checked again on every call. What a tool answers is
+ * The current workspace's MCP tools, and its integrations' tools (ADR 0019, ADR 0020), as a run offers and calls them
+ * (ADR 0017). A tool is offered and called only while the workspace allows it and the server marks it read-only, or
+ * it is one of ConXist's own read tools for an integration, checked again on every call. What a tool answers is
  * untrusted data, cut to {@link #MAX_ANSWER_CHARACTERS}; a run wraps it as data before the model reads it.
  */
 public final class CallMcpTools implements McpToolbox {
@@ -40,17 +42,17 @@ public final class CallMcpTools implements McpToolbox {
     private final McpCredentials credentials;
     private final McpGateway gateway;
     private final IntegrationRepository integrations;
-    private final GitHubApi github;
+    private final Map<Integration.Kind, IntegrationApi> apis = new EnumMap<>(Integration.Kind.class);
     private final CurrentWorkspace workspace;
     private final Clock clock;
 
     public CallMcpTools(McpServerRepository servers, McpCredentials credentials, McpGateway gateway,
-            IntegrationRepository integrations, GitHubApi github, CurrentWorkspace workspace, Clock clock) {
+            IntegrationRepository integrations, List<IntegrationApi> apis, CurrentWorkspace workspace, Clock clock) {
         this.servers = servers;
         this.credentials = credentials;
         this.gateway = gateway;
         this.integrations = integrations;
-        this.github = github;
+        apis.forEach(api -> this.apis.put(api.kind(), api));
         this.workspace = workspace;
         this.clock = clock;
     }
@@ -120,7 +122,7 @@ public final class CallMcpTools implements McpToolbox {
         }
     }
 
-    /** One of ConXist's own tools for an integration (ADR 0019); its answer is GitHub's data, untrusted. */
+    /** One of ConXist's own tools for an integration; its answer is the service's data, untrusted. */
     private Result callIntegration(Integration integration, String tool, Map<String, Object> arguments) {
         if (!integration.allows(tool)) {
             return new Result("This tool is no longer allowed in this workspace.", true);
@@ -129,38 +131,45 @@ public final class CallMcpTools implements McpToolbox {
             return new Result("The arguments are too long. Send this tool only what it asks for.", true);
         }
         if (integration.status() == Integration.Status.SIGN_IN_NEEDED) {
-            return new Result("GitHub refused ConXist's token. A person replaces it in Settings.", true);
+            return new Result(integration.name() + " refused ConXist's token. A person replaces it in Settings.", true);
+        }
+        IntegrationApi api = apis.get(integration.kind());
+        if (api == null) {
+            return new Result("This tool is no longer allowed in this workspace.", true);
         }
         return integrations.token(integration.workspaceId(), integration.id())
-                .map(token -> callGitHub(integration, token, tool, arguments))
+                .map(token -> callService(api, integration, token, tool, arguments))
                 .orElseGet(() -> new Result("This integration is no longer in this workspace.", true));
     }
 
-    private Result callGitHub(Integration integration, String token, String tool, Map<String, Object> arguments) {
+    private Result callService(IntegrationApi api, Integration integration, String credential, String tool,
+            Map<String, Object> arguments) {
+        String name = integration.name();
         try {
-            return new Result(capped(github.call(integration, token, tool, arguments), MAX_ANSWER_CHARACTERS), false);
-        } catch (GitHubApi.Problem problem) {
+            return new Result(capped(api.call(integration, credential, tool, arguments), MAX_ANSWER_CHARACTERS),
+                    false);
+        } catch (IntegrationApi.Problem problem) {
             return new Result(problem.getMessage(), true);
-        } catch (GitHubApi.Missing missing) {
-            return new Result("GitHub has nothing there, or the token can't see it.", true);
-        } catch (GitHubApi.Refused refused) {
-            log.info("Workspace {}: GitHub refused a call to {} on integration {}", integration.workspaceId(), tool,
+        } catch (IntegrationApi.Missing missing) {
+            return new Result(name + " has nothing there, or the token can't see it.", true);
+        } catch (IntegrationApi.Refused refused) {
+            log.info("Workspace {}: {} refused a call to {} on integration {}", integration.workspaceId(), name, tool,
                     integration.id());
-            return new Result("GitHub refused this request. It may be limiting requests: try again later.", true);
-        } catch (GitHubApi.TokenRefused refused) {
+            return new Result(name + " refused this request. It may be limiting requests: try again later.", true);
+        } catch (IntegrationApi.TokenRefused refused) {
             integrations.update(integration.withStatus(Integration.Status.SIGN_IN_NEEDED, clock.instant()));
-            log.info("Workspace {}: GitHub refused the token of integration {}", integration.workspaceId(),
+            log.info("Workspace {}: {} refused the token of integration {}", integration.workspaceId(), name,
                     integration.id());
-            return new Result("GitHub refused ConXist's token. A person replaces it in Settings.", true);
-        } catch (GitHubApi.Unreachable unreachable) {
-            log.info("Workspace {}: GitHub could not be reached for integration {}", integration.workspaceId(),
+            return new Result(name + " refused ConXist's token. A person replaces it in Settings.", true);
+        } catch (IntegrationApi.Unreachable unreachable) {
+            log.info("Workspace {}: {} could not be reached for integration {}", integration.workspaceId(), name,
                     integration.id());
-            return new Result("GitHub could not be reached. Try again later.", true);
+            return new Result(name + " could not be reached. Try again later.", true);
         } catch (RuntimeException unexpected) {
             // Only the class: the message may hold what the model searched for, which is customer data.
-            log.warn("Workspace {}: a call to GitHub for integration {} failed: {}", integration.workspaceId(),
+            log.warn("Workspace {}: a call to {} for integration {} failed: {}", integration.workspaceId(), name,
                     integration.id(), unexpected.getClass().getSimpleName());
-            return new Result("GitHub could not be reached. Try again later.", true);
+            return new Result(name + " could not be reached. Try again later.", true);
         }
     }
 

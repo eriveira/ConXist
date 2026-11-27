@@ -12,6 +12,7 @@ import org.springframework.validation.annotation.Validated;
  * @param redirectUri   where a server's sign-in page sends the person back: this API's callback, on this machine
  * @param allowLoopback lets plain http on this computer through; only tests and the local fake turn it on
  * @param githubApi     GitHub's REST API (ADR 0019); only tests and the local fake point it elsewhere
+ * @param bitbucketApi  Bitbucket Cloud's REST API, version 2.0 (ADR 0020); likewise
  */
 @Validated
 @ConfigurationProperties("conxist.connectors")
@@ -20,5 +21,6 @@ public record ConnectorsProperties(
         boolean allowLoopback,
         @NotNull Duration connectTimeout,
         @NotNull Duration readTimeout,
-        @NotNull URI githubApi) {
+        @NotNull URI githubApi,
+        @NotNull URI bitbucketApi) {
 }

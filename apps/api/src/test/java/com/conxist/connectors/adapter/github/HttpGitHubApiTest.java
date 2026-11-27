@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import com.conxist.connectors.application.GitHubApi;
+import com.conxist.connectors.application.IntegrationApi;
 import com.conxist.connectors.domain.Integration;
 import com.conxist.testing.FakeGitHubServer;
 import org.junit.jupiter.api.AfterEach;
@@ -38,8 +38,8 @@ class HttpGitHubApiTest {
     @Test
     void reads_the_account_and_its_repositories_and_refuses_a_wrong_token() {
         assertThat(github.account(FakeGitHubServer.TOKEN))
-                .isEqualTo(new GitHubApi.Account("alex-acme", List.of("acme/api", "acme/web")));
-        assertThatThrownBy(() -> github.account("github_pat_wrong")).isInstanceOf(GitHubApi.TokenRefused.class);
+                .isEqualTo(new IntegrationApi.Account("alex-acme", List.of("acme/api", "acme/web")));
+        assertThatThrownBy(() -> github.account("github_pat_wrong")).isInstanceOf(IntegrationApi.TokenRefused.class);
     }
 
     @Test
@@ -66,6 +66,6 @@ class HttpGitHubApiTest {
     @Test
     void a_missing_path_is_missing() {
         assertThatThrownBy(() -> github.call(integration, FakeGitHubServer.TOKEN, "get_file",
-                Map.of("repository", "acme/web", "path", "nothing.md"))).isInstanceOf(GitHubApi.Missing.class);
+                Map.of("repository", "acme/web", "path", "nothing.md"))).isInstanceOf(IntegrationApi.Missing.class);
     }
 }

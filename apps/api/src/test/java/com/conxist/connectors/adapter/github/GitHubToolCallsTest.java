@@ -1,5 +1,6 @@
 package com.conxist.connectors.adapter.github;
 
+import com.conxist.connectors.adapter.api.ToolArguments;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -9,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import com.conxist.connectors.application.GitHubApi;
+import com.conxist.connectors.application.IntegrationApi;
 import com.conxist.connectors.domain.Integration;
 import org.junit.jupiter.api.Test;
 
@@ -48,7 +49,7 @@ class GitHubToolCallsTest {
     void a_repository_the_integration_does_not_list_is_refused_before_github_is_asked() {
         assertThatThrownBy(() -> calls.call(github, "t", "get_issue", Map.of("repository", "evil/secrets",
                 "number", 1)))
-                .isInstanceOf(GitHubApi.Problem.class)
+                .isInstanceOf(IntegrationApi.Problem.class)
                 .hasMessageContaining("acme/api, acme/web");
         assertThat(sent).isEmpty();
     }
@@ -56,11 +57,11 @@ class GitHubToolCallsTest {
     @Test
     void a_path_that_climbs_out_or_a_ref_with_odd_characters_is_refused() {
         assertThatThrownBy(() -> calls.call(github, "t", "get_file", Map.of("repository", "acme/api",
-                "path", "src/../../user"))).isInstanceOf(GitHubApi.Problem.class);
+                "path", "src/../../user"))).isInstanceOf(IntegrationApi.Problem.class);
         assertThatThrownBy(() -> calls.call(github, "t", "get_file", Map.of("repository", "acme/api",
-                "path", "README.md", "ref", "main?x=1"))).isInstanceOf(GitHubApi.Problem.class);
+                "path", "README.md", "ref", "main?x=1"))).isInstanceOf(IntegrationApi.Problem.class);
         assertThatThrownBy(() -> calls.call(github, "t", "get_issue", Map.of("repository", "acme/api",
-                "number", "1/comments"))).isInstanceOf(GitHubApi.Problem.class);
+                "number", "1/comments"))).isInstanceOf(IntegrationApi.Problem.class);
         assertThat(sent).isEmpty();
     }
 
@@ -81,10 +82,10 @@ class GitHubToolCallsTest {
 
     @Test
     void a_search_keeps_code_words_and_drops_github_syntax_in_any_case() {
-        assertThat(GitHubToolCalls.plainWords("std::vector Foo::bar")).isEqualTo("std::vector Foo::bar");
-        assertThat(GitHubToolCalls.plainWords("refund Repo:evil/x ORG:evil -user:x (path:src OR NOT y)"))
+        assertThat(ToolArguments.plainWords("std::vector Foo::bar")).isEqualTo("std::vector Foo::bar");
+        assertThat(ToolArguments.plainWords("refund Repo:evil/x ORG:evil -user:x (path:src OR NOT y)"))
                 .isEqualTo("refund y");
-        assertThat(GitHubToolCalls.plainWords("http://acme.test")).isEmpty();
+        assertThat(ToolArguments.plainWords("http://acme.test")).isEmpty();
     }
 
     @Test
