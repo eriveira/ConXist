@@ -150,6 +150,8 @@ public final class OpenAiModel implements ModelPort {
         ChatCompletionCreateParams.Builder params = ChatCompletionCreateParams.builder()
                 .model(model.id())
                 .maxCompletionTokens(model.maxTokens())
+                // Nothing of a run is kept (ADR 0012): OpenAI is asked not to store the completion either.
+                .store(false)
                 .addDeveloperMessage(request.system())
                 .addUserMessage(request.firstMessage());
         if (OpenAiModels.reasons(model.id())) {

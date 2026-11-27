@@ -52,6 +52,9 @@ class OpenAiModelTest {
         assertThat(sent.path("messages").get(0).path("role").asString()).isEqualTo("developer");
         assertThat(sent.path("messages").get(0).path("content").asString()).isEqualTo("The rules.");
         assertThat(sent.has("temperature")).isFalse();
+        assertThat(sent.path("store").isBoolean()).isTrue();
+        assertThat(sent.path("store").asBoolean()).isFalse();
+        assertThat(sent.has("user")).isFalse();
         JsonNode format = sent.path("response_format");
         assertThat(format.path("type").asString()).isEqualTo("json_schema");
         assertThat(format.path("json_schema").path("strict").asBoolean()).isTrue();
