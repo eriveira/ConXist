@@ -6,9 +6,10 @@ import { SETTINGS_SECTIONS, settingsHref, useSettingsSection } from '../../navig
 import { GeneralSection } from './GeneralSection';
 import { LlmProvidersSection } from './LlmProvidersSection';
 import { VariablesSection } from './VariablesSection';
+import { IntegrationsSection } from '../integrations/IntegrationsSection';
 import { McpsSection } from '../mcps/McpsSection';
 
-/** A workspace's Settings, opened from the workspace menu: General, LLM providers, MCPs and Variables. */
+/** A workspace's Settings, opened from the workspace menu: General, LLM providers, MCPs, Integrations and Variables. */
 export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onSaved: (workspace: Workspace) => void }) {
   const t = useT();
   const section = useSettingsSection();
@@ -35,6 +36,7 @@ export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onS
           {section === 'general' && <GeneralSection workspace={workspace} onSaved={onSaved} />}
           {section === 'llm' && <LlmProvidersSection />}
           {section === 'mcps' && <McpsSection />}
+          {section === 'integrations' && <IntegrationsSection />}
           {section === 'variables' && <VariablesSection />}
         </div>
       </div>

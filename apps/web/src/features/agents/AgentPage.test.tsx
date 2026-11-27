@@ -38,6 +38,7 @@ function api(agent: Agent, routes: Parameters<typeof stubApi>[0] = {}) {
     'GET /api/skills': () => ({ body: SKILLS }),
     'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
     'GET /api/mcps': () => ({ body: [] }),
+    'GET /api/integrations': () => ({ body: [] }),
     'GET /api/variables': () => ({ body: [{ id: 'v1', name: 'company_name', value: 'Acme Inc.' }] }),
     'GET /api/test-runs/status': () => ({ body: { ready: true } }),
     [`GET /api/sources/${SOURCE.id}/documents`]: () => ({ body: [] }),
@@ -332,7 +333,7 @@ describe('AgentPage', () => {
 
     const group = await screen.findByRole('group', { name: /Acme Docs/ });
     expect(within(group).queryByRole('checkbox', { name: /create_doc/ })).not.toBeInTheDocument();
-    expect(screen.getByText('old_tool from an MCP server is no longer allowed.')).toBeInTheDocument();
+    expect(screen.getByText('old_tool is no longer allowed in this workspace.')).toBeInTheDocument();
     expect(screen.getByText('Before you publish').parentElement).toHaveTextContent('Remove the MCP tools that are no longer allowed.');
     expect(screen.getByRole('link', { name: 'Settings › MCPs' })).toHaveAttribute('href', '#/settings/mcps');
     expect(await accessibilityViolations(container)).toEqual([]);
@@ -343,11 +344,33 @@ describe('AgentPage', () => {
     expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.mcpTools).toEqual([{ serverId, tool: 'search_docs' }]);
   });
 
+  it('offers GitHub’s allowed tools as their own group, marked API', async () => {
+    const integrationId = '77777777-7777-7777-7777-777777777777';
+    const read = (name: string, allowed: boolean) => ({ name, title: name, description: `About ${name}.`, readOnly: true, allowed, usedBy: [] });
+    const calls = api(AGENT, {
+      'GET /api/integrations': () => ({ body: [{
+        id: integrationId, kind: 'GITHUB', name: 'GitHub', account: 'alex-acme', repositories: ['acme/api'], tokenEnding: '9kQ2',
+        status: 'WORKS', tools: [read('search_code', true), read('get_file', false)],
+        addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
+      }] }),
+      [`PUT /api/agents/${ID}/draft`]: (init) => ({ body: { ...AGENT, revision: 2, draft: JSON.parse(String(init?.body)).draft } }),
+    });
+    render(<AgentPage agentId={ID} />);
+
+    const group = await screen.findByRole('group', { name: /GitHub/ });
+    expect(group).toHaveTextContent('API');
+    expect(within(group).queryByRole('checkbox', { name: /get_file/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Settings › Integrations' })).toHaveAttribute('href', '#/settings/integrations');
+    await userEvent.click(within(group).getByRole('checkbox', { name: /search_code/ }));
+    await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
+    expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.mcpTools).toEqual([{ serverId: integrationId, tool: 'search_code' }]);
+  });
+
   it('keeps the agent editable when the MCP servers can’t load', async () => {
     api(AGENT, { 'GET /api/mcps': () => ({ status: 500, body: {} }) });
     render(<AgentPage agentId={ID} />);
 
-    expect(await screen.findByText(/The MCP servers’ tools could not load/)).toBeInTheDocument();
+    expect(await screen.findByText(/The tools of MCP servers and integrations could not load/)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
     expect(await screen.findByRole('checkbox', { name: /Specs/ })).toBeInTheDocument();
   });

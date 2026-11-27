@@ -14,7 +14,7 @@ import com.conxist.connectors.application.McpGateway;
  * Reads an answer up to a limit and within a deadline, so a broken or hostile server can neither fill the memory with
  * one answer nor hold a thread by sending it a byte at a time. The client's read timeout only covers the headers.
  */
-final class BoundedBody {
+public final class BoundedBody {
 
     static final Duration DEADLINE = Duration.ofSeconds(30);
     private static final ScheduledExecutorService CLOSER = Executors.newSingleThreadScheduledExecutor(task -> {
@@ -26,7 +26,7 @@ final class BoundedBody {
     private BoundedBody() {
     }
 
-    static byte[] read(InputStream body, int maxBytes) throws IOException {
+    public static byte[] read(InputStream body, int maxBytes) throws IOException {
         return read(body, maxBytes, DEADLINE);
     }
 

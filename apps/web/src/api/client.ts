@@ -4,6 +4,7 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
+import type { Integration, IntegrationCheck, TokenCheck } from '../domain/integrations';
 import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
 import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels } from '../domain/settings';
 import type { Variable } from '../domain/variables';
@@ -100,6 +101,10 @@ export interface NewAgent {
 const agentPath = (agentId: string) => `/api/agents/${encodeURIComponent(agentId)}`;
 const skillPath = (skillId: string) => `/api/skills/${encodeURIComponent(skillId)}`;
 
+function integrationPath(id: string): string {
+  return `/api/integrations/${encodeURIComponent(id)}`;
+}
+
 function mcpPath(serverId: string): string {
   return `/api/mcps/${encodeURIComponent(serverId)}`;
 }
@@ -129,6 +134,15 @@ export const api = {
   mcpSignedIn: (serverId: string, connectionId: string) =>
     postJson<McpServer>(`${mcpPath(serverId)}/credential`, { connectionId }),
   removeMcp: (serverId: string) => request<void>(mcpPath(serverId), { method: 'DELETE' }),
+  integrations: () => request<Integration[]>('/api/integrations'),
+  integration: (id: string) => request<Integration>(integrationPath(id)),
+  checkGitHubToken: (token: string) => postJson<TokenCheck>('/api/integrations/github/check', { token }),
+  addGitHub: (token: string, allowedTools: string[]) =>
+    postJson<Integration>('/api/integrations/github', { token, allowedTools }),
+  updateIntegration: (id: string, allowedTools: string[]) => putJson<Integration>(integrationPath(id), { allowedTools }),
+  checkIntegration: (id: string) => postJson<IntegrationCheck>(`${integrationPath(id)}/check`, {}),
+  replaceIntegrationToken: (id: string, token: string) => putJson<Integration>(`${integrationPath(id)}/token`, { token }),
+  removeIntegration: (id: string) => request<void>(integrationPath(id), { method: 'DELETE' }),
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
   /** Where this workspace's new blank agents start; agents already made keep their own pick. */
   setDefaultModel: (pick: AgentModel) => putJson<LlmProviders>('/api/llm-providers/default', pick),

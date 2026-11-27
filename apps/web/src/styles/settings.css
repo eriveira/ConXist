@@ -110,6 +110,10 @@
 .mcp-actions { justify-content: flex-start; margin: 0 0 8px; }
 .mcp-found { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .mcp-found h3 { margin: 0; overflow-wrap: anywhere; }
+.github-steps { margin: 0 0 16px; padding-left: 20px; color: var(--cx-fg-muted); font-size: 14px; display: grid; gap: 4px; }
+.ok-line { display: flex; align-items: flex-start; gap: 6px; color: var(--cx-ok-fg); font-weight: 600; overflow-wrap: anywhere; }
+.repo-list { list-style: none; margin: 8px 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.repo-list li { padding: 4px 10px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); font-size: 13.5px; overflow-wrap: anywhere; }
 .mcp-selrow { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 13.5px; }
 .mcp-wait { display: flex; gap: 8px; align-items: center; }
 .mcp-switch { align-self: flex-start; }

@@ -8,6 +8,7 @@ import { runEn, runEs } from './runMessages';
 import { deleteEn, deleteEs } from './deleteMessages';
 import { settingsEn, settingsEs } from './settingsMessages';
 import { mcpEn, mcpEs } from './mcpMessages';
+import { integrationEn, integrationEs } from './integrationMessages';
 
 const en = {
   ...pickerEn,
@@ -15,7 +16,7 @@ const en = {
   ...editEn,
   ...shellEn,
   ...agentEn,
-  ...skillEn, ...runEn, ...deleteEn, ...settingsEn, ...mcpEn,
+  ...skillEn, ...runEn, ...deleteEn, ...settingsEn, ...mcpEn, ...integrationEn,
   'app.theme': 'Theme',
   'app.theme.system': 'System',
   'app.theme.light': 'Light', 'app.theme.dark': 'Dark',
@@ -208,7 +209,7 @@ const es: Messages = {
   ...editEs,
   ...shellEs,
   ...agentEs,
-  ...skillEs, ...runEs, ...deleteEs, ...settingsEs, ...mcpEs,
+  ...skillEs, ...runEs, ...deleteEs, ...settingsEs, ...mcpEs, ...integrationEs,
   'app.theme': 'Tema',
   'app.theme.system': 'Sistema',
   'app.theme.light': 'Claro', 'app.theme.dark': 'Oscuro',

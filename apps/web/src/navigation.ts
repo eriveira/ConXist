@@ -61,7 +61,7 @@ export function useAgentsRoute(): AgentsRoute {
 }
 
 /** The parts of a workspace's Settings, each at #/settings/{section}; #/settings opens General. */
-export const SETTINGS_SECTIONS = ['general', 'llm', 'mcps', 'variables'] as const;
+export const SETTINGS_SECTIONS = ['general', 'llm', 'mcps', 'integrations', 'variables'] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 export function settingsSectionOf(hash: string): SettingsSection {
@@ -88,6 +88,27 @@ export function useMcpServerId(): string | null {
   const [id, setId] = useState(() => mcpServerIdOf(window.location.hash));
   useEffect(() => {
     const onChange = () => setId(mcpServerIdOf(window.location.hash));
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return id;
+}
+
+/** One integration's page in Settings, at #/settings/integrations/{id}. */
+export function integrationHref(integrationId: string): string {
+  return `#/settings/integrations/${integrationId}`;
+}
+
+/** The integration the address shows, if any. */
+export function integrationIdOf(hash: string): string | null {
+  return /^#\/settings\/integrations\/([0-9a-fA-F-]{36})$/.exec(hash)?.[1] ?? null;
+}
+
+/** The integration in the address, following the back button and links. */
+export function useIntegrationId(): string | null {
+  const [id, setId] = useState(() => integrationIdOf(window.location.hash));
+  useEffect(() => {
+    const onChange = () => setId(integrationIdOf(window.location.hash));
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);

@@ -47,7 +47,7 @@ public final class McpServerViews {
                 connection.error());
     }
 
-    private static McpViews.ToolView tool(McpTool tool, List<AgentBriefs.McpToolUse> uses) {
+    static McpViews.ToolView tool(McpTool tool, List<AgentBriefs.McpToolUse> uses) {
         return new McpViews.ToolView(tool.name(), tool.title(), tool.description(), tool.readOnly(), tool.allowed(),
                 uses.stream().map(use -> new McpViews.AgentUseView(use.agentId(), use.agentName(), use.where(),
                         use.archived())).toList());
