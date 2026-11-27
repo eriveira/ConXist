@@ -34,6 +34,10 @@ public final class PublishAgent {
                 throw new InvalidAgent(AgentBook.SKILL_NEEDS_TOOL,
                         "A skill this agent follows needs a tool that is off. Turn it on in Tools, or remove the skill.");
             }
+            if (problems.contains(AgentBook.MCP_TOOL_UNAVAILABLE)) {
+                throw new InvalidAgent(AgentBook.MCP_TOOL_UNAVAILABLE,
+                        "An MCP tool this agent uses is no longer allowed. Remove it from Tools, then publish.");
+            }
             Agent.Published published = agent.publish(book.clock().instant());
             book.save(agent, published.agent());
             book.agents().addVersion(published.version());

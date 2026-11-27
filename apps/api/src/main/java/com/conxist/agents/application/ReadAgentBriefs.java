@@ -1,6 +1,9 @@
 package com.conxist.agents.application;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import com.conxist.agents.AgentBrief;
@@ -10,6 +13,7 @@ import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentDefinition;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTool;
+import com.conxist.agents.domain.McpToolPick;
 
 /**
  * An agent's draft for a run. Each skill is read again at its pinned version, in this workspace only (ADR 0011); a
@@ -41,6 +45,27 @@ public final class ReadAgentBriefs implements AgentBriefs {
                 .toList();
     }
 
+    @Override
+    public List<McpToolUse> mcpToolUses() {
+        UUID workspaceId = book.workspaceId();
+        List<McpToolUse> uses = new ArrayList<>();
+        for (Agent agent : book.agents().findAll(workspaceId)) {
+            Set<McpToolPick> live = agent.publishedVersion() > 0 ? book.agents()
+                    .version(workspaceId, agent.id(), agent.publishedVersion())
+                    .map(version -> Set.copyOf(version.definition().mcpTools())).orElse(Set.of()) : Set.of();
+            Set<McpToolPick> picks = new LinkedHashSet<>(agent.draft().mcpTools());
+            picks.addAll(live);
+            for (McpToolPick pick : picks) {
+                boolean inDraft = agent.draft().mcpTools().contains(pick);
+                boolean inLive = live.contains(pick);
+                uses.add(new McpToolUse(pick.serverId(), pick.tool(), agent.id(), agent.draft().name(),
+                        inDraft && inLive ? "BOTH" : inDraft ? "DRAFT" : "LIVE",
+                        agent.status() == AgentStatus.ARCHIVED));
+            }
+        }
+        return List.copyOf(uses);
+    }
+
     private AgentBrief brief(Agent agent) {
         AgentDefinition draft = agent.draft();
         Optional<AgentModel> model = Optional.ofNullable(draft.model());
@@ -56,6 +81,7 @@ public final class ReadAgentBriefs implements AgentBriefs {
                 model.map(m -> m.effort().name()).orElse(null), draft.style().name(),
                 draft.givesBack().name(), draft.limits().maxSteps(), draft.limits().timeoutSeconds(),
                 draft.limits().maxToolCalls(), followed, book.problems(draft),
-                agent.status() == AgentStatus.ARCHIVED);
+                agent.status() == AgentStatus.ARCHIVED,
+                draft.mcpTools().stream().map(pick -> new AgentBrief.McpTool(pick.serverId(), pick.tool())).toList());
     }
 }

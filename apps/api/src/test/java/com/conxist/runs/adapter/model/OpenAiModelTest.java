@@ -167,6 +167,23 @@ class OpenAiModelTest {
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED));
     }
 
+    @Test
+    void an_mcp_servers_own_schema_is_sent_as_it_is_without_strict_mode() {
+        ModelPort.ToolSpec bare = new ModelPort.ToolSpec("docs__list_spaces", "Lists spaces.", Map.of("type", "object"),
+                false);
+        ModelPort.ToolSpec odd = new ModelPort.ToolSpec("docs__get_space", "Gets a space.", Map.of("type", "object",
+                "properties", Map.of("id", Map.of("$ref", "#/$defs/Space")), "required", "id",
+                "$defs", Map.of("Space", Map.of("type", "string"))), false);
+        openAi.next(KEY, request(GPT, List.of(bare, odd), null, List.of()));
+
+        JsonNode tools = server.requests().get(0).path("tools");
+        JsonNode first = tools.get(0).path("function");
+        assertThat(first.path("strict").asBoolean()).isFalse();
+        assertThat(first.path("parameters").path("properties").isObject()).isTrue();
+        assertThat(first.path("parameters").has("additionalProperties")).isFalse();
+        assertThat(tools.get(1).path("function").path("parameters").path("$defs").has("Space")).isTrue();
+    }
+
     private static ModelPort.Request request(ModelChoice model, List<ModelPort.ToolSpec> tools,
             Map<String, Object> schema, List<ModelPort.Exchange> exchanges) {
         return new ModelPort.Request(model, "The rules.", "<meeting title=\"x\">\nhello\n</meeting>", exchanges, tools,

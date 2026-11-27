@@ -61,16 +61,37 @@ export function useAgentsRoute(): AgentsRoute {
 }
 
 /** The parts of a workspace's Settings, each at #/settings/{section}; #/settings opens General. */
-export const SETTINGS_SECTIONS = ['general', 'llm', 'topics'] as const;
+export const SETTINGS_SECTIONS = ['general', 'llm', 'mcps', 'topics'] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 export function settingsSectionOf(hash: string): SettingsSection {
-  const name = /^#\/settings\/([a-z]+)$/.exec(hash)?.[1];
+  const name = /^#\/settings\/([a-z]+)(\/[0-9a-fA-F-]{36})?$/.exec(hash)?.[1];
   return SETTINGS_SECTIONS.find((section) => section === name) ?? 'general';
 }
 
 export function settingsHref(section: SettingsSection = 'general'): string {
   return section === 'general' ? '#/settings' : `#/settings/${section}`;
+}
+
+/** One MCP server's page in Settings, at #/settings/mcps/{id}. */
+export function mcpHref(serverId: string): string {
+  return `#/settings/mcps/${serverId}`;
+}
+
+/** The MCP server the address shows, if any. */
+export function mcpServerIdOf(hash: string): string | null {
+  return /^#\/settings\/mcps\/([0-9a-fA-F-]{36})$/.exec(hash)?.[1] ?? null;
+}
+
+/** The MCP server in the address, following the back button and links. */
+export function useMcpServerId(): string | null {
+  const [id, setId] = useState(() => mcpServerIdOf(window.location.hash));
+  useEffect(() => {
+    const onChange = () => setId(mcpServerIdOf(window.location.hash));
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, []);
+  return id;
 }
 
 /** The part of Settings in the address, following the back button and links. */

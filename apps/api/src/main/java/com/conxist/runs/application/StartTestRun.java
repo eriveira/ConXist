@@ -109,9 +109,10 @@ public final class StartTestRun {
             this.key = call.key();
             this.choice = call.choice();
             this.shape = OutputShape.of(agent.givesBack());
-            this.scope = new RunTools.Scope(agent.tools(), agent.knowledgeSources(), meeting.sourceId(), meeting.id());
-            this.offered = tools.specs(agent.tools());
-            this.system = RunPrompt.system(agent, tools.descriptions(agent.tools()));
+            this.scope = new RunTools.Scope(agent.tools(), agent.knowledgeSources(), meeting.sourceId(), meeting.id(),
+                    tools.mcpTools(agent));
+            this.offered = tools.specs(scope);
+            this.system = RunPrompt.system(agent, tools.descriptions(scope));
             this.started = clock.instant();
             this.deadline = started.plusSeconds(agent.timeoutSeconds());
         }

@@ -40,7 +40,15 @@ public interface ModelPort {
     record Exchange(Turn turn, List<ToolResult> results) {
     }
 
-    record ToolSpec(String name, String description, Map<String, Object> inputSchema) {
+    /**
+     * A tool the model may call. {@code strict} asks the provider to hold the model to the schema exactly; ConXist's own
+     * tools are written for that, while an MCP server's schema is its own and is passed as it is.
+     */
+    record ToolSpec(String name, String description, Map<String, Object> inputSchema, boolean strict) {
+
+        public ToolSpec(String name, String description, Map<String, Object> inputSchema) {
+            this(name, description, inputSchema, true);
+        }
     }
 
     record ToolCall(String id, String name, Map<String, Object> input) {

@@ -37,6 +37,11 @@ class AllowModelTest {
         public List<String> usingModel(String provider, String model) {
             return users.getOrDefault(provider + "/" + model, List.of());
         }
+
+        @Override
+        public List<McpToolUse> mcpToolUses() {
+            return List.of();
+        }
     }, FixedWorkspace.standard(), TestClock.fixed());
 
     @Test

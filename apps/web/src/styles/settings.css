@@ -108,3 +108,23 @@
   .vendor-actions { width: 100%; justify-content: stretch; }
   .vendor-actions .btn { flex: 1 1 auto; min-height: 44px; }
 }
+/* MCP servers (ADR 0017): their logo or first letter, one server's page, the add dialog's steps. */
+.mcp-logo { display: grid; place-items: center; flex: none; overflow: hidden; width: 40px; height: 40px; border-radius: var(--cx-radius-sm); background: var(--cx-surface); border: 1px solid var(--cx-border); color: var(--cx-fg); font-weight: 800; font-size: 17px; }
+.mcp-logo.sm { width: 24px; height: 24px; font-size: 12px; border-radius: var(--cx-radius-sm); }
+.mcp-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.mcp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 0; }
+.mcp-head h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 19px; font-weight: 800; overflow-wrap: anywhere; }
+.mcp-address { overflow-wrap: anywhere; }
+.mcp-actions { justify-content: flex-start; margin: 0 0 8px; }
+.mcp-found { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.mcp-found h3 { margin: 0; overflow-wrap: anywhere; }
+.mcp-selrow { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 13.5px; }
+.mcp-wait { display: flex; gap: 8px; align-items: center; }
+.mcp-switch { align-self: flex-start; }
+.mcp-empty-add { margin-top: 12px; }
+.mcp-tools .mono { font-family: var(--cx-font-mono); font-size: 14px; overflow-wrap: anywhere; }
+.mcp-tools .kind { width: 1%; white-space: nowrap; }
+.mcp-tools tbody th small { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .mcp-tools thead .kind, .mcp-tools td.kind { display: none; }
+}

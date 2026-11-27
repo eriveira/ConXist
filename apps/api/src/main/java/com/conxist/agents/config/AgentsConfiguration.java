@@ -2,6 +2,7 @@ package com.conxist.agents.config;
 
 import java.time.Clock;
 import com.conxist.agents.AgentBriefs;
+import com.conxist.agents.AgentMcpTools;
 import com.conxist.agents.AgentModels;
 import com.conxist.agents.application.AddSkill;
 import com.conxist.agents.application.AgentBook;
@@ -42,8 +43,8 @@ class AgentsConfiguration {
 
     @Bean
     AgentBook agentBook(AgentRepository agents, CurrentWorkspace workspace, SourceCatalog sources,
-            SkillBook skills, AgentModels models, UnitOfWork unitOfWork, Clock clock) {
-        return new AgentBook(agents, workspace, sources, skills, models, unitOfWork, clock);
+            SkillBook skills, AgentModels models, AgentMcpTools mcpTools, UnitOfWork unitOfWork, Clock clock) {
+        return new AgentBook(agents, workspace, sources, skills, models, mcpTools, unitOfWork, clock);
     }
 
     @Bean

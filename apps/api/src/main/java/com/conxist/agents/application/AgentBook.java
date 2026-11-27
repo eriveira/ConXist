@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import com.conxist.agents.AgentMcpTools;
 import com.conxist.agents.AgentModels;
 import com.conxist.agents.domain.Agent;
 import com.conxist.agents.domain.AgentDefinition;
@@ -28,22 +29,26 @@ public final class AgentBook {
     static final String SKILL_NEEDS_TOOL = "skill-needs-tool";
     /** Reported when the agent's provider is not connected or no longer offers its model. */
     static final String MODEL_UNAVAILABLE = "model-unavailable";
+    /** Reported when an MCP tool the agent uses is gone from its server or no longer allowed (ADR 0017). */
+    static final String MCP_TOOL_UNAVAILABLE = "mcp-tool-unavailable";
 
     private final AgentRepository agents;
     private final CurrentWorkspace workspace;
     private final SourceCatalog sources;
     private final SkillBook skills;
     private final AgentModels models;
+    private final AgentMcpTools mcpTools;
     private final UnitOfWork unitOfWork;
     private final Clock clock;
 
     public AgentBook(AgentRepository agents, CurrentWorkspace workspace, SourceCatalog sources,
-            SkillBook skills, AgentModels models, UnitOfWork unitOfWork, Clock clock) {
+            SkillBook skills, AgentModels models, AgentMcpTools mcpTools, UnitOfWork unitOfWork, Clock clock) {
         this.agents = agents;
         this.workspace = workspace;
         this.sources = sources;
         this.skills = skills;
         this.models = models;
+        this.mcpTools = mcpTools;
         this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
@@ -98,7 +103,7 @@ public final class AgentBook {
 
     /**
      * What stops the draft from being published: the draft's own rules, then sources it reads that are gone, then
-     * a model that can't run, then skills it follows that are gone or need a tool it is not allowed.
+     * a model that can't run, then MCP tools the workspace no longer allows, then skills it follows that are gone or need a tool it is not allowed.
      */
     List<String> problems(AgentDefinition draft) {
         return problems(draft, pinnedSkills(draft));
@@ -111,6 +116,9 @@ public final class AgentBook {
         }
         if (draft.model() != null && !models.available(draft.model().provider(), draft.model().model())) {
             problems.add(MODEL_UNAVAILABLE);
+        }
+        if (draft.mcpTools().stream().anyMatch(pick -> !mcpTools.allowed(pick.serverId(), pick.tool()))) {
+            problems.add(MCP_TOOL_UNAVAILABLE);
         }
         if (pinned.size() < draft.skills().size()) {
             problems.add(SKILL_MISSING);

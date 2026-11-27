@@ -140,3 +140,7 @@
 .delete-uses .pill { white-space: normal; }
 .delete-body p { margin: 0 0 10px; }
 .delete-body [role="status"] { display: flex; align-items: center; gap: 8px; }
+/* Tools grouped by who provides them: ConXist, then each MCP server the workspace added (ADR 0017). */
+.tool-group { margin: 0 0 8px; font-size: 14px; font-weight: 800; }
+.mcp-group legend { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 0; font-size: 14px; font-weight: 800; overflow-wrap: anywhere; }
+.mcp-group .mono { font-family: var(--cx-font-mono); overflow-wrap: anywhere; }

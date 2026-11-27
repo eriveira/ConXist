@@ -8,7 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * What an agent is: its purpose, its brief, what it may read, the skills it follows and the tools it may use, how it thinks, what it takes in and gives back,
+ * What an agent is: its purpose, its brief, what it may read, the skills it follows and the tools it may use (its own
+ * and those of MCP servers the workspace added), how it thinks, what it takes in and gives back,
  * and where it stops. A draft may be unfinished (even without a model); {@link #problems()} says what must be done before it is published.
  */
 public record AgentDefinition(
@@ -22,13 +23,15 @@ public record AgentDefinition(
         Style style,
         List<InputKind> accepts,
         OutputKind givesBack,
-        Limits limits) {
+        Limits limits,
+        List<McpToolPick> mcpTools) {
 
     public static final int MAX_NAME_LENGTH = 60;
     public static final int MAX_PURPOSE_LENGTH = 200;
     public static final int MAX_INSTRUCTIONS_LENGTH = 8_000;
     public static final int MAX_KNOWLEDGE_SOURCES = 20;
     public static final int MAX_SKILLS = 10;
+    public static final int MAX_MCP_TOOLS = 30;
 
     /** Checks the lengths and sizes every draft must keep, and trims and de-duplicates what the person typed. */
     public AgentDefinition {
@@ -51,10 +54,22 @@ public record AgentDefinition(
             throw new InvalidAgent("skill-twice", "An agent follows one version of each skill.");
         }
         tools = distinct(tools);
+        mcpTools = distinct(mcpTools);
+        if (mcpTools.size() > MAX_MCP_TOOLS) {
+            throw new InvalidAgent("too-many-mcp-tools", "An agent can use up to " + MAX_MCP_TOOLS + " MCP tools.");
+        }
         accepts = distinct(accepts);
         style = Objects.requireNonNullElse(style, Style.PRECISE);
         givesBack = Objects.requireNonNullElse(givesBack, OutputKind.FREE_TEXT);
         limits = Objects.requireNonNullElse(limits, Limits.DEFAULT);
+    }
+
+    /** A definition without MCP tools, as every agent was before ADR 0017. */
+    public AgentDefinition(String name, String purpose, String instructions, List<UUID> knowledgeSources,
+            List<SkillPin> skills, List<AgentTool> tools, AgentModel model, Style style, List<InputKind> accepts,
+            OutputKind givesBack, Limits limits) {
+        this(name, purpose, instructions, knowledgeSources, skills, tools, model, style, accepts, givesBack, limits,
+                List.of());
     }
 
     /**

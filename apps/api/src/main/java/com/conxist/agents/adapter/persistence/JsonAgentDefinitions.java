@@ -7,6 +7,7 @@ import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.InputKind;
 import com.conxist.agents.domain.Limits;
+import com.conxist.agents.domain.McpToolPick;
 import com.conxist.agents.domain.OutputKind;
 import com.conxist.agents.domain.SkillPin;
 import com.conxist.agents.domain.Style;
@@ -32,7 +33,8 @@ final class JsonAgentDefinitions {
                 model == null ? null : model.effort().name(),
                 definition.style().name(), definition.accepts().stream().map(Enum::name).toList(),
                 definition.givesBack().name(), new StoredLimits(definition.limits().maxSteps(),
-                        definition.limits().timeoutSeconds(), definition.limits().maxToolCalls())));
+                        definition.limits().timeoutSeconds(), definition.limits().maxToolCalls()),
+                definition.mcpTools().stream().map(pick -> new StoredMcpTool(pick.serverId(), pick.tool())).toList()));
     }
 
     AgentDefinition read(String text) {
@@ -46,7 +48,13 @@ final class JsonAgentDefinitions {
                 model(stored), Style.valueOf(stored.style()),
                 stored.accepts().stream().map(InputKind::valueOf).toList(), OutputKind.valueOf(stored.givesBack()),
                 new Limits(stored.limits().maxSteps(), stored.limits().timeoutSeconds(),
-                        stored.limits().maxToolCalls()));
+                        stored.limits().maxToolCalls()), mcpTools(stored.mcpTools()));
+    }
+
+    /** Definitions saved before ADR 0017 use no MCP tools. */
+    private static List<McpToolPick> mcpTools(List<StoredMcpTool> stored) {
+        return stored == null ? List.of()
+                : stored.stream().map(tool -> new McpToolPick(tool.serverId(), tool.tool())).toList();
     }
 
     /** No model is picked when the provider is missing; V14 gave every row saved before ADR 0014 a provider. */
@@ -64,10 +72,14 @@ final class JsonAgentDefinitions {
     /**
      * @param skills   added after shape 1 was first written; absent in older rows, which read as no skills
      * @param provider added with ADR 0014, with {@code effort}; {@code model} was FAST, BALANCED or THOROUGH before
+     * @param mcpTools added with ADR 0017; absent in older rows, which read as none
      */
     record Stored(int v, String name, String purpose, String instructions, List<UUID> knowledgeSources,
             List<StoredPin> skills, List<String> tools, String provider, String model, String effort, String style,
-            List<String> accepts, String givesBack, StoredLimits limits) {
+            List<String> accepts, String givesBack, StoredLimits limits, List<StoredMcpTool> mcpTools) {
+    }
+
+    record StoredMcpTool(UUID serverId, String tool) {
     }
 
     record StoredPin(UUID skillId, int version) {

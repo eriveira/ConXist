@@ -128,6 +128,24 @@ class ClaudeModelTest {
                 });
     }
 
+    @Test
+    void an_mcp_servers_own_schema_is_sent_as_it_is_without_strict_mode() {
+        ModelPort.ToolSpec bare = new ModelPort.ToolSpec("docs__list_spaces", "Lists spaces.", Map.of("type", "object"),
+                false);
+        ModelPort.ToolSpec odd = new ModelPort.ToolSpec("docs__get_space", "Gets a space.", Map.of("type", "object",
+                "properties", Map.of("id", Map.of("$ref", "#/$defs/Space")), "required", "id",
+                "$defs", Map.of("Space", Map.of("type", "string"))), false);
+        claude.next(KEY, request(HAIKU, List.of(bare, odd), null, List.of()));
+
+        JsonNode tools = server.requests().get(0).path("tools");
+        assertThat(tools.get(0).path("strict").asBoolean()).isFalse();
+        assertThat(tools.get(0).path("input_schema").path("properties").isObject()).isTrue();
+        assertThat(tools.get(0).path("input_schema").has("additionalProperties")).isFalse();
+        JsonNode odd2 = tools.get(1).path("input_schema");
+        assertThat(odd2.path("required").isEmpty()).isTrue();
+        assertThat(odd2.path("$defs").has("Space")).isTrue();
+    }
+
     private static ModelPort.Request request(ModelChoice model, List<ModelPort.ToolSpec> tools,
             Map<String, Object> schema, List<ModelPort.Exchange> exchanges) {
         return new ModelPort.Request(model, "The rules.", "<meeting title=\"x\">\nhello\n</meeting>", exchanges, tools,

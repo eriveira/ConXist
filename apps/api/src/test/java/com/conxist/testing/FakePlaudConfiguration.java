@@ -13,7 +13,8 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
  * by the integration tests and by {@code mvn spring-boot:test-run} (Client ID {@code demo-team} works with any key).
  * The fake Claude takes any key that starts with {@code sk-ant-fake-}; it is also this computer's key unless
  * {@code CONXIST_FAKE_COMPUTER_KEY=false}, to try Settings with no key at all. The fake OpenAI takes any key that
- * starts with {@code sk-fake-} and is never this computer's key.
+ * starts with {@code sk-fake-} and is never this computer's key. Three fake MCP servers ({@link FakeMcpServers}) log
+ * their addresses at start.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class FakePlaudConfiguration {
@@ -38,6 +39,12 @@ public class FakePlaudConfiguration {
         return new FakeOpenAiServer();
     }
 
+    /** Outside MCP servers to add in Settings › MCPs: one with its own sign-in, one that takes a token, one public. */
+    @Bean(destroyMethod = "close")
+    FakeMcpServers fakeMcpServers() throws IOException {
+        return FakeMcpServers.start();
+    }
+
     @Bean
     DynamicPropertyRegistrar fakePlaudProperties(FakePlaudServer fake, FakePlaudMcpServer mcp,
             FakeClaudeServer claude, FakeOpenAiServer openAi) {
@@ -56,6 +63,8 @@ public class FakePlaudConfiguration {
             // OpenAI has no key on this computer, so a workspace connects its own (any key that starts with sk-fake-).
             registry.add("conxist.runs.openai-base-url", () -> openAi.baseUrl().toString());
             registry.add("conxist.runs.openai-api-key", () -> "");
+            // The fake MCP servers run on this computer, over plain http.
+            registry.add("conxist.connectors.allow-loopback", () -> "true");
         };
     }
 }
