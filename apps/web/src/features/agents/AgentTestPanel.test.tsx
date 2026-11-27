@@ -33,7 +33,8 @@ function api(routes: Parameters<typeof stubApi>[0] = {}) {
 }
 
 const panel = (block: Parameters<typeof AgentTestPanel>[0]['block'] = null) =>
-  <AgentTestPanel agentId={ID} reads={[SOURCE.id]} givesBack="REQUIREMENTS" sources={[SOURCE]} block={block} />;
+  <AgentTestPanel agentId={ID} reads={[SOURCE.id]} givesBack="REQUIREMENTS" sources={[SOURCE]} block={block}
+    provider="openai" />;
 
 describe('AgentTestPanel', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -44,7 +45,7 @@ describe('AgentTestPanel', () => {
 
     const meeting = await screen.findByRole('combobox', { name: 'Meeting' });
     expect(within(meeting).getByRole('option', { name: /Weekly sync/ })).toBeInTheDocument();
-    expect(screen.getByText(/The meeting is sent to the AI provider the agent runs on/)).toBeInTheDocument();
+    expect(screen.getByText(/The meeting is sent to OpenAI \(GPT\) to run the model/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     expect(await screen.findByText('Done. This is what it gives back.')).toBeInTheDocument();
@@ -89,7 +90,7 @@ describe('AgentTestPanel', () => {
     api({ [`POST /api/agents/${ID}/test-runs`]: () => ({ status: 422, body: { code: 'run.model-key-rejected' } }) });
     const { unmount } = render(panel());
     await userEvent.click(await screen.findByRole('button', { name: 'Run' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('The agent’s provider did not accept the key');
+    expect(await screen.findByRole('alert')).toHaveTextContent('OpenAI (GPT) refused this workspace’s key');
     unmount();
 
     api({ [`POST /api/agents/${ID}/test-runs`]: () => ({ body: { ...RESULT, outcome: 'TOOL_LIMIT', answer: null,

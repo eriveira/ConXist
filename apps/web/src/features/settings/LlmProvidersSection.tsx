@@ -141,7 +141,7 @@ function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
   return (
     <section className="models" aria-labelledby={`models-${provider.id}`}>
       <div className="models-head">
-        <h3 id={`models-${provider.id}`}>{t('settings.provider.models', { provider: providerBrand(t, provider.id) })}</h3>
+        <h3 id={`models-${provider.id}`}>{t('settings.provider.models', { provider: name })}</h3>
         <span className="muted">{t('settings.models.count', { offered: offered.models.length, allowed: allowedCount })}</span>
         <SavedStatus saved={saved} />
         <button type="button" className="btn sm" disabled={refreshing} onClick={() => void load(true)}>

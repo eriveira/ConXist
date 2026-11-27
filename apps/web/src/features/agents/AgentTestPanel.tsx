@@ -5,8 +5,9 @@ import type { OutputKind } from '../../domain/agents';
 import type { CapturedDocument, Source } from '../../domain/model';
 import { type AnswerPart, type RunChoiceGroup, type TestRunResult, type TestRunStep, answerParts, firstChoice,
   runChoiceGroups } from '../../domain/testRuns';
-import { type Translate, useLanguage, useT } from '../../i18n/i18n';
+import { providerLabel, type Translate, useLanguage, useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
+import { ApiError } from '../../api/client';
 import { problemMessage } from '../../i18n/problems';
 import { SOURCES_HREF } from '../../navigation';
 
@@ -26,14 +27,17 @@ interface Props {
   /** The workspace's sources, or null while the page is still loading them. */
   sources: Source[] | null;
   block: RunBlock;
+  /** The provider the saved draft runs on, such as openai, named where the run's text goes and whose key failed. */
+  provider: string | null;
 }
 
 /**
  * The Test panel (ADR 0012): pick a meeting, run the saved draft once and see what it gives back, whether that has
  * the agent's shape, and what it did on the way. Nothing of a run is kept.
  */
-export function AgentTestPanel({ agentId, reads, givesBack, sources, block }: Props) {
+export function AgentTestPanel({ agentId, reads, givesBack, sources, block, provider }: Props) {
   const t = useT();
+  const providerName = provider ? providerLabel(t, provider) : null;
   const [status, setStatus] = useState<Status>('checking');
   const [meetings, setMeetings] = useState<Meetings>({ status: 'loading' });
   const [picked, setPicked] = useState('');
@@ -116,7 +120,7 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block }: Pr
       )}
       {status === 'ready' && meetings.status === 'ready' && meetings.groups.length > 0 && (
         <>
-          <p className="test-note"><Icon name="info" size={16} /> {t('run.note')}</p>
+          <p className="test-note"><Icon name="info" size={16} /> {providerName ? t('run.noteTo', { provider: providerName }) : t('run.note')}</p>
           {/* Kept focusable while it runs, so a keyboard user stays on it. */}
           <button type="button" className="btn primary test-run" onClick={() => void start()} disabled={!canRun}
             aria-disabled={running || undefined} aria-describedby={block ? `${pickId}-block` : undefined}>
@@ -129,7 +133,7 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block }: Pr
       {running && <p className="sr-only" role="status">{t('run.started')}</p>}
       {run.status === 'failed' && (
         <p ref={failureRef} tabIndex={-1} className="alert error" role="alert">
-          <Icon name="alert" /> {problemMessage(run.problem, t)}
+          <Icon name="alert" /> {keyProblem(run.problem, providerName, t) ?? problemMessage(run.problem, t)}
         </p>
       )}
       {run.status === 'done' && <RunResult result={run.result} givesBack={givesBack} />}
@@ -278,4 +282,10 @@ function Part({ part, t, field }: { part: AnswerPart; t: Translate; field?: stri
       ))}
     </dl>
   );
+}
+
+/** A refused key names the provider whose key to replace, when the panel knows it. */
+function keyProblem(problem: unknown, provider: string | null, t: Translate): string | null {
+  const refused = problem instanceof ApiError && (problem.code === 'run.key-refused' || problem.code === 'run.model-key-rejected');
+  return refused && provider ? t('run.keyRefusedBy', { provider }) : null;
 }

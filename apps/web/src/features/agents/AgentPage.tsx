@@ -156,7 +156,8 @@ export function AgentPage({ agentId }: { agentId: string }) {
           choices={choices} onRetryChoices={loadChoices} />
         <aside className="agent-side">
           <AgentTestPanel agentId={agent.id} reads={draft.knowledgeSources} givesBack={draft.givesBack}
-            sources={choices.status === 'ready' ? choices.sources : null} block={runBlock} />
+            sources={choices.status === 'ready' ? choices.sources : null} block={runBlock}
+            provider={draft.model?.provider ?? null} />
         </aside>
       </div>
       {historyOpen && (
