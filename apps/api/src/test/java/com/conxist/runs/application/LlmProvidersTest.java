@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Map;
 import com.conxist.agents.AgentBrief;
 import com.conxist.agents.AgentModels;
 import com.conxist.platform.RuleViolation;
@@ -16,8 +17,11 @@ class LlmProvidersTest {
     private final TestPort anthropic = new TestPort();
     private final TestModels.Defaults defaults = new TestModels.Defaults();
     private final TestModels.Allowed allowed = new TestModels.Allowed();
+    private final Map<String, ApiKey> computerKeys = TestModels.computerKeys();
+    private final TestModels.Keys stored = new TestModels.Keys();
+    private final ProviderKeys keys = new ProviderKeys(stored, computerKeys, FixedWorkspace.standard());
     private final LlmProviders providers = new LlmProviders(TestModels.catalog(), List.of(anthropic), defaults,
-            allowed, TestModels.lists(), FixedWorkspace.standard(), TestClock.fixed());
+            allowed, TestModels.lists(), keys, FixedWorkspace.standard(), TestClock.fixed());
 
     @Test
     void the_view_lists_each_provider_with_the_models_the_workspace_allows_without_asking_the_provider() {
@@ -33,7 +37,7 @@ class LlmProvidersTest {
                 .isEqualTo(new ModelStart("anthropic", TestModels.SONNET, ModelChoice.Effort.MEDIUM));
         assertThat(anthropic.asked).isZero();
 
-        anthropic.ready = false;
+        computerKeys.clear();
         assertThat(providers.view().providers().get(0).connected()).isFalse();
     }
 
@@ -93,7 +97,7 @@ class LlmProvidersTest {
 
     @Test
     void a_provider_without_a_key_lists_nothing_and_an_unknown_provider_is_refused() {
-        anthropic.ready = false;
+        computerKeys.clear();
 
         assertThat(providers.offered("anthropic", false).models()).isEmpty();
         assertThat(anthropic.asked).isZero();
@@ -120,7 +124,7 @@ class LlmProvidersTest {
         assertCode(() -> providers.setDefault("anthropic", TestModels.HAIKU, "MAX"), "model.unknown-effort");
         assertCode(() -> providers.setDefault("anthropic", TestModels.HAIKU, null), "model.unknown-effort");
 
-        anthropic.ready = false;
+        computerKeys.clear();
         assertCode(() -> providers.setDefault("anthropic", TestModels.HAIKU, "LOW"), "model.unavailable");
         assertThat(defaults.saved).isEmpty();
     }
@@ -131,7 +135,7 @@ class LlmProvidersTest {
         assertThat(providers.available("anthropic", "claude-retired")).isFalse();
         assertThat(providers.available("openai", TestModels.OPUS)).isFalse();
 
-        anthropic.ready = false;
+        computerKeys.clear();
         assertThat(providers.available("anthropic", TestModels.OPUS)).isFalse();
         assertThat(providers.anyConnected()).isFalse();
     }

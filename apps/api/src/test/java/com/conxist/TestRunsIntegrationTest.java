@@ -1,9 +1,11 @@
 package com.conxist;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -45,6 +48,48 @@ class TestRunsIntegrationTest {
 
     @Autowired
     FakeClaudeServer claude;
+
+    @Autowired
+    JdbcClient jdbc;
+
+    @Test
+    void a_workspace_connects_its_own_key_which_is_checked_stored_sealed_and_never_shown() throws Exception {
+        String workspace = workspace("Own key");
+        mvc.perform(get("/api/llm-providers").header(HEADER, workspace))
+                .andExpect(jsonPath("$.providers[0].connection.source").value("COMPUTER"));
+
+        mvc.perform(put("/api/llm-providers/anthropic/key").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"apiKey\":\"sk-ant-wrong-key-000000000\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("provider.key-refused"));
+        mvc.perform(put("/api/llm-providers/anthropic/key").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"apiKey\":\"" + FakeClaudeServer.KEY + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connection.source").value("WORKSPACE"))
+                .andExpect(jsonPath("$.connection.keyEnding").value(FakeClaudeServer.KEY.substring(
+                        FakeClaudeServer.KEY.length() - 4)))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString(FakeClaudeServer.KEY))));
+
+        byte[] sealed = jdbc.sql("select key_sealed from workspace_provider_keys where workspace_id = :id::uuid")
+                .param("id", workspace).query(byte[].class).single();
+        org.assertj.core.api.Assertions.assertThat(new String(sealed, StandardCharsets.ISO_8859_1))
+                .doesNotContain(FakeClaudeServer.KEY);
+
+        mvc.perform(post("/api/llm-providers/anthropic/test").header(HEADER, workspace))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.works").value(true))
+                .andExpect(jsonPath("$.provider.connection.refused").value(false));
+        mvc.perform(get("/api/llm-providers").header(HEADER, workspace("Another")))
+                .andExpect(jsonPath("$.providers[0].connection.source").value("COMPUTER"));
+
+        mvc.perform(delete("/api/llm-providers/anthropic/key").header(HEADER, workspace))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providers[0].connection.source").value("COMPUTER"));
+        mvc.perform(put("/api/llm-providers/anthropic/key").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
 
     @Test
     void settings_list_the_providers_and_set_where_new_blank_agents_start() throws Exception {

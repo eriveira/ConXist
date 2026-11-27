@@ -107,7 +107,7 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block }: Pr
       {status === 'no-key' && (
         <div className="alert info test-key">
           <Icon name="lock" />
-          <div><b>{t('run.noKey.title')}</b><p>{t('run.noKey.body')}</p></div>
+          <div><b>{t('run.noKey.title')}</b><p>{t('run.noKey.body')} <a href="#/settings/llm">{t('run.noKey.link')}</a></p></div>
         </div>
       )}
       {(status === 'ready' || status === 'no-key') && (

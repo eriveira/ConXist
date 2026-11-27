@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import com.conxist.runs.application.ApiKey;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.ProviderModel;
@@ -23,7 +24,9 @@ class ClaudeModelTest {
             Map.of("type", "object", "properties", Map.of(), "required", List.of(), "additionalProperties", false));
 
     private final FakeClaudeServer server = server();
-    private final ClaudeModel claude = new ClaudeModel(FakeClaudeServer.KEY, server.baseUrl().toString());
+    private static final ApiKey KEY = new ApiKey(FakeClaudeServer.KEY);
+    private static final ApiKey WRONG = new ApiKey("wrong");
+    private final ClaudeModel claude = new ClaudeModel(server.baseUrl().toString());
 
     @AfterEach
     void stop() {
@@ -33,7 +36,7 @@ class ClaudeModelTest {
     @Test
     void a_run_asks_for_tools_then_answers_in_its_shape_sending_back_each_turn_as_it_came() {
         ModelPort.Request first = request(SONNET, List.of(LIST_SOURCES), OutputShape.REQUIREMENTS.schema(), List.of());
-        ModelPort.Turn asked = claude.next(first);
+        ModelPort.Turn asked = claude.next(KEY, first);
 
         assertThat(asked.stop()).isEqualTo(ModelPort.Stop.TOOL_USE);
         assertThat(asked.toolCalls()).singleElement().satisfies(call -> {
@@ -42,7 +45,7 @@ class ClaudeModelTest {
         });
         assertThat(asked.inputTokens()).isEqualTo(1200);
 
-        ModelPort.Turn answered = claude.next(request(SONNET, List.of(LIST_SOURCES), OutputShape.REQUIREMENTS.schema(),
+        ModelPort.Turn answered = claude.next(KEY, request(SONNET, List.of(LIST_SOURCES), OutputShape.REQUIREMENTS.schema(),
                 List.of(new ModelPort.Exchange(asked, List.of(new ModelPort.ToolResult(
                         asked.toolCalls().get(0).id(), "<data>\nnone\n</data>", false))))));
 
@@ -73,7 +76,7 @@ class ClaudeModelTest {
 
     @Test
     void a_model_without_fallbacks_and_a_plain_text_answer_send_neither() {
-        ModelPort.Turn turn = claude.next(request(HAIKU, List.of(), null, List.of()));
+        ModelPort.Turn turn = claude.next(KEY, request(HAIKU, List.of(), null, List.of()));
 
         assertThat(turn.text()).isEqualTo("A short answer from the fake model.");
         JsonNode sent = server.requests().get(0);
@@ -85,26 +88,26 @@ class ClaudeModelTest {
     @Test
     void a_refusal_a_wrong_key_and_a_missing_key_are_told_apart() {
         server.decline();
-        assertThat(claude.next(request(SONNET, List.of(), null, List.of())).stop()).isEqualTo(ModelPort.Stop.REFUSED);
+        assertThat(claude.next(KEY, request(SONNET, List.of(), null, List.of())).stop()).isEqualTo(ModelPort.Stop.REFUSED);
 
-        ClaudeModel wrongKey = new ClaudeModel("wrong", server.baseUrl().toString());
-        assertThatThrownBy(() -> wrongKey.next(request(SONNET, List.of(), null, List.of())))
+        assertThatThrownBy(() -> claude.next(WRONG, request(SONNET, List.of(), null, List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.KEY_REJECTED));
-
-        assertThat(new ClaudeModel("", null).ready()).isFalse();
-        assertThat(claude.ready()).isTrue();
+        // The same adapter goes on calling with the right key: each key has its own client.
+        assertThat(claude.next(KEY, request(SONNET, List.of(), null, List.of())).stop())
+                .isEqualTo(ModelPort.Stop.REFUSED);
     }
 
     @Test
     void the_models_come_back_as_anthropic_lists_them_and_a_wrong_key_is_told_apart() {
-        assertThat(claude.models(Duration.ofSeconds(10))).extracting(ProviderModel::id, ProviderModel::label)
+        assertThat(claude.models(KEY, Duration.ofSeconds(10))).extracting(ProviderModel::id, ProviderModel::label)
                 .startsWith(org.assertj.core.groups.Tuple.tuple("claude-fable-5-2", "Claude Fable 5.2"),
                         org.assertj.core.groups.Tuple.tuple("claude-opus-5-5", "Claude Opus 5.5"))
                 .hasSize(FakeClaudeServer.MODELS.size());
 
-        ClaudeModel wrongKey = new ClaudeModel("wrong", server.baseUrl().toString());
-        assertThatThrownBy(() -> wrongKey.models(Duration.ofSeconds(10)))
+        assertThat(claude.models(new ApiKey(FakeClaudeServer.ANY_KEY_PREFIX + "pasted"), Duration.ofSeconds(10)))
+                .hasSize(FakeClaudeServer.MODELS.size());
+        assertThatThrownBy(() -> claude.models(WRONG, Duration.ofSeconds(10)))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.KEY_REJECTED));
     }
@@ -114,11 +117,11 @@ class ClaudeModelTest {
         server.slow(Duration.ofSeconds(2));
         ModelPort.Request quick = new ModelPort.Request(HAIKU, "The rules.", "<meeting>\nhello\n</meeting>", List.of(),
                 List.of(), null, Duration.ofMillis(300));
-        assertThatThrownBy(() -> claude.next(quick)).isInstanceOf(ModelPort.Timeout.class);
+        assertThatThrownBy(() -> claude.next(KEY, quick)).isInstanceOf(ModelPort.Timeout.class);
 
         server.slow(Duration.ZERO);
         server.garble();
-        assertThatThrownBy(() -> claude.next(request(HAIKU, List.of(), null, List.of())))
+        assertThatThrownBy(() -> claude.next(KEY, request(HAIKU, List.of(), null, List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure -> {
                     assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED);
                     assertThat(failure.getMessage()).doesNotContain("customer words");

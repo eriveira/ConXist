@@ -2,7 +2,7 @@ package com.conxist.capture.adapter.persistence;
 
 import java.util.List;
 import java.util.UUID;
-import com.conxist.capture.adapter.secrets.SecretBox;
+import com.conxist.platform.SecretBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;

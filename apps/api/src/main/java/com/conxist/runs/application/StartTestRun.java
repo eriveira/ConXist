@@ -61,7 +61,11 @@ public final class StartTestRun {
         }
         if (!providers.anyConnected()) {
             throw new RuleViolation("run.no-model-key",
-                    "No model key is set. Add CONXIST_ANTHROPIC_API_KEY to the API's settings and start it again.");
+                    "No LLM provider is connected. Connect one in Settings, LLM providers.");
+        }
+        if (agent.provider() != null && providers.refused(agent.provider())) {
+            throw new RuleViolation("run.key-refused",
+                    "The provider refused this workspace's key. Test or replace it in Settings, LLM providers.");
         }
         if (!agent.problems().isEmpty()) {
             throw notReady();
@@ -82,6 +86,7 @@ public final class StartTestRun {
         private final AgentBrief agent;
         private final MeetingLibrary.Text meeting;
         private final ModelPort model;
+        private final ApiKey key;
         private final ModelChoice choice;
         private final Optional<OutputShape> shape;
         private final RunTools.Scope scope;
@@ -101,6 +106,7 @@ public final class StartTestRun {
             this.agent = agent;
             this.meeting = meeting;
             this.model = call.port();
+            this.key = call.key();
             this.choice = call.choice();
             this.shape = OutputShape.of(agent.givesBack());
             this.scope = new RunTools.Scope(agent.tools(), agent.knowledgeSources(), meeting.sourceId(), meeting.id());
@@ -122,7 +128,7 @@ public final class StartTestRun {
                 ModelPort.Turn turn;
                 Instant asked = clock.instant();
                 try {
-                    turn = model.next(new ModelPort.Request(choice, system,
+                    turn = model.next(key, new ModelPort.Request(choice, system,
                             RunPrompt.firstMessage(meeting.title(), meeting.text()), List.copyOf(exchanges), offered,
                             shape.map(OutputShape::schema).orElse(null), left));
                 } catch (ModelPort.Timeout timeout) {

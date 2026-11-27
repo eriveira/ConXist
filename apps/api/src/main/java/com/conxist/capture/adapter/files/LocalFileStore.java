@@ -6,7 +6,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
-import com.conxist.capture.adapter.secrets.SecretBox;
+import com.conxist.platform.SecretBox;
 import com.conxist.capture.application.FileStore;
 
 /**

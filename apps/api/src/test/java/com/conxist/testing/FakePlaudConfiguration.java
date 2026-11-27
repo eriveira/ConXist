@@ -11,6 +11,8 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
  * Points the API at a {@link FakePlaudServer} (Teams) and a {@link FakePlaudMcpServer} (Sign in with Plaud, which
  * approves at once) on localhost, test runs at a {@link FakeClaudeServer}, and gives it a throwaway secrets key. Used
  * by the integration tests and by {@code mvn spring-boot:test-run} (Client ID {@code demo-team} works with any key).
+ * The fake Claude takes any key that starts with {@code sk-ant-fake-}; it is also this computer's key unless
+ * {@code CONXIST_FAKE_COMPUTER_KEY=false}, to try Settings with no key at all.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class FakePlaudConfiguration {
@@ -43,7 +45,8 @@ public class FakePlaudConfiguration {
             registry.add("conxist.plaud.account.mcp-url", () -> mcp.mcpUrl().toString());
             registry.add("conxist.secrets.encryption-key", () -> secretsKey);
             registry.add("conxist.runs.anthropic-base-url", () -> claude.baseUrl().toString());
-            registry.add("conxist.runs.anthropic-api-key", () -> FakeClaudeServer.KEY);
+            registry.add("conxist.runs.anthropic-api-key",
+                    () -> "false".equals(System.getenv("CONXIST_FAKE_COMPUTER_KEY")) ? "" : FakeClaudeServer.KEY);
         };
     }
 }

@@ -4,7 +4,7 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
-import type { LlmProviders, OfferedModels, Topic } from '../domain/settings';
+import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels, Topic } from '../domain/settings';
 import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
 import type { TestRunResult, TestRunStatus } from '../domain/testRuns';
@@ -118,6 +118,15 @@ export const api = {
   allowModel: (provider: string, model: string, allowed: boolean) =>
     putJson<OfferedModels>(`/api/llm-providers/${encodeURIComponent(provider)}/models/${encodeURIComponent(model)}`,
       { allowed }),
+  /** Checks the key with the provider, then saves it encrypted as this workspace's own. The key is never sent back. */
+  connectProvider: (provider: string, apiKey: string) =>
+    putJson<LlmProvider>(`/api/llm-providers/${encodeURIComponent(provider)}/key`, { apiKey }),
+  /** Asks the provider now with the workspace's key. */
+  testProvider: (provider: string) =>
+    request<ConnectionCheck>(`/api/llm-providers/${encodeURIComponent(provider)}/test`, { method: 'POST' }),
+  /** Forgets this workspace's own key for the provider. */
+  disconnectProvider: (provider: string) =>
+    request<LlmProviders>(`/api/llm-providers/${encodeURIComponent(provider)}/key`, { method: 'DELETE' }),
   providers: () => request<Provider[]>('/api/providers'),
   sources: () => request<Source[]>('/api/sources'),
   documents: (sourceId: string) => request<CapturedDocument[]>(`/api/sources/${sourceId}/documents`),

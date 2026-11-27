@@ -13,17 +13,16 @@ public interface ModelPort {
     /** The LLM provider this port calls, as the API's settings name it, such as {@code anthropic}. */
     String provider();
 
-    /** False when the model cannot be called, for example because no key is set; nothing is sent then. */
-    boolean ready();
-
-    Turn next(Request request);
+    /** One turn, called with the workspace's key (ProviderKeys). */
+    Turn next(ApiKey key, Request request);
 
     /**
-     * Every model the provider offers this key, newest first, as the provider lists it.
+     * Every model the provider offers this key, newest first, as the provider lists it. Also how ConXist checks a key:
+     * listing costs nothing.
      *
      * @throws Failure when the list could not be fetched
      */
-    List<ProviderModel> models(Duration timeout);
+    List<ProviderModel> models(ApiKey key, Duration timeout);
 
     /**
      * One call. {@code exchanges} are the earlier turns with their tool results, in order; {@code outputSchema} is

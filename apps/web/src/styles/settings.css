@@ -94,3 +94,19 @@
   .presets td.allow { width: auto; text-align: left; padding-top: 2px; }
   .presets td.preset-users { grid-column: 2; }
 }
+/* A provider and its key (ADR 0014): its mark, status, what is known of the key, and what can be done with it. */
+.vendor-item { list-style: none; }
+.vendor-icon.brand { background: var(--cx-soon-bg); color: var(--cx-fg); }
+.vendor-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.status-line { margin: 8px 2px 0; font-size: 14px; color: var(--cx-ok-fg); }
+.status-line:empty { margin: 0; }
+.status-line.failed { color: var(--cx-err-fg); }
+.field input[type=password] { font-family: var(--cx-font-mono); }
+.field .alert { margin: 4px 0 0; }
+@media (max-width: 760px) {
+  /* The buttons go under the name, each one wide enough to tap. */
+  .vendor { flex-wrap: wrap; }
+  .vendor .grow { flex-basis: calc(100% - 52px); }
+  .vendor-actions { width: 100%; justify-content: stretch; }
+  .vendor-actions .btn { flex: 1 1 auto; min-height: 44px; }
+}

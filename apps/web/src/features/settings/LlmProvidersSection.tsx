@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
-import { Pill } from '../../components/Pill';
 import { type AgentModel, type AgentSummary, EFFORTS, type Effort } from '../../domain/agents';
 import {
-  type LlmProvider, type LlmProviders, lockReason, modelAvailable, modelLabel, modelUsers, type OfferedModel, type OfferedModels,
-  samePick,
+  type LlmProvider, type LlmProviders, lockReason, modelAvailable, modelLabel, modelUsers, type OfferedModel,
+  type OfferedModels, providerUsers, samePick,
 } from '../../domain/settings';
 import { providerLabel, useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { problemMessage } from '../../i18n/problems';
+import { ProviderRow } from './ProviderRow';
 import { ErrorState, LoadingState, SavedStatus, SettingsCard } from './SettingsParts';
 
 type Loaded = { providers: LlmProviders; agents: AgentSummary[] };
@@ -39,51 +39,39 @@ export function LlmProvidersSection() {
 
 function ProvidersCard({ providers, agents, onChanged }: Loaded & { onChanged: (providers: LlmProviders) => void }) {
   const t = useT();
-  const connected = providers.providers.filter((provider) => provider.connected);
+  const live = providers.providers.filter((provider) => provider.connected);
 
   /** A tick changes which models the default may use, so the providers are read again. */
   async function reload() {
     try {
       onChanged(await api.llmProviders());
     } catch {
-      // The table already shows the tick; the default's choices catch up on the next visit.
+      // The tick is already shown; the default's choices catch up on the next visit.
     }
+  }
+
+  /** A new key or a test changes the provider's row at once; its models are then read again. */
+  function connected(next: LlmProvider) {
+    onChanged({ ...providers, providers: providers.providers.map((each) => (each.id === next.id ? next : each)) });
+    void reload();
   }
 
   return (
     <SettingsCard id="settings-llm" title={t('settings.llm')} lead={t('settings.llm.lead')}>
       <ul className="vendors">
-        {providers.providers.map((provider) => <ProviderRow key={provider.id} provider={provider} />)}
+        {providers.providers.map((provider) => (
+          <ProviderRow key={provider.id} provider={provider} users={providerUsers(agents, provider.id)}
+            onConnected={(next) => connected(next)} onDisconnected={onChanged} />
+        ))}
       </ul>
-      {connected.map((provider) => (
-        <ModelsTable key={provider.id} provider={provider} providers={providers} agents={agents}
-          onAllowedChanged={() => void reload()} />
+      {live.map((provider) => (
+        <ModelsTable key={`${provider.id}-${provider.connection.source}-${provider.connection.addedAt ?? ''}`}
+          provider={provider} providers={providers} agents={agents} onAllowedChanged={() => void reload()} />
       ))}
-      {connected.length > 0
-        ? <DefaultPick providers={providers} connected={connected} onSaved={onChanged} />
-        : <p className="alert error" role="alert"><Icon name="alert" /> {t('settings.noProvider')}</p>}
-      <p className="alert info"><Icon name="info" /> {t('settings.keys.note')}</p>
+      {live.length > 0
+        ? <DefaultPick providers={providers} connected={live} onSaved={onChanged} />
+        : <p className="alert info"><Icon name="info" /> {t('settings.noProvider')}</p>}
     </SettingsCard>
-  );
-}
-
-function ProviderRow({ provider }: { provider: LlmProvider }) {
-  const t = useT();
-  return (
-    <li className="vendor">
-      <span className="vendor-icon" aria-hidden="true"><Icon name="vendor" /></span>
-      <span className="grow">
-        <span className="vendor-name">
-          {providerLabel(t, provider.id)}{' '}
-          {provider.connected
-            ? <Pill tone="live">{t('settings.provider.connected')}</Pill>
-            : <Pill tone="preview">{t('settings.provider.missing')}</Pill>}
-        </span>
-        <span className="vendor-desc">
-          {provider.connected ? t('settings.provider.key') : t('settings.provider.keyMissing')}
-        </span>
-      </span>
-    </li>
   );
 }
 

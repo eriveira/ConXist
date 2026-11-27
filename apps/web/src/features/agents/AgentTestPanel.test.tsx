@@ -63,11 +63,11 @@ describe('AgentTestPanel', () => {
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
-  it('says how to add a key when the API has none, and keeps Run off', async () => {
+  it('says where to connect a provider when the workspace has no key, and keeps Run off', async () => {
     api({ 'GET /api/test-runs/status': () => ({ body: { ready: false } }) });
     render(panel());
-    expect(await screen.findByText('Add your Anthropic key to run tests')).toBeInTheDocument();
-    expect(screen.getByText(/CONXIST_ANTHROPIC_API_KEY/)).toBeInTheDocument();
+    expect(await screen.findByText('Connect Anthropic to run tests')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open LLM providers' })).toHaveAttribute('href', '#/settings/llm');
     expect(screen.queryByRole('button', { name: 'Run' })).not.toBeInTheDocument();
   });
 

@@ -25,6 +25,8 @@ public final class FakeClaudeServer implements AutoCloseable {
 
     /** The key the fake accepts; any other gets a 401, as Anthropic would. */
     public static final String KEY = "fake-anthropic-key";
+    /** Keys that start with this are accepted too, so a person trying the dev app can paste one of their own making. */
+    public static final String ANY_KEY_PREFIX = "sk-ant-fake-";
 
     private final HttpServer server;
     private final JsonMapper json = JsonMapper.builder().build();
@@ -72,10 +74,15 @@ public final class FakeClaudeServer implements AutoCloseable {
             Map.of("id", "claude-opus-5", "display_name", "Claude Opus 5"),
             Map.of("id", "claude-haiku-4-5", "display_name", "Claude Haiku 4.5"));
 
-    private void models(HttpExchange exchange) throws IOException {
+    private static boolean accepted(HttpExchange exchange) {
         String key = exchange.getRequestHeaders().getFirst("x-api-key");
         String bearer = exchange.getRequestHeaders().getFirst("Authorization");
-        if (!KEY.equals(key) && !("Bearer " + KEY).equals(bearer)) {
+        String sent = key != null ? key : bearer != null && bearer.startsWith("Bearer ") ? bearer.substring(7) : "";
+        return KEY.equals(sent) || sent.startsWith(ANY_KEY_PREFIX);
+    }
+
+    private void models(HttpExchange exchange) throws IOException {
+        if (!accepted(exchange)) {
             send(exchange, 401, Map.of("type", "error",
                     "error", Map.of("type", "authentication_error", "message", "invalid x-api-key")));
             return;
@@ -88,9 +95,7 @@ public final class FakeClaudeServer implements AutoCloseable {
     }
 
     private void messages(HttpExchange exchange) throws IOException {
-        String key = exchange.getRequestHeaders().getFirst("x-api-key");
-        String bearer = exchange.getRequestHeaders().getFirst("Authorization");
-        if (!KEY.equals(key) && !("Bearer " + KEY).equals(bearer)) {
+        if (!accepted(exchange)) {
             send(exchange, 401, Map.of("type", "error",
                     "error", Map.of("type", "authentication_error", "message", "invalid x-api-key")));
             return;

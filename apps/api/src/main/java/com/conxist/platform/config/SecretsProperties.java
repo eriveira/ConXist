@@ -1,4 +1,4 @@
-package com.conxist.capture.config;
+package com.conxist.platform.config;
 
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;

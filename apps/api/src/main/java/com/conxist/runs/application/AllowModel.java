@@ -32,11 +32,10 @@ public final class AllowModel {
 
     public LlmProviders.Offered allow(String provider, String model, boolean allow) {
         ModelPort port = providers.port(provider).orElseThrow(LlmProviders::unknownProvider);
-        if (!port.ready()) {
-            throw new RuleViolation("provider.not-connected", "Connect the provider first.");
-        }
+        ProviderKeys.Key key = providers.key(provider)
+                .orElseThrow(() -> new RuleViolation("provider.not-connected", "Connect the provider first."));
         if (allow) {
-            save(provider, offeredModel(port, model), true);
+            save(provider, offeredModel(port, key, model), true);
         } else {
             // A model that is not allowed has nothing to untick; nothing is saved for it.
             allowedModel(provider, model).ifPresent(current -> save(provider, current, false));
@@ -48,8 +47,9 @@ public final class AllowModel {
         allowed.save(workspace.id(), new AllowedModelsRepository.Choice(provider, model, allow), clock.instant());
     }
 
-    private ProviderModel offeredModel(ModelPort port, String model) {
-        ProviderModelLists.Listing listing = lists.models(port, false);
+    private ProviderModel offeredModel(ModelPort port, ProviderKeys.Key key, String model) {
+        ProviderModelLists.Listing listing = lists.models(port, key.value(), false);
+        providers.recordCheck(port.provider(), key, listing);
         return listing.models().stream().filter(m -> m.id().equals(model)).findFirst().orElseThrow(() ->
                 listing.error() != null
                         ? new RuleViolation("model.list-failed", "The provider's list could not be fetched. Try again.")

@@ -20,9 +20,12 @@ class AllowModelTest {
     private final TestPort anthropic = new TestPort();
     private final TestModels.Defaults defaults = new TestModels.Defaults();
     private final TestModels.Allowed allowed = new TestModels.Allowed();
+    private final Map<String, ApiKey> computerKeys = TestModels.computerKeys();
+    private final TestModels.Keys stored = new TestModels.Keys();
+    private final ProviderKeys keys = new ProviderKeys(stored, computerKeys, FixedWorkspace.standard());
     private final ProviderModelLists lists = TestModels.lists();
     private final LlmProviders providers = new LlmProviders(TestModels.catalog(), List.of(anthropic), defaults,
-            allowed, lists, FixedWorkspace.standard(), TestClock.fixed());
+            allowed, lists, keys, FixedWorkspace.standard(), TestClock.fixed());
     private final Map<String, List<String>> users = new HashMap<>();
     private final AllowModel allow = new AllowModel(providers, lists, allowed, new AgentBriefs() {
         @Override
@@ -93,7 +96,7 @@ class AllowModelTest {
         assertCode(() -> allow.allow("anthropic", "claude-made-up", true), "model.not-offered");
         assertCode(() -> allow.allow("openai", TestModels.HAIKU, true), "provider.unknown");
 
-        anthropic.ready = false;
+        computerKeys.clear();
         assertCode(() -> allow.allow("anthropic", TestModels.HAIKU, false), "provider.not-connected");
         assertThat(allowed.saved).isEmpty();
     }
