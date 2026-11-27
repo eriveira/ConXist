@@ -12,6 +12,7 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param redirectUri   where a server's sign-in page sends the person back: this API's callback, on this machine
  * @param allowLoopback lets plain http on this computer through; only tests and the local fake turn it on
+ * @param faviconService asks a public favicon service, with the host name only, for a server whose site has no icon
  * @param githubApi     GitHub's REST API (ADR 0019); only tests and the local fake point it elsewhere
  * @param bitbucketApi  Bitbucket Cloud's REST API, version 2.0 (ADR 0020); likewise
  * @param gmailApi      Gmail's API for the signed-in person (ADR 0021); likewise
@@ -22,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 public record ConnectorsProperties(
         @NotNull URI redirectUri,
         boolean allowLoopback,
+        boolean faviconService,
         @NotNull Duration connectTimeout,
         @NotNull Duration readTimeout,
         @NotNull URI githubApi,

@@ -86,6 +86,7 @@ public class FakePlaudConfiguration {
             registry.add("conxist.runs.openai-api-key", () -> "");
             // The fake MCP servers run on this computer, over plain http.
             registry.add("conxist.connectors.allow-loopback", () -> "true");
+            registry.add("conxist.connectors.favicon-service", () -> "false");
             registry.add("conxist.connectors.github-api", () -> github.baseUrl().toString());
             registry.add("conxist.connectors.bitbucket-api", () -> bitbucket.baseUrl().toString());
             registry.add("conxist.connectors.gmail-api", () -> google.gmailApi().toString());

@@ -1,7 +1,7 @@
 /** The words of Settings › MCPs and of MCP tools on an agent's page (ADR 0017). */
 export const mcpEn = {
   'settings.mcps': 'MCPs',
-  'mcp.lead': 'MCP servers your team or a vendor runs. Agents only get the tools you allow, and only the ones the server marks as read-only.',
+  'mcp.lead': 'MCP servers your team or a vendor runs. Agents only get the tools you allow. Tools that change things start off and ask before you allow them.',
   'mcp.add': 'Add',
   'mcp.empty.title': 'No MCPs yet',
   'mcp.empty.body': 'Add an MCP server your team or a vendor runs, then choose which of its tools your agents may use. ConXist’s own tools are always there.',
@@ -138,7 +138,7 @@ export const mcpEn = {
 
 export const mcpEs: Record<keyof typeof mcpEn, string> = {
   'settings.mcps': 'MCPs',
-  'mcp.lead': 'Servidores MCP que gestiona tu equipo o un proveedor. Los agentes solo reciben las herramientas que permites, y solo las que el servidor marca como de solo lectura.',
+  'mcp.lead': 'Servidores MCP que gestiona tu equipo o un proveedor. Los agentes solo reciben las herramientas que permites. Las que cambian cosas empiezan desactivadas y preguntan antes de permitirlas.',
   'mcp.add': 'Añadir',
   'mcp.empty.title': 'Aún no hay MCPs',
   'mcp.empty.body': 'Añade un servidor MCP que gestione tu equipo o un proveedor y elige qué herramientas pueden usar tus agentes. Las herramientas de ConXist siempre están.',

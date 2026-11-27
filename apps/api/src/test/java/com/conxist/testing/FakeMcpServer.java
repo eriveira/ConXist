@@ -64,8 +64,10 @@ public final class FakeMcpServer implements AutoCloseable {
             server.createContext("/token", this::token);
         }
         if (mode == Mode.TOKEN) {
-            // This one names no logo, so ConXist falls back to the site's own icon.
-            server.createContext("/apple-touch-icon.png", this::siteIcon);
+            // This one names no logo, so ConXist falls back to the site's own icon: its home page redirects, and the
+            // page it lands on links the icon.
+            server.createContext("/", this::home);
+            server.createContext("/static/logo.png", this::siteIcon);
         }
         server.start();
     }
@@ -286,6 +288,20 @@ public final class FakeMcpServer implements AutoCloseable {
                     parts.length > 1 ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8) : "");
         }
         return values;
+    }
+
+    private void home(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        if (path.equals("/")) {
+            exchange.getResponseHeaders().set("Location", "/home");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        } else if (path.equals("/home")) {
+            send(exchange, 200, "text/html; charset=utf-8",
+                    "<html><head><link rel=\"icon\" type=\"image/png\" href=\"/static/logo.png\"></head></html>");
+        } else {
+            send(exchange, 404, "text/plain", "not found");
+        }
     }
 
     private void siteIcon(HttpExchange exchange) throws IOException {

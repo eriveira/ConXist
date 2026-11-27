@@ -57,6 +57,8 @@ conxist:
     redirect-uri: ${CONXIST_MCP_REDIRECT_URI:http://127.0.0.1:${server.port}/api/mcps/callback}
     # Only https servers on the internet. Tests and the local fake turn on plain http on this computer.
     allow-loopback: false
+    # A server whose site has no icon gets one from a public favicon service, asked with its host name only (ADR 0022).
+    favicon-service: ${CONXIST_FAVICON_SERVICE:true}
     connect-timeout: 10s
     read-timeout: 30s
     # GitHub's REST API, for the GitHub integration (ADR 0019).
