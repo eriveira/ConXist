@@ -74,12 +74,6 @@ export function ImportSkillDialog({ onClose, onImported }: ImportSkillDialogProp
         </div>
         {picked && <p className="picked"><Icon name="file" size={16} /> {picked.name}</p>}
         <p className="note"><Icon name="lock" size={14} /> {t('skills.import.safety')}</p>
-        <div className="choice">
-          <div className="soon-row">
-            <span className="grow"><b>{t('skills.import.github')}</b><small>{t('skills.import.github.desc')}</small></span>
-            <span className="pill soon">{t('skills.soon')}</span>
-          </div>
-        </div>
       </div>
     </Dialog>
   );

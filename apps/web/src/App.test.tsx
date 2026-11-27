@@ -47,24 +47,19 @@ describe('App', () => {
     await screen.findByRole('heading', { name: 'Sources', level: 1 });
 
     const menu = screen.getByRole('navigation', { name: 'Main' });
-    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Flow', 'Agents', 'Skills', 'Sources', 'Knowledge', 'Memories']);
+    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Agents', 'Skills', 'Sources']);
     expect(within(menu).getByRole('link', { name: 'Sources' })).toHaveAttribute('aria-current', 'page');
 
-    await userEvent.click(within(menu).getByRole('link', { name: 'Flow' }));
-    expect(await screen.findByRole('heading', { name: 'Flow is coming soon' })).toBeInTheDocument();
     await userEvent.click(within(menu).getByRole('link', { name: 'Home' }));
     expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
-  it('opens Skills and Memories from the menu, and keeps Skills marked on its page', async () => {
+  it('opens Skills from the menu, and keeps Skills marked on its page', async () => {
     api([ACME], { 'GET /api/skills': () => ({ body: [] }) });
     render(<App />);
     await screen.findByRole('heading', { name: 'Sources', level: 1 });
     const menu = screen.getByRole('navigation', { name: 'Main' });
-
-    await userEvent.click(within(menu).getByRole('link', { name: 'Memories' }));
-    expect(await screen.findByRole('heading', { name: 'Memories is coming soon' })).toBeInTheDocument();
 
     await userEvent.click(within(menu).getByRole('link', { name: 'Skills' }));
     expect(await screen.findByRole('heading', { name: 'Skills', level: 1 })).toBeInTheDocument();
@@ -132,27 +127,24 @@ describe('App', () => {
       .toEqual({ name: 'Acme Checkout', description: '' });
   });
 
-  it('keeps theme and language in the account menu, and says sign-in is coming', async () => {
+  it('keeps theme and language in the account menu, and says ConXist runs only on this computer', async () => {
     api([ACME]);
     render(<App />);
     await screen.findByRole('heading', { name: 'Sources', level: 1 });
 
     await userEvent.click(screen.getByRole('button', { name: /Account and settings/ }));
-    expect(screen.getByText(/Sign-in is coming soon/)).toBeInTheDocument();
+    expect(screen.getByText(/runs only on this computer/)).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('Language'), 'es');
     expect(await screen.findByRole('link', { name: 'Fuentes' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('opens Ask ConXist, which says the agent is coming soon', async () => {
+  it('shows nothing that is not available yet: no Ask ConXist button', async () => {
     api([ACME]);
     render(<App />);
     await screen.findByRole('heading', { name: 'Sources', level: 1 });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Ask ConXist' }));
-    expect(screen.getByRole('region', { name: 'Ask ConXist' })).toHaveTextContent(/Coming soon/);
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('region', { name: 'Ask ConXist' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ask ConXist' })).toHaveFocus();
+    expect(screen.queryByRole('button', { name: 'Ask ConXist' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
   });
 
   it('offers Retry when ConXist cannot be reached', async () => {

@@ -74,6 +74,7 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   `ApiKey` and the request record hide the key in `toString`, so it can't reach a log.
 - **Connectors** now hold what is not a model: Storage (where Knowledge and Memories will be saved) and AI tools that
   reach ConXist over MCP. Both show "coming soon".
+  2026-11-27 (owner): the app shows only what works, so the Connectors section is gone until connectors work.
 - **Topics** live in the `workspaces` module: table `workspace_topics` (V13) with a name of 1 to 60 characters,
   unique per workspace ignoring case, and a description up to 300. A workspace keeps up to 50, which the app enforces.
   `/api/topics` (GET, POST, PUT and DELETE `/{id}`) acts for the workspace in `X-Workspace-Id`.

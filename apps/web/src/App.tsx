@@ -6,9 +6,7 @@ import { SkillPage } from './features/skills/SkillPage';
 import { SkillsPage } from './features/skills/SkillsPage';
 import type { Workspace } from './domain/workspaces';
 import { AppHeader } from './features/shell/AppHeader';
-import { AskConxist } from './features/shell/AskConxist';
 import { THEMES, type Theme } from './features/shell/AccountMenu';
-import { ComingSoonPage } from './features/shell/ComingSoonPage';
 import { HomePage } from './features/shell/HomePage';
 import { useRoute } from './features/shell/useRoute';
 import { SourcePage } from './features/source/SourcePage';
@@ -53,7 +51,7 @@ interface SettingsProps {
   onLanguage: (language: Language) => void;
 }
 
-/** First run asks for a workspace; after that, the header, the current page and Ask ConXist. */
+/** First run asks for a workspace; after that, the header and the current page. */
 function Workspaces(settings: SettingsProps) {
   const t = translator(settings.language);
   const { state, retry, switchTo, created, updated, refresh } = useWorkspaces();
@@ -106,9 +104,7 @@ function Workspaces(settings: SettingsProps) {
           : <SourcesPage />)}
         {(page === 'agents' || page === 'skills') && <AgentsArea route={agentsRoute} />}
         {page === 'settings' && <SettingsPage workspace={state.current} onSaved={updated} />}
-        {(page === 'flow' || page === 'knowledge' || page === 'memories') && <ComingSoonPage page={page} />}
       </main>
-      <AskConxist />
       {newOpen && <NewWorkspaceDialog onClose={() => setNewOpen(false)} onCreated={onCreated} />}
     </div>
   );

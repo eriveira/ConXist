@@ -3,12 +3,11 @@ import type { Workspace } from '../../domain/workspaces';
 import { useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { SETTINGS_SECTIONS, settingsHref, useSettingsSection } from '../../navigation';
-import { ConnectorsSection } from './ConnectorsSection';
 import { GeneralSection } from './GeneralSection';
 import { LlmProvidersSection } from './LlmProvidersSection';
 import { TopicsSection } from './TopicsSection';
 
-/** A workspace's Settings, opened from the workspace menu: General, LLM providers, Connectors and Topics. */
+/** A workspace's Settings, opened from the workspace menu: General, LLM providers and Topics. */
 export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onSaved: (workspace: Workspace) => void }) {
   const t = useT();
   const section = useSettingsSection();
@@ -34,7 +33,6 @@ export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onS
         <div className="settings-content">
           {section === 'general' && <GeneralSection workspace={workspace} onSaved={onSaved} />}
           {section === 'llm' && <LlmProvidersSection />}
-          {section === 'connectors' && <ConnectorsSection />}
           {section === 'topics' && <TopicsSection />}
         </div>
       </div>

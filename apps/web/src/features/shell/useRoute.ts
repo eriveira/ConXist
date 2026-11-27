@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export const PAGES = ['home', 'flow', 'agents', 'skills', 'sources', 'knowledge', 'memories'] as const;
+export const PAGES = ['home', 'agents', 'skills', 'sources'] as const;
 export type Page = (typeof PAGES)[number];
 /** The pages in the address: the menu's, and Settings, opened from the workspace menu. */
 export const ROUTES = [...PAGES, 'settings'] as const;

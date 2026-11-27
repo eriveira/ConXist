@@ -96,7 +96,7 @@ describe('SourcesPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Connect your first source/ }));
 
     expect(screen.getByRole('button', { name: 'Add source' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: /Capture/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upload files/ })).toBeInTheDocument();
   });
 
   it('has no accessibility violations with sources', async () => {

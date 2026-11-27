@@ -49,7 +49,7 @@ describe('SkillPage', () => {
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText('v1 live · edited')).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Analyst' })).toBeInTheDocument();
-    expect(screen.getByText('Reference files').closest('section')).toHaveTextContent('Coming soon');
+    expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
     expect(await accessibilityViolations(container)).toEqual([]);
 
     await userEvent.click(screen.getByRole('tab', { name: 'SKILL.md' }));

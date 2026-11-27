@@ -206,12 +206,12 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument();
   });
 
-  it('shows storage and the AI tools that reach ConXist as coming soon', async () => {
-    const { container } = open('#/settings/connectors');
+  it('lists only the sections that work, and opens General for an address it does not know', async () => {
+    open('#/settings/connectors');
 
-    expect(screen.getByText('Storage').parentElement).toHaveTextContent('Coming soon');
-    expect(screen.getByText('AI tools that reach ConXist').parentElement).toHaveTextContent('Coming soon');
-    expect(await accessibilityViolations(container)).toEqual([]);
+    const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['General', 'LLM providers', 'Topics']);
+    expect(within(nav).getByRole('link', { name: 'General' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('starts with no topics, adds one with its description, and refuses a taken name under the field', async () => {

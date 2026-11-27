@@ -1,22 +1,23 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
+import type { Provider } from '../../domain/model';
 import { PROVIDERS } from '../../testing';
 import { AddMenu } from './AddMenu';
 
+/** A second category that can be added, so the menu asks for the category first. */
+const WITH_REPO: Provider[] = [...PROVIDERS, { provider: 'BITBUCKET', category: 'REPO', availability: 'LIVE', displayName: 'Bitbucket', signInRequired: true }];
+
 describe('AddMenu', () => {
-  it('offers the three categories first, then the providers in the one picked', async () => {
+  it('goes straight to the providers when only one category can be added', async () => {
     const onChoose = vi.fn();
     render(<AddMenu providers={PROVIDERS} onChoose={onChoose} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Add source' }));
-    expect(screen.getByRole('button', { name: /Capture/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Repo/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Storage/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Repo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /Capture/ }));
     await userEvent.click(screen.getByRole('button', { name: /Upload files/ }));
-
     expect(onChoose).toHaveBeenCalledWith(PROVIDERS[0]);
   });
 
@@ -24,29 +25,28 @@ describe('AddMenu', () => {
     const { container } = render(<AddMenu providers={PROVIDERS} onChoose={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Add source' }));
-    await userEvent.click(screen.getByRole('button', { name: /Capture/ }));
 
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
-  it('shows coming-soon providers as unavailable', async () => {
+  it('leaves out providers that are not available yet', async () => {
     render(<AddMenu providers={PROVIDERS} onChoose={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Add source' }));
-    await userEvent.click(screen.getByRole('button', { name: /Capture/ }));
 
-    expect(screen.getByRole('button', { name: /Email forwarding/ })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Email forwarding/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Meeting recorder.*Preview/ })).toBeEnabled();
   });
 
-  it('steps back with Escape, then closes and returns focus to the Add button', async () => {
-    render(<AddMenu providers={PROVIDERS} onChoose={vi.fn()} />);
+  it('asks for the category first when more than one can be added, and steps back with Escape', async () => {
+    render(<AddMenu providers={WITH_REPO} onChoose={vi.fn()} />);
     const add = screen.getByRole('button', { name: 'Add source' });
 
     await userEvent.click(add);
+    expect(screen.queryByRole('button', { name: /Storage/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Repo/ }));
     await userEvent.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: /Storage/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Capture/ })).toBeInTheDocument();
 
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('group')).not.toBeInTheDocument();

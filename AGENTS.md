@@ -52,20 +52,20 @@ Sources page does not show it for now, owner decision 2026-11-17).
   OAuth sign-in, waiting on Plaud to confirm outside apps may use it; see
   `docs/adr/0005-plaud-sign-in.md`) on the Sources page. Connecting Plaud lists the
   newest recordings to pick from (up to 500) and can follow new ones. Each source has its own page
-  (`#/sources/{id}`): its meetings, each transcript, and an import history kept 90 days; a meeting can be deleted and is then not imported again (ADR 0006, ADR 0008), and corrected in ConXist (title, speaker names, lines) with the original kept to restore (ADR 0009). Repo and Storage show as
-  coming soon. Plaud Team workspaces (ADR 0003) are on hold: the API code stays,
+  (`#/sources/{id}`): its meetings, each transcript, and an import history kept 90 days; a meeting can be deleted and is then not imported again (ADR 0006, ADR 0008), and corrected in ConXist (title, speaker names, lines) with the original kept to restore (ADR 0009). The Add menu lists only what can be
+  added, so it goes straight to Capture. Plaud Team workspaces (ADR 0003) are on hold: the API code stays,
   the app does not offer them (owner, 2026-11-19). Captured text, files and tokens are encrypted at rest (ADR 0004). The API needs `CONXIST_SECRETS_KEY` (32 bytes, Base64) to start;
   `mvn spring-boot:test-run` runs a fake Plaud that signs in as `alex@acme.test`.
 - Workspaces (ADR 0007): a person keeps several; first run asks for one (name, optional description up to 500
   characters). Every workspace request sends `X-Workspace-Id`; the app keeps the last one used. The header menu is
-  Home (empty for now), Flow, Agents, Skills, Sources, Knowledge, Memories (owner, 2026-11-21); Flow, Knowledge,
-  Memories and Ask ConXist show "coming soon".
+  Home (empty for now), Agents, Skills, Sources. Flow, Knowledge, Memories and Ask ConXist come back when they work
+  (owner, 2026-11-27).
 - Agents (ADR 0010, step 1 of 4 the owner set: Agents, Skills, Test run, Schedules): an `agents` module and the
   Agents pages. Create by name (an empty draft; no templates since ADR 0015), edit a draft that saves itself (revision check), publish numbered versions,
   History and Restore, Archive, Delete.
 - Skills (ADR 0011, step 2): in the `agents` module, with its own menu item. Write or import a SKILL.md (no
   built-in skills since ADR 0015); publish numbered versions with a note. An agent pins a skill version and gets "vN available" when a
-  newer one is published. Reference files and GitHub import show "coming soon".
+  newer one is published.
 - Delete (ADR 0013, owner 2026-11-21): an agent or a skill is deleted for good with all its versions, after a check of what
   uses it. A skill any agent (archived too) follows in its draft or live version is not deleted; the dialog names
   and links those agents. Nothing uses an agent yet; flows and schedules will plug
@@ -81,7 +81,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   stores encrypted per workspace, Test connection, Replace key, Disconnect; a workspace without its own key uses
   `CONXIST_ANTHROPIC_API_KEY` when set; every model the key offers with an Allowed box, who uses each and at what
   effort, and the default for new agents),
-  Connectors (Storage and MCP access, both coming soon) and Topics (up to 50 per workspace, for the topic classifier).
+  and Topics (up to 50 per workspace, for the topic classifier).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
@@ -118,6 +118,8 @@ Sources page does not show it for now, owner decision 2026-11-17).
 
 ## Project rules
 
+- The app shows only what works: no "coming soon" items, menus or pages (owner, 2026-11-27). What is coming is
+  described on the product page, marked "coming soon" there.
 - Never merge, deploy or apply migrations without the owner's explicit go.
 - Do not start parallel agents or split worktrees without a human request.
 - Integration scope for Phase 1, set by the owner: Capture = meeting recorder
