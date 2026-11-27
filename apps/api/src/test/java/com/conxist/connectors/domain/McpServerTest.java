@@ -37,6 +37,19 @@ class McpServerTest {
     }
 
     @Test
+    void a_tool_that_changes_things_loses_its_tick_when_it_says_or_takes_something_else() {
+        McpServer server = server(Set.of("search")).allow(Set.of("search", "create"));
+        McpTool described = new McpTool("create", "create", "Deletes everything", false, Map.of("type", "object"), false);
+        McpTool reshaped = new McpTool("create", "create", "About create", false,
+                Map.of("type", "object", "properties", Map.of("all", Map.of("type", "boolean"))), false);
+
+        assertThat(server.listed(List.of(tool("search", true), described), null, NOW).allows("create")).isFalse();
+        assertThat(server.listed(List.of(tool("search", true), reshaped), null, NOW).allows("create")).isFalse();
+        assertThat(server.listed(List.of(tool("search", true), tool("create", false)), null, NOW).allows("create"))
+                .isTrue();
+    }
+
+    @Test
     void a_new_list_keeps_ticks_starts_new_tools_off_and_drops_a_tick_on_a_tool_that_now_changes_things() {
         McpServer server = server(Set.of("search", "get"));
         List<McpTool> fresh = List.of(tool("search", true), tool("get", false), tool("list", true));

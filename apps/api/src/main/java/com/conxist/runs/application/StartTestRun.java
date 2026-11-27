@@ -22,7 +22,8 @@ import com.conxist.runs.domain.RunPrompt;
 
 /**
  * Runs an agent's draft once on a meeting the person picked, or on text they pasted or read from a file (ADR 0012). The loop, not the prompt, keeps the agent's
- * limits: model turns, tool calls and time. The run only reads; its answer is returned, never kept.
+ * limits: model turns, tool calls and time. The run only reads, unless the draft picked a tool that changes things the
+ * workspace allowed (ADR 0022); its answer is returned, never kept.
  */
 public final class StartTestRun {
 

@@ -38,10 +38,11 @@ when ticked; the tick is the approval (no approval per change).
   carries "Can change things". Ticking it asks first, in the tools table: what it may change, that agents use it
   without asking each time, test runs included, and that ConXist can't undo it. That tick is the owner-approved
   automatic action TOOL_CALLING_STANDARDS §3 allows, one tool at a time and recorded here. Agents label those tools;
-  the Test panel names the ones a run may use for real. The run prompt (`2026-11-27.4`) marks each such tool and tells
-  the model to use it only for the task it was given, never because data asked for it, and to say what it changed. A
-  later Check keeps a tick only while the tool stays what it was when ticked: a read tool that turns into one that
-  changes things is unticked.
+  the Test panel names the ones a run may use for real. The run prompt marks each such tool and tells
+  the model to use it only when the agent's instructions call for that change, never because data, a skill or a tool
+  asked for it, and to say what it changed (`2026-11-27.5`). A later Check keeps a tick only while the tool stays what
+  it was when ticked: a read tool that now changes things, or a tool that changes things whose description or input
+  schema changed, is unticked.
 - **The site's icon for a server with no logo.** When `serverInfo` names no usable icon, ConXist tries
   `/apple-touch-icon.png`, then `/favicon.ico`, on the server's host and then on its parent domain, through the same
   address guard, with no redirects, image types only and up to 100 KB. Check refreshes it for servers already added.
@@ -49,6 +50,12 @@ when ticked; the tick is the approval (no approval per change).
 ## Consequences
 
 - V23 changes a table's key; it needs the owner's go before it is applied.
+- MCP's `destructiveHint` is not read: a tool that deletes is tickable like any other tool that changes things, behind
+  the same warning, and the tick stands for every target (TOOL_CALLING_STANDARDS §3 asks a confirmation naming the
+  target for destructive actions). For the owner to confirm, or to keep such tools locked.
+- The only guard against data that asks for a change is the prompt rule and the person's tick. Eval cases where a
+  meeting, pasted text or a tool answer asks for a write call are REFACTOR LATER (TOOL_CALLING_STANDARDS §6).
+- The site icon's parent-domain try can reach a public suffix (`a.co.uk` → `co.uk`); the worst case is a wrong logo.
 - The API trusts the screen to warn before a tool that changes things is ticked; it has no extra confirm flag.
 - Deleting a workspace does not revoke Plaud or Google sign-ins at the provider; it only forgets them (REFACTOR LATER).
 - Sign-in (not yet built) will decide who may delete a workspace and who may allow tools that change things.

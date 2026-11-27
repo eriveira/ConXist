@@ -70,18 +70,27 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
 
     /**
      * The server's tool list as it is now. A tool it still lists keeps its tick, unless it only read before and may
-     * change things now, which the person did not allow; a new tool starts off, so nothing new reaches agents without
-     * the person; a tool it no longer lists is gone.
+     * change things now, or it changes things and now says or takes something else: the person allowed the tool they
+     * were shown, not another one under the same name (ADR 0022). A new tool starts off, so nothing new reaches agents
+     * without the person; a tool it no longer lists is gone.
      */
     public McpServer listed(List<McpTool> fresh, String newIcon, Instant now) {
         Map<String, McpTool> known = byName();
         List<McpTool> merged = new ArrayList<>();
         for (McpTool tool : fresh) {
             McpTool before = known.get(tool.name());
-            merged.add(tool.withAllowed(before != null && before.allowed() && (tool.readOnly() || !before.readOnly())));
+            merged.add(tool.withAllowed(before != null && before.allowed() && stillAllowed(before, tool)));
         }
         return new McpServer(id, workspaceId, name, address, auth, newIcon == null ? icon : newIcon, merged,
                 Status.WORKS, addedAt, now);
+    }
+
+    private static boolean stillAllowed(McpTool before, McpTool now) {
+        if (now.readOnly()) {
+            return true;
+        }
+        return !before.readOnly() && Objects.equals(before.description(), now.description())
+                && Objects.equals(before.inputSchema(), now.inputSchema());
     }
 
     /** The names of tools the fresh list has that this one does not. */
