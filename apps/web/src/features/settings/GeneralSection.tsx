@@ -93,7 +93,7 @@ function DeleteWorkspaceDialog({ workspace, onClose, onDeleted }: {
         <p>{t('workspace.delete.what')}</p>
         <div className="field">
           <label htmlFor="delete-workspace-name">{t('workspace.delete.type', { name: workspace.name })}</label>
-          <input id="delete-workspace-name" value={typed} autoComplete="off" spellCheck={false} disabled={busy}
+          <input id="delete-workspace-name" type="text" value={typed} autoComplete="off" spellCheck={false} disabled={busy}
             onChange={(event) => setTyped(event.target.value)} />
         </div>
         {problem && <p className="alert error" role="alert"><Icon name="alert" /> {problem}</p>}

@@ -193,3 +193,7 @@
 .tool-ask-text.warn { display: flex; gap: 6px; align-items: flex-start; font-weight: 600; }
 .tool-ask-text.warn svg { flex: none; margin-top: 2px; }
 .tool-ask-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+@media (max-width: 760px) {
+  .presets tr.tool-ask-row { grid-template-columns: minmax(0, 1fr); padding-top: 0; }
+  .presets tr.tool-ask-row td { grid-column: 1 / -1; padding: 0; }
+}
