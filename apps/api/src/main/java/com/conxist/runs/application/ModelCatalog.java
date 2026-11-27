@@ -32,9 +32,4 @@ public record ModelCatalog(List<ModelOption> models, ModelStart newAgents, long 
     ModelOption callable(String provider, String id) {
         return option(provider, id).orElseGet(() -> new ModelOption(provider, id, id, false, defaultMaxTokens));
     }
-
-    /** The providers the models belong to, in the order the settings list them. */
-    List<String> providers() {
-        return models.stream().map(ModelOption::provider).distinct().toList();
-    }
 }

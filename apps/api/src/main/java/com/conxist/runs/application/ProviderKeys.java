@@ -7,7 +7,7 @@ import com.conxist.platform.CurrentWorkspace;
 
 /**
  * Which key calls a provider for the current workspace: the workspace's own when it connected one, else the key set on
- * this computer ({@code CONXIST_ANTHROPIC_API_KEY}), else none (ADR 0014). A stored key is opened only to call the
+ * this computer ({@code CONXIST_ANTHROPIC_API_KEY} or {@code CONXIST_OPENAI_API_KEY}), else none (ADR 0014). A stored key is opened only to call the
  * provider; Settings reads its status without opening it.
  */
 public final class ProviderKeys {

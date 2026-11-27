@@ -5,7 +5,7 @@ import { Icon } from '../../components/Icon';
 import type { LlmProvider, LlmProviders } from '../../domain/settings';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
-import { ProviderMark, providerBrand } from './ProviderMark';
+import { ProviderMark, providerBrand, providerKeyStart } from './ProviderMark';
 
 /**
  * Takes a pasted API key and connects the workspace with it. The API checks the key with the provider before saving;
@@ -60,7 +60,7 @@ export function ConnectDialog({ provider, replacing, onClose, onConnected }: {
         <div className="field">
           <label htmlFor={field}>{t('settings.connect.label')}</label>
           <input id={field} className="input" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" spellCheck={false}
-            placeholder="sk-ant-..." value={key} disabled={busy} maxLength={1000}
+            placeholder={providerKeyStart(provider)} value={key} disabled={busy} maxLength={1000}
             aria-invalid={error ? true : undefined} aria-describedby={error ? `${help} ${errorId}` : help}
             onChange={(event) => { setKey(event.target.value); setError(null); }} />
           <small id={help} className="hint">{t('settings.connect.help', { provider: brand })}</small>

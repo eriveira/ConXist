@@ -6,9 +6,10 @@ import {
   type LlmProvider, type LlmProviders, lockReason, modelAvailable, modelLabel, modelUsers, type OfferedModel,
   type OfferedModels, providerUsers, samePick,
 } from '../../domain/settings';
-import { providerLabel, useT } from '../../i18n/i18n';
+import { useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { problemMessage } from '../../i18n/problems';
+import { providerBrand, providerModelsLead } from './ProviderMark';
 import { ProviderRow } from './ProviderRow';
 import { ErrorState, LoadingState, SavedStatus, SettingsCard } from './SettingsParts';
 
@@ -90,7 +91,7 @@ function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const name = providerLabel(t, provider.id);
+  const name = providerBrand(t, provider.id);
 
   const load = useCallback(async (refresh: boolean) => {
     setError(null);
@@ -140,14 +141,14 @@ function ModelsTable({ provider, providers, agents, onAllowedChanged }: {
   return (
     <section className="models" aria-labelledby={`models-${provider.id}`}>
       <div className="models-head">
-        <h3 id={`models-${provider.id}`}>{t('settings.models')}</h3>
+        <h3 id={`models-${provider.id}`}>{t('settings.provider.models', { provider: name })}</h3>
         <span className="muted">{t('settings.models.count', { offered: offered.models.length, allowed: allowedCount })}</span>
         <SavedStatus saved={saved} />
         <button type="button" className="btn sm" disabled={refreshing} onClick={() => void load(true)}>
           {refreshing ? t('settings.models.refreshing') : t('settings.models.refresh')}
         </button>
       </div>
-      <p className="hint">{t('settings.models.lead', { provider: name })}</p>
+      <p className="hint">{providerModelsLead(t, provider.id)}</p>
       {offered.listError && (
         <p className="alert error" role="alert"><Icon name="alert" /> {t('settings.models.listFailed')} {t(`settings.models.listFailed.${offered.listError}`)}</p>
       )}
@@ -251,11 +252,13 @@ function DefaultPick({ providers, connected, onSaved }: {
               {t('agent.model.gone', { model: modelLabel(providers, pick.provider, pick.model) })}
             </option>
           )}
-          {connected.flatMap((provider) => provider.models.map((model) => (
-            <option key={`${provider.id}/${model.id}`} value={`${provider.id}/${model.id}`}>
-              {t('settings.default.option', { provider: providerLabel(t, provider.id), model: model.label })}
-            </option>
-          )))}
+          {connected.map((provider) => (
+            <optgroup key={provider.id} label={providerBrand(t, provider.id)}>
+              {provider.models.map((model) => (
+                <option key={`${provider.id}/${model.id}`} value={`${provider.id}/${model.id}`}>{model.label}</option>
+              ))}
+            </optgroup>
+          ))}
         </select>
         <select value={pick.effort} disabled={busy} aria-label={t('settings.default.effort')}
           onChange={(event) => change({ ...pick, effort: event.target.value as Effort })}>

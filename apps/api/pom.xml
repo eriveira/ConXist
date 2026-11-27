@@ -22,6 +22,7 @@
     <tika.version>4.2.0</tika.version>
     <archunit.version>1.5.1</archunit.version>
     <anthropic.version>3.12.0</anthropic.version>
+    <openai.version>4.105.0</openai.version>
   </properties>
 
   <dependencyManagement>
@@ -46,6 +47,12 @@
       <groupId>com.anthropic</groupId>
       <artifactId>anthropic-java</artifactId>
       <version>${anthropic.version}</version>
+    </dependency>
+    <dependency>
+      <!-- OpenAI, the second model provider; used only by the runs module's model adapter (ADR 0014) -->
+      <groupId>com.openai</groupId>
+      <artifactId>openai-java</artifactId>
+      <version>${openai.version}</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
