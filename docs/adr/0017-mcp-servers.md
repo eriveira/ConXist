@@ -3,6 +3,8 @@
 - Status: Proposed
 - Date: 2026-11-27
 - Deciders: owner, Claude
+- Changed by: ADR 0022 (2026-11-27): tools that change things can be ticked after a warning; the site's icon stands
+  in for a missing logo.
 - Changes: ADR 0014's Settings sections (Connectors becomes MCPs, Integrations and Variables; see "Settings")
 
 ## Context

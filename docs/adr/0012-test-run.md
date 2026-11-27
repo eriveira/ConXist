@@ -3,6 +3,7 @@
 - Status: Proposed
 - Date: 2026-11-21
 - Deciders: owner, Claude
+- Changed by: ADR 0022 (2026-11-27): a test run also takes pasted text or a text file.
 
 ## Context
 
