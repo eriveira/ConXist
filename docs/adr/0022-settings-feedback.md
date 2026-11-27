@@ -51,17 +51,30 @@ when ticked; the tick is the approval (no approval per change).
   icon (gmailmcp.googleapis.com), ConXist asks Google's public favicon service with the host name only (owner's
   choice, 2026-11-27; `CONXIST_FAVICON_SERVICE=false` turns it off). Check refreshes the logo for servers
   already added; icon requests carry no token.
+- **A logo a person sets.** When the found logo is missing or wrong (Google's service has none for googleapis.com),
+  the MCP's page takes an image address (owner, 2026-11-27, `App/mocks/mcp-logo-url-v1/`). `PUT /api/mcps/{id}/logo`
+  fetches it once through the same guard and redirects, without a token, and keeps it only when it is a PNG, JPG,
+  SVG, WebP or ICO up to 100 KB (`mcp.logo-not-image`, `mcp.logo-not-https`, `mcp.logo-private`,
+  `mcp.logo-unreachable`). V24 keeps the copy, its address and when it was fetched beside the found icon, so a Check
+  still refreshes the found one and the chosen one keeps showing. `DELETE /api/mcps/{id}/logo` goes back to the found
+  logo.
 
 ## Consequences
 
-- V23 changes a table's key; it needs the owner's go before it is applied.
+- V23 changes a table's key, and V24 adds three columns to `mcp_servers`; each needs the owner's go before it is
+  applied.
 - MCP's `destructiveHint` is not read: a tool that deletes is tickable like any other tool that changes things, behind
   the same warning, and the tick stands for every target (TOOL_CALLING_STANDARDS §3 asks a confirmation naming the
   target for destructive actions). For the owner to confirm, or to keep such tools locked.
 - The only guard against data that asks for a change is the prompt rule and the person's tick. Eval cases where a
   meeting, pasted text or a tool answer asks for a write call are REFACTOR LATER (TOOL_CALLING_STANDARDS §6).
 - The site icon's parent-domain try can reach a public suffix (`a.co.uk` → `co.uk`); the worst case is a wrong logo.
-- The favicon service learns the host name of a server whose site has no icon.
+- The favicon service learns the host name of a server whose site has no icon. A logo address is fetched once, from
+  ConXist's machine, so that site learns ConXist's address; a chosen SVG shows only as an image, so its scripts never
+  run.
+- REFACTOR LATER (security review): the guard resolves a host and the client resolves it again, so DNS rebinding can
+  reach a private address (true of every MCP and icon fetch; must close before hosting); a logo fetch has no overall
+  deadline across its redirects; a logo address with a signed query string is kept and shown as pasted.
 - The API trusts the screen to warn before a tool that changes things is ticked; it has no extra confirm flag.
 - Deleting a workspace does not revoke Plaud or Google sign-ins at the provider; it only forgets them (REFACTOR LATER).
 - Sign-in (not yet built) will decide who may delete a workspace and who may allow tools that change things.

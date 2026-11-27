@@ -15,11 +15,28 @@ import java.util.UUID;
  * An MCP server a workspace added (ADR 0017): its name in ConXist, its address, how ConXist signs in, the logo it
  * gives, and the tools it lists with the ones agents may use. The credential itself is kept apart, encrypted.
  *
- * @param icon   the server's logo as a {@code data:image/...} address, or null when it gives none
+ * @param icon   the logo ConXist found (the server's, else its site's) as a {@code data:image/...} address, or null
+ * @param logo   the logo a person chose instead, or null to show the one ConXist found
  * @param status how the server answered when last asked
  */
-public record McpServer(UUID id, UUID workspaceId, String name, URI address, McpAuth auth, String icon,
+public record McpServer(UUID id, UUID workspaceId, String name, URI address, McpAuth auth, String icon, Logo logo,
         List<McpTool> tools, Status status, Instant addedAt, Instant checkedAt) {
+
+    /**
+     * A logo a person chose by its address (ADR 0022). ConXist fetched it once and keeps its own copy, so it still
+     * shows if that address changes.
+     *
+     * @param image     the copy, as a {@code data:image/...} address
+     * @param address   where it was fetched from, to show the person
+     * @param fetchedAt when
+     */
+    public record Logo(String image, URI address, Instant fetchedAt) {
+        public Logo {
+            Objects.requireNonNull(image, "image");
+            Objects.requireNonNull(address, "address");
+            Objects.requireNonNull(fetchedAt, "fetchedAt");
+        }
+    }
 
     public static final int MAX_NAME_LENGTH = 60;
     /** A server may list more; the rest are left out, in the order the server lists them. */
@@ -50,7 +67,7 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
     /** A server just added: the tools the person ticked are allowed, the rest are not. */
     public static McpServer add(UUID id, UUID workspaceId, String name, URI address, McpAuth auth, String icon,
             List<McpTool> listed, Set<String> allowed, Instant now) {
-        McpServer server = new McpServer(id, workspaceId, name, address, auth, icon,
+        McpServer server = new McpServer(id, workspaceId, name, address, auth, icon, null,
                 listed.stream().map(tool -> tool.withAllowed(false)).toList(), Status.WORKS, now, now);
         return server.allow(allowed);
     }
@@ -65,7 +82,7 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
     }
 
     public McpServer renamed(String newName) {
-        return new McpServer(id, workspaceId, newName, address, auth, icon, tools, status, addedAt, checkedAt);
+        return new McpServer(id, workspaceId, newName, address, auth, icon, logo, tools, status, addedAt, checkedAt);
     }
 
     /**
@@ -81,7 +98,7 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
             McpTool before = known.get(tool.name());
             merged.add(tool.withAllowed(before != null && before.allowed() && stillAllowed(before, tool)));
         }
-        return new McpServer(id, workspaceId, name, address, auth, newIcon == null ? icon : newIcon, merged,
+        return new McpServer(id, workspaceId, name, address, auth, newIcon == null ? icon : newIcon, logo, merged,
                 Status.WORKS, addedAt, now);
     }
 
@@ -100,12 +117,22 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
     }
 
     public McpServer withStatus(Status newStatus, Instant now) {
-        return new McpServer(id, workspaceId, name, address, auth, icon, tools, newStatus, addedAt, now);
+        return new McpServer(id, workspaceId, name, address, auth, icon, logo, tools, newStatus, addedAt, now);
     }
 
     /** The server signs in another way now, for example a new token in place of an expired sign-in. */
     public McpServer signedInWith(McpAuth newAuth) {
-        return new McpServer(id, workspaceId, name, address, newAuth, icon, tools, status, addedAt, checkedAt);
+        return new McpServer(id, workspaceId, name, address, newAuth, icon, logo, tools, status, addedAt, checkedAt);
+    }
+
+    /** The logo to show: the one a person chose, else the one ConXist found; null when there is neither. */
+    public String shownIcon() {
+        return logo != null ? logo.image() : icon;
+    }
+
+    /** Shows this logo in place of the one ConXist found; null goes back to the found one. */
+    public McpServer withLogo(Logo newLogo) {
+        return new McpServer(id, workspaceId, name, address, auth, icon, newLogo, tools, status, addedAt, checkedAt);
     }
 
     public boolean allows(String tool) {
@@ -118,7 +145,7 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
     }
 
     private McpServer withTools(List<McpTool> newTools) {
-        return new McpServer(id, workspaceId, name, address, auth, icon, newTools, status, addedAt, checkedAt);
+        return new McpServer(id, workspaceId, name, address, auth, icon, logo, newTools, status, addedAt, checkedAt);
     }
 
     private Map<String, McpTool> byName() {

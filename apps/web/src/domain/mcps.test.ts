@@ -7,7 +7,7 @@ const tool = (name: string, readOnly: boolean, allowed: boolean, users: string[]
 });
 
 const server: McpServer = {
-  id: 's1', name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'NONE', icon: null, status: 'WORKS',
+  id: 's1', name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'NONE', icon: null, logo: null, status: 'WORKS',
   tools: [tool('search', true, true, ['Zed', 'Analyst']), tool('get', true, false), tool('create', false, true, ['Zed'])],
   addedAt: '', checkedAt: '',
 };

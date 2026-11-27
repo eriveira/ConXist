@@ -110,6 +110,7 @@ export function asToolServer(integration: Integration): McpServer & { kind: 'api
     address: '',
     auth: 'TOKEN',
     icon: kindIcon(integration.kind),
+    logo: null,
     status: integration.status,
     tools: integration.tools,
     addedAt: integration.addedAt,

@@ -318,7 +318,7 @@ describe('AgentPage', () => {
   it('offers the tools each MCP server allows, saves a pick, and flags one the workspace no longer allows', async () => {
     const serverId = '66666666-6666-6666-6666-666666666666';
     const server = {
-      id: serverId, name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'NONE', icon: null, status: 'WORKS',
+      id: serverId, name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'NONE', icon: null, logo: null, status: 'WORKS',
       addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
       tools: [
         { name: 'search_docs', title: 'Search', description: 'Finds docs.', readOnly: true, allowed: true, usedBy: [] },

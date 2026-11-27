@@ -210,6 +210,15 @@ public final class HttpMcpGateway implements McpGateway {
                 inputSchema, false);
     }
 
+    @Override
+    public String image(URI address) {
+        try {
+            return followed(address, (at, answer) -> image(answer));
+        } catch (org.springframework.web.client.RestClientException failed) {
+            throw new Unreachable(failed.getClass().getSimpleName());
+        }
+    }
+
     /** The first logo the server gives that is a small image, as a {@code data:} address; null when none is. */
     private String icon(JsonNode icons) {
         int tried = 0;
@@ -314,7 +323,7 @@ public final class HttpMcpGateway implements McpGateway {
                 int code = answer.getStatusCode().value();
                 if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
                     String location = answer.getHeaders().getFirst("Location");
-                    return new Hop<T>(location == null || location.length() > 2_000 ? null : here.resolve(location), null);
+                    return new Hop<T>(redirect(here, location), null);
                 }
                 return new Hop<T>(null, code == 200 ? reader.read(here, answer) : null);
             });
@@ -324,6 +333,18 @@ public final class HttpMcpGateway implements McpGateway {
             at = guard.check(answered.next().toString());
         }
         return null;
+    }
+
+    /** Where a redirect points; null when the server gives no usable address (never logged: it is the server's text). */
+    private static URI redirect(URI here, String location) {
+        if (location == null || location.length() > 2_000) {
+            return null;
+        }
+        try {
+            return here.resolve(location);
+        } catch (IllegalArgumentException unusable) {
+            return null;
+        }
     }
 
     private static Page page(URI at, org.springframework.http.client.ClientHttpResponse answer) throws java.io.IOException {
@@ -370,7 +391,10 @@ public final class HttpMcpGateway implements McpGateway {
         if (!ICON_TYPES.contains(kind)) {
             return null;
         }
-        byte[] bytes = BoundedBody.read(answer.getBody(), MAX_ICON_BYTES);
+        byte[] bytes = BoundedBody.read(answer.getBody(), MAX_ICON_BYTES + 1, true);
+        if (bytes.length > MAX_ICON_BYTES) {
+            return null;
+        }
         return "data:" + kind + ";base64," + Base64.getEncoder().encodeToString(bytes);
     }
 

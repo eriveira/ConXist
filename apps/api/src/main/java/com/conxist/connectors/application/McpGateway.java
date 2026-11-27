@@ -36,6 +36,14 @@ public interface McpGateway {
 
     Tokens refresh(SignIn signIn, String refreshToken);
 
+    /**
+     * Fetches one image a person chose as a server's logo, through the same guard as a server's address. Null when
+     * the address answers with something other than a PNG, JPG, SVG, WebP or ICO up to 100 KB.
+     *
+     * @return the image as a {@code data:image/...} address
+     */
+    String image(URI address);
+
     /** Calls one tool and returns its text; {@code error} is true when the tool says it failed. */
     ToolAnswer call(URI address, String bearer, String tool, Map<String, Object> arguments);
 

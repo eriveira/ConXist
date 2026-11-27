@@ -32,6 +32,8 @@ import tools.jackson.databind.json.JsonMapper;
 public final class FakeMcpServer implements AutoCloseable {
 
     public static final String TOKEN = "mcp-fake-token";
+    /** A logo a person chooses by its address. */
+    public static final String BRAND = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\"/>";
     /** A 1x1 PNG. */
     static final String ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
             + "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
@@ -68,6 +70,15 @@ public final class FakeMcpServer implements AutoCloseable {
             // page it lands on links the icon.
             server.createContext("/", this::home);
             server.createContext("/static/logo.png", this::siteIcon);
+            // Logos a person may choose by address: an SVG, and a PNG over the 100 KB ConXist takes.
+            server.createContext("/static/brand.svg", exchange -> send(exchange, 200, "image/svg+xml", BRAND));
+            server.createContext("/static/away.png", exchange -> {
+                exchange.getResponseHeaders().set("Location", "https://10.0.0.8/logo.png");
+                exchange.sendResponseHeaders(302, -1);
+                exchange.close();
+            });
+            server.createContext("/static/huge.png", exchange -> send(exchange, 200, "image/png",
+                    "x".repeat(100 * 1024 + 1)));
         }
         server.start();
     }

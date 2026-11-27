@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Repository
 class JdbcMcpServerRepository implements McpServerRepository {
 
-    private static final String COLUMNS = "id, workspace_id, name, address, auth, icon, tools, status, added_at, checked_at";
+    private static final String COLUMNS = "id, workspace_id, name, address, auth, icon, logo, logo_address, logo_at, tools, status, added_at, checked_at";
 
     private final JdbcClient jdbc;
     private final SecretBox box;
@@ -106,6 +107,20 @@ class JdbcMcpServerRepository implements McpServerRepository {
     }
 
     @Override
+    public boolean saveLogo(UUID workspaceId, UUID serverId, McpServer.Logo logo) {
+        return jdbc.sql("""
+                update mcp_servers set logo = :logo, logo_address = :address, logo_at = :at
+                where workspace_id = :workspaceId and id = :id
+                """)
+                .param("workspaceId", workspaceId)
+                .param("id", serverId)
+                .param("logo", logo == null ? null : logo.image(), Types.VARCHAR)
+                .param("address", logo == null ? null : logo.address().toString(), Types.VARCHAR)
+                .param("at", logo == null ? null : Timestamp.from(logo.fetchedAt()), Types.TIMESTAMP)
+                .update() > 0;
+    }
+
+    @Override
     public Optional<McpCredential> credential(UUID workspaceId, UUID serverId) {
         return jdbc.sql("select credential_sealed from mcp_servers where workspace_id = :workspaceId and id = :id")
                 .param("workspaceId", workspaceId)
@@ -137,9 +152,15 @@ class JdbcMcpServerRepository implements McpServerRepository {
         });
         return new McpServer(row.getObject("id", UUID.class), row.getObject("workspace_id", UUID.class),
                 row.getString("name"), URI.create(row.getString("address")), McpAuth.valueOf(row.getString("auth")),
-                row.getString("icon"), tools.stream().map(StoredTool::tool).toList(),
+                row.getString("icon"), logo(row), tools.stream().map(StoredTool::tool).toList(),
                 McpServer.Status.valueOf(row.getString("status")), row.getTimestamp("added_at").toInstant(),
                 row.getTimestamp("checked_at").toInstant());
+    }
+
+    private static McpServer.Logo logo(ResultSet row) throws SQLException {
+        String image = row.getString("logo");
+        return image == null ? null : new McpServer.Logo(image, URI.create(row.getString("logo_address")),
+                row.getTimestamp("logo_at").toInstant());
     }
 
     private byte[] seal(UUID workspaceId, UUID serverId, McpCredential credential) {

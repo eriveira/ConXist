@@ -92,7 +92,8 @@ Sources page does not show it for now, owner decision 2026-11-17).
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - MCPs (ADR 0017, owner 2026-11-27): a `connectors` module and Settings › MCPs. Add any MCP server by its https
   address; ConXist finds the sign-in (the server's OAuth sign-in, else a pasted token, else public), shows its logo
-  (else the icon its site links, else a public favicon service by host name; ADR 0022) and tools, and the workspace ticks the tools agents may use. Read tools
+  (else the icon its site links, else a public favicon service by host name; or one the person sets by its image address, fetched once and kept,
+  V24; ADR 0022) and tools, and the workspace ticks the tools agents may use. Read tools
   (`readOnlyHint`) come ticked; tools that change things start unticked and ask first (ADR 0022). An agent's
   Tools section lists them by server, and test runs call them, results as data. A tool or server agents use cannot
   be unticked or removed. `mvn spring-boot:test-run` runs three fake MCP servers (OAuth, token `mcp-fake-token`,

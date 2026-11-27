@@ -180,6 +180,44 @@ class McpServersIntegrationTest {
     }
 
     @Test
+    void a_person_chooses_a_logo_by_its_address_and_goes_back_to_the_one_found() throws Exception {
+        String workspace = workspace("Logo MCP");
+        String connection = JsonPath.read(connect(workspace, "{\"address\":\"" + fakes.open().mcpUrl() + "\"}")
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        String server = JsonPath.read(add(workspace, connection, "Acme Docs", "\"search_docs\"")
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        URI site = fakes.token().mcpUrl();
+
+        logo(workspace, server, site.resolve("/home").toString()).andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("mcp.logo-not-image"));
+        logo(workspace, server, site.resolve("/static/huge.png").toString())
+                .andExpect(jsonPath("$.code").value("mcp.logo-not-image"));
+        logo(workspace, server, "https://10.0.0.8/logo.png").andExpect(jsonPath("$.code").value("mcp.logo-private"));
+        logo(workspace, server, "http://203.0.113.5/logo.png").andExpect(jsonPath("$.code").value("mcp.logo-not-https"));
+        logo(workspace, server, site.resolve("/static/away.png").toString())
+                .andExpect(jsonPath("$.code").value("mcp.logo-private"));
+        String other = workspace("Other logo");
+        logo(other, server, site.resolve("/static/brand.svg").toString()).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/mcps/{id}/logo", server).header(HEADER, other)).andExpect(status().isNotFound());
+
+        String brand = "data:image/svg+xml;base64,"
+                + java.util.Base64.getEncoder().encodeToString(FakeMcpServer.BRAND.getBytes(StandardCharsets.UTF_8));
+        String address = site.resolve("/static/brand.svg").toString();
+        logo(workspace, server, address).andExpect(status().isOk())
+                .andExpect(jsonPath("$.icon").value(brand))
+                .andExpect(jsonPath("$.logo.address").value(address))
+                .andExpect(jsonPath("$.logo.fetchedAt").exists());
+        // A check finds the server's own logo again, and the chosen one still shows.
+        mvc.perform(post("/api/mcps/{id}/check", server).header(HEADER, workspace))
+                .andExpect(jsonPath("$.server.icon").value(brand));
+        mvc.perform(get("/api/mcps").header(HEADER, workspace)).andExpect(jsonPath("$[0].icon").value(brand));
+
+        mvc.perform(delete("/api/mcps/{id}/logo", server).header(HEADER, workspace)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.icon").value(Matchers.startsWith("data:image/png;base64,")))
+                .andExpect(jsonPath("$.logo").doesNotExist());
+    }
+
+    @Test
     void an_address_off_https_or_on_a_private_network_is_refused() throws Exception {
         String workspace = workspace("Addresses");
         connect(workspace, "{\"address\":\"http://203.0.113.5/mcp\"}").andExpect(status().isUnprocessableContent())
@@ -284,6 +322,12 @@ class McpServersIntegrationTest {
         return mvc.perform(post("/api/mcps").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"connectionId\":\"" + connection + "\",\"name\":\"" + name + "\",\"allowedTools\":["
                         + allowed + "]}"));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions logo(String workspace, String server, String address)
+            throws Exception {
+        return mvc.perform(put("/api/mcps/{id}/logo", server).header(HEADER, workspace)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"address\":\"" + address + "\"}"));
     }
 
     private String workspace(String name) throws Exception {

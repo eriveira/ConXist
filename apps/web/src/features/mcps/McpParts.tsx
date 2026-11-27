@@ -14,7 +14,7 @@ const BITBUCKET_MARK = 'M1.2 1.5h13.6a.5.5 0 0 1 .5.58l-2 12.3a.6.6 0 0 1-.6.5H3
 const GMAIL_MARK = 'M1 3.6A1.6 1.6 0 0 1 2.6 2h.5L8 5.7 12.9 2h.5A1.6 1.6 0 0 1 15 3.6v8.8a1.6 1.6 0 0 1-1.6 1.6H12V6.4L8 9.4 4 6.4V14H2.6A1.6 1.6 0 0 1 1 12.4Z';
 
 /** The server's logo, or the first letter of its name when it gives none. Decorative: its name is beside it. */
-export function McpLogo({ name, icon, size = 'md' }: { name: string; icon: string | null; size?: 'sm' | 'md' }) {
+export function McpLogo({ name, icon, size = 'md' }: { name: string; icon: string | null; size?: 'sm' | 'md' | 'lg' }) {
   const [broken, setBroken] = useState<string | null>(null);
   if (icon === GITHUB_ICON || icon === BITBUCKET_ICON || icon === GMAIL_ICON) {
     return (

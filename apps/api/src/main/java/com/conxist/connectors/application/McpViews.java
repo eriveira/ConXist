@@ -24,8 +24,16 @@ public final class McpViews {
     public record AgentUseView(UUID agentId, String agentName, String where, boolean archived) {
     }
 
-    public record ServerView(UUID id, String name, URI address, McpAuth auth, String icon, McpServer.Status status,
-            List<ToolView> tools, Instant addedAt, Instant checkedAt) {
+    /**
+     * @param icon the logo to show: the one a person chose, else the one ConXist found
+     * @param logo where the chosen logo came from, or null when it is the found one
+     */
+    public record ServerView(UUID id, String name, URI address, McpAuth auth, String icon, LogoView logo,
+            McpServer.Status status, List<ToolView> tools, Instant addedAt, Instant checkedAt) {
+    }
+
+    /** A logo a person chose: the address ConXist fetched it from, once, and when. */
+    public record LogoView(URI address, Instant fetchedAt) {
     }
 
     /**

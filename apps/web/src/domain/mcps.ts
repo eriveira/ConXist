@@ -27,12 +27,20 @@ export interface McpServer {
   name: string;
   address: string;
   auth: McpAuth;
-  /** The server's logo as a data: address, or null when it gives none. */
+  /** The logo to show as a data: address: the one a person chose, else the one ConXist found; null when neither. */
   icon: string | null;
+  /** Where the chosen logo came from, or null when the found one shows. */
+  logo: McpLogoChoice | null;
   status: McpStatus;
   tools: McpTool[];
   addedAt: string;
   checkedAt: string;
+}
+
+/** A logo a person chose by its address. ConXist fetched it once and keeps its own copy. */
+export interface McpLogoChoice {
+  address: string;
+  fetchedAt: string;
 }
 
 export type McpConnectionStatus = 'SIGNING_IN' | 'READY' | 'TOKEN_NEEDED' | 'FAILED';

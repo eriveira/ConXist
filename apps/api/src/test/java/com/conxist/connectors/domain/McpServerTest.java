@@ -88,6 +88,19 @@ class McpServerTest {
         assertThat(longOne).hasSize(64).matches("[A-Za-z0-9_-]+");
     }
 
+    @Test
+    void a_chosen_logo_shows_in_place_of_the_found_one_and_outlives_a_check() {
+        McpServer server = server(Set.of());
+        McpServer.Logo chosen = new McpServer.Logo("data:image/svg+xml;base64,PHN2Zy8+",
+                URI.create("https://acme.test/logo.svg"), NOW);
+
+        McpServer withLogo = server.withLogo(chosen).listed(server.tools(), "data:image/png;base64,BB==", NOW);
+
+        assertThat(server.shownIcon()).isEqualTo("data:image/png;base64,AA==");
+        assertThat(withLogo.shownIcon()).isEqualTo(chosen.image());
+        assertThat(withLogo.withLogo(null).shownIcon()).isEqualTo("data:image/png;base64,BB==");
+    }
+
     private static McpServer server(Set<String> allowed) {
         return McpServer.add(UUID.randomUUID(), UUID.randomUUID(), "Acme", URI.create("https://mcp.acme.test/mcp"),
                 McpAuth.NONE, "data:image/png;base64,AA==",
