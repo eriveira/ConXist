@@ -8,8 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import com.conxist.connectors.adapter.mcp.BoundedBody;
-import com.conxist.connectors.application.GitHubApi;
-import com.conxist.connectors.domain.GitHubTools;
+import com.conxist.connectors.application.IntegrationApi;
 import com.conxist.connectors.domain.Integration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.ResourceAccessException;
@@ -22,7 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
  * GitHub's REST API over HTTPS, GET only (ADR 0019). The token goes only to the configured API address; redirects are
  * not followed, so it never reaches another host. A body over {@link #MAX_BODY_BYTES} is cut off.
  */
-public final class HttpGitHubApi implements GitHubApi {
+public final class HttpGitHubApi implements IntegrationApi {
 
     static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
     private static final String API_VERSION = "2022-11-28";
@@ -39,6 +38,11 @@ public final class HttpGitHubApi implements GitHubApi {
     public HttpGitHubApi(RestClient http, URI base) {
         this.http = http;
         this.base = base;
+    }
+
+    @Override
+    public Integration.Kind kind() {
+        return Integration.Kind.GITHUB;
     }
 
     @Override
@@ -65,7 +69,7 @@ public final class HttpGitHubApi implements GitHubApi {
         for (JsonNode repository : json.readTree(get(token, "/user/repos",
                 Map.of("per_page", String.valueOf(Integration.MAX_REPOSITORIES), "sort", "full_name"), JSON))) {
             String name = repository.path("full_name").asString("");
-            if (GitHubTools.REPOSITORY.matcher(name).matches()) {
+            if (Integration.Kind.GITHUB.repository().matcher(name).matches()) {
                 repositories.add(name);
             }
         }

@@ -61,6 +61,8 @@ conxist:
     read-timeout: 30s
     # GitHub's REST API, for the GitHub integration (ADR 0019).
     github-api: https://api.github.com
+    # Bitbucket Cloud's REST API, for the Bitbucket integration (ADR 0020).
+    bitbucket-api: https://api.bitbucket.org/2.0
   runs:
     # Test runs (ADR 0012). The owner's own Anthropic key; blank means test runs say a key is missing.
     anthropic-api-key: ${CONXIST_ANTHROPIC_API_KEY:}

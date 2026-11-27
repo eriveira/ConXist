@@ -84,7 +84,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, and the
   default for new agents, grouped by provider),
-  MCPs (ADR 0017, below), Integrations (ADR 0019, below), and Variables (ADR 0018, below).
+  MCPs (ADR 0017, below), Integrations (ADR 0019 and 0020, below), and Variables (ADR 0018, below).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - MCPs (ADR 0017, owner 2026-11-27): a `connectors` module and Settings › MCPs. Add any MCP server by its https
@@ -99,6 +99,12 @@ Sources page does not show it for now, owner decision 2026-11-17).
   `get_pull_request`) reach only the repositories the token was checked for, and only by GET. Agents pick them like MCP
   tools (`mcpTools`, the integration's id as `serverId`). `mvn spring-boot:test-run` runs a fake GitHub API that takes
   any token starting with `github_pat_fake`.
+- Bitbucket (ADR 0020, owner 2026-11-27): the second integration (V21 adds the kind). It connects with the person's
+  Atlassian email and an API token (`ATATT…`), sealed together; the token reaches every repository its person sees, so
+  the person picks the ones agents may read (Change repositories on its page). Five read tools: `search_code`,
+  `get_file`, `list_pull_requests`, `get_pull_request`, `list_commits`. Integrations share one `IntegrationApi` port
+  with an adapter per service; error codes that name a service start with its kind (`integration.bitbucket-…`).
+  `mvn spring-boot:test-run` runs a fake Bitbucket API that takes any email with a token starting with `ATATTfake`.
 - Variables (ADR 0018, owner 2026-11-27): Settings › Variables replaces Topics. A name (letters, digits, underscores,
   starting with a letter; unique ignoring case) and a value up to 2,000 characters, up to 100 per workspace, edited in
   place. Agents' and skills' instructions use one as `{{name}}`; a run puts the value in its place, and a name the

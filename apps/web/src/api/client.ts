@@ -141,7 +141,15 @@ export const api = {
     postJson<Integration>('/api/integrations/github', { token, allowedTools }),
   updateIntegration: (id: string, allowedTools: string[]) => putJson<Integration>(integrationPath(id), { allowedTools }),
   checkIntegration: (id: string) => postJson<IntegrationCheck>(`${integrationPath(id)}/check`, {}),
-  replaceIntegrationToken: (id: string, token: string) => putJson<Integration>(`${integrationPath(id)}/token`, { token }),
+  checkBitbucketToken: (email: string, token: string) =>
+    postJson<TokenCheck>('/api/integrations/bitbucket/check', { email, token }),
+  addBitbucket: (email: string, token: string, repositories: string[], allowedTools: string[]) =>
+    postJson<Integration>('/api/integrations/bitbucket', { email, token, repositories, allowedTools }),
+  reachableRepositories: (id: string) => postJson<TokenCheck>(`${integrationPath(id)}/reachable`, {}),
+  pickRepositories: (id: string, repositories: string[]) =>
+    putJson<Integration>(`${integrationPath(id)}/repositories`, { repositories }),
+  replaceIntegrationToken: (id: string, token: string, email?: string) =>
+    putJson<Integration>(`${integrationPath(id)}/token`, email === undefined ? { token } : { email, token }),
   removeIntegration: (id: string) => request<void>(integrationPath(id), { method: 'DELETE' }),
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
   /** Where this workspace's new blank agents start; agents already made keep their own pick. */

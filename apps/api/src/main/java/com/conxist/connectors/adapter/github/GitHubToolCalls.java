@@ -1,6 +1,15 @@
 package com.conxist.connectors.adapter.github;
 
-import java.net.URLEncoder;
+import static com.conxist.connectors.adapter.api.ToolArguments.encodedPath;
+import static com.conxist.connectors.adapter.api.ToolArguments.number;
+import static com.conxist.connectors.adapter.api.ToolArguments.ordered;
+import static com.conxist.connectors.adapter.api.ToolArguments.path;
+import static com.conxist.connectors.adapter.api.ToolArguments.plainWords;
+import static com.conxist.connectors.adapter.api.ToolArguments.ref;
+import static com.conxist.connectors.adapter.api.ToolArguments.repository;
+import static com.conxist.connectors.adapter.api.ToolArguments.repositoryPath;
+import static com.conxist.connectors.adapter.api.ToolArguments.text;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -8,8 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import com.conxist.connectors.application.GitHubApi;
-import com.conxist.connectors.application.GitHubApi.Problem;
+import com.conxist.connectors.application.IntegrationApi;
+import com.conxist.connectors.application.IntegrationApi.Problem;
 import com.conxist.connectors.domain.GitHubTools;
 import com.conxist.connectors.domain.Integration;
 import tools.jackson.databind.JsonNode;
@@ -29,11 +38,7 @@ final class GitHubToolCalls {
     static final int MAX_PATCH_CHARACTERS = 4_000;
     /** GitHub refuses a search query longer than this. */
     static final int MAX_QUERY_LENGTH = 256;
-    private static final Pattern REF = Pattern.compile("[A-Za-z0-9._/-]{1,200}");
     private static final Pattern LABELS = Pattern.compile("[^\\p{Cntrl}]{1,200}");
-    /** A GitHub search qualifier at the start of a word, such as repo:, ORG: or path:, but not std::vector. */
-    private static final Pattern QUALIFIER = Pattern.compile("^[A-Za-z_]+:(?!:)");
-    private static final List<String> OPERATORS = List.of("AND", "OR", "NOT");
 
     private final Getter github;
     private final JsonMapper json = JsonMapper.builder().build();
@@ -88,34 +93,12 @@ final class GitHubToolCalls {
         return write(ordered("total", total, "files", files, "cut", total > files.size()));
     }
 
-    /**
-     * The words of a search without anything GitHub reads as search syntax: qualifiers such as {@code repo:} in any
-     * case (so a search stays in the integration's repositories), and the operators AND, OR and NOT.
-     */
-    static String plainWords(String query) {
-        List<String> kept = new ArrayList<>();
-        for (String word : query.split("\\s+")) {
-            String bare = word.replaceAll("^[-(\"]+", "");
-            if (QUALIFIER.matcher(bare).find() || OPERATORS.contains(word)) {
-                continue;
-            }
-            kept.add(word.replace("(", " ").replace(")", " ").strip());
-        }
-        return String.join(" ", kept).replaceAll("\\s+", " ").strip();
-    }
-
     private String file(Integration integration, String token, Map<String, Object> arguments) {
         String repository = repository(integration, arguments);
-        String path = text(arguments, "path", 500, true).replaceAll("^/+", "");
-        if (path.isEmpty() || List.of(path.split("/")).contains("..") || path.contains("\\")) {
-            throw new Problem("Give the file's path from the repository's root, such as src/app.ts.");
-        }
+        String path = path(arguments);
         Map<String, String> query = new LinkedHashMap<>();
-        String ref = text(arguments, "ref", 200, false);
+        String ref = ref(arguments, "ref", "GitHub");
         if (!ref.isEmpty()) {
-            if (!REF.matcher(ref).matches() || ref.contains("..")) {
-                throw new Problem("Give a branch, tag or commit as GitHub writes it, or leave ref out.");
-            }
             query.put("ref", ref);
         }
         JsonNode found = read(github.get(token, repoPath(repository) + "/contents/" + encodedPath(path), query));
@@ -135,7 +118,7 @@ final class GitHubToolCalls {
         try {
             return new String(Base64.getMimeDecoder().decode(content), StandardCharsets.UTF_8);
         } catch (IllegalArgumentException unreadable) {
-            throw new GitHubApi.Unreachable("GitHub answered with content ConXist can't read");
+            throw new IntegrationApi.Unreachable("GitHub answered with content ConXist can't read");
         }
     }
 
@@ -205,57 +188,8 @@ final class GitHubToolCalls {
                 "moreFiles", pull.path("changed_files").asInt(0) > files.size()));
     }
 
-    private static String repository(Integration integration, Map<String, Object> arguments) {
-        String asked = text(arguments, "repository", 141, true);
-        return integration.repository(asked).orElseThrow(() -> new Problem("Use one of the connected repositories: "
-                + String.join(", ", integration.repositories()) + "."));
-    }
-
-    private static int number(Map<String, Object> arguments) {
-        Object value = arguments.get("number");
-        long number;
-        if (value instanceof Number given) {
-            number = given.longValue();
-        } else if (value instanceof String given && given.strip().matches("\\d{1,9}")) {
-            number = Long.parseLong(given.strip());
-        } else {
-            throw new Problem("Give the number as a whole number, such as 42.");
-        }
-        if (number < 1 || number > Integer.MAX_VALUE) {
-            throw new Problem("Give the number as a whole number, such as 42.");
-        }
-        return (int) number;
-    }
-
-    private static String text(Map<String, Object> arguments, String name, int max, boolean required) {
-        Object value = arguments.get(name);
-        String text = value == null ? "" : String.valueOf(value).strip();
-        if (required && text.isEmpty()) {
-            throw new Problem("Give " + name + ".");
-        }
-        if (text.length() > max) {
-            throw new Problem(name + " is too long.");
-        }
-        return text;
-    }
-
     private static String repoPath(String repository) {
-        String[] parts = repository.split("/");
-        return "/repos/" + encode(parts[0]) + "/" + encode(parts[1]);
-    }
-
-    private static String encodedPath(String path) {
-        List<String> parts = new ArrayList<>();
-        for (String part : path.split("/")) {
-            if (!part.isEmpty()) {
-                parts.add(encode(part));
-            }
-        }
-        return String.join("/", parts);
-    }
-
-    private static String encode(String part) {
-        return URLEncoder.encode(part, StandardCharsets.UTF_8).replace("+", "%20");
+        return "/repos/" + repositoryPath(repository);
     }
 
     private static List<String> labels(JsonNode issue) {
@@ -268,7 +202,7 @@ final class GitHubToolCalls {
         try {
             return json.readTree(body);
         } catch (RuntimeException unreadable) {
-            throw new GitHubApi.Unreachable("GitHub answered with something that is not JSON");
+            throw new IntegrationApi.Unreachable("GitHub answered with something that is not JSON");
         }
     }
 
@@ -276,11 +210,4 @@ final class GitHubToolCalls {
         return json.writeValueAsString(value);
     }
 
-    private static Map<String, Object> ordered(Object... pairs) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        for (int i = 0; i < pairs.length; i += 2) {
-            map.put((String) pairs[i], pairs[i + 1]);
-        }
-        return map;
-    }
 }

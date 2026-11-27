@@ -139,7 +139,7 @@ export function ConnectGitHubDialog({ integration, onClose, onDone }: {
           </span>
         </div>
         <McpToolTable server={{ name: 'GitHub' }} tools={check.tools} allowed={allowed} onToggle={toggle} />
-        <p className="note"><Icon name="info" size={14} /> {t('integration.page.readOnly')}</p>
+        <p className="note"><Icon name="info" size={14} /> {t('integration.page.readOnly', { name: 'GitHub' })}</p>
       </div>
     );
     footer = (

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
-import { GITHUB_ICON, type Integration, type IntegrationCheck } from '../../domain/integrations';
+import { type Integration, type IntegrationCheck, kindIcon } from '../../domain/integrations';
 import { allowedTools, type McpTool } from '../../domain/mcps';
 import { dateTime } from '../../domain/time';
 import { useLanguage, useT } from '../../i18n/i18n';
@@ -10,16 +10,19 @@ import { problemMessage } from '../../i18n/problems';
 import { settingsHref } from '../../navigation';
 import { ErrorState, LoadingState, SavedStatus } from '../settings/SettingsParts';
 import { McpLogo, McpToolTable } from '../mcps/McpParts';
+import { ConnectBitbucketDialog } from './ConnectBitbucketDialog';
 import { ConnectGitHubDialog } from './ConnectGitHubDialog';
+import { PickRepositoriesDialog } from './PickRepositoriesDialog';
 import { RemoveIntegrationDialog } from './RemoveIntegrationDialog';
 
 type PageState = { status: 'loading' } | { status: 'error' } | { status: 'gone' } | { status: 'ready'; integration: Integration };
 type Check = { state: 'idle' } | { state: 'checking' } | { state: 'done'; check: IntegrationCheck } | { state: 'error' }
-  | { state: 'replaced' };
+  | { state: 'replaced' } | { state: 'picked' };
 
 /**
- * One integration: the account and repositories its token reaches, its tools with the ones agents may use (each tick
- * saves at once), and what can be done with it: check it now, replace its token, remove it.
+ * One integration: the account and the repositories agents may read, its tools with the ones agents may use (each
+ * tick saves at once), and what can be done with it: check it now, replace its token, change the repositories
+ * (Bitbucket, ADR 0020), remove it.
  */
 export function IntegrationPage({ integrationId, onRemoved }: {
   integrationId: string; onRemoved: (integration: Integration) => void;
@@ -31,7 +34,7 @@ export function IntegrationPage({ integrationId, onRemoved }: {
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<'token' | 'remove' | null>(null);
+  const [dialog, setDialog] = useState<'token' | 'repositories' | 'remove' | null>(null);
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
@@ -82,11 +85,17 @@ export function IntegrationPage({ integrationId, onRemoved }: {
   }
 
   const titleId = `integration-${integration.id}`;
+  const picks = integration.kind === 'BITBUCKET';
+  const show = (next: Integration, done: Check) => {
+    setDialog(null);
+    setCheck(done);
+    setState({ status: 'ready', integration: next });
+  };
   return (
     <section className="settings-card" aria-labelledby={titleId}>
       {back}
       <div className="mcp-head">
-        <McpLogo name={integration.name} icon={GITHUB_ICON} />
+        <McpLogo name={integration.name} icon={kindIcon(integration.kind)} />
         <h2 id={titleId}>
           {integration.name} <Pill tone="info">{t('integration.kind')}</Pill>{' '}
           <Pill tone={integration.status === 'WORKS' ? 'live' : 'error'}>{t(`integration.status.${integration.status}`)}</Pill>
@@ -100,7 +109,7 @@ export function IntegrationPage({ integrationId, onRemoved }: {
       </p>
       {integration.status !== 'WORKS' && (
         <p className={integration.status === 'SIGN_IN_NEEDED' ? 'alert error' : 'alert info'}>
-          <Icon name="alert" /> {t(`integration.state.${integration.status}`)}
+          <Icon name="alert" /> {t(`integration.state.${integration.status}`, { name: integration.name })}
         </p>
       )}
       <div className="vendor-actions mcp-actions">
@@ -113,7 +122,7 @@ export function IntegrationPage({ integrationId, onRemoved }: {
         </button>
         <button type="button" className="btn sm danger" onClick={() => setDialog('remove')}>{t('mcp.page.remove')}</button>
       </div>
-      <CheckResult check={check} />
+      <CheckResult check={check} name={integration.name} />
       <div className="models-head">
         <h3>{t('integration.page.repositories')}</h3>
         <span className="muted">{t(integration.repositories.length === 1 ? 'integration.repositories_one' : 'integration.repositories',
@@ -122,7 +131,12 @@ export function IntegrationPage({ integrationId, onRemoved }: {
       <ul className="repo-list">
         {integration.repositories.map((repository) => <li key={repository} className="mono">{repository}</li>)}
       </ul>
-      <p className="hint">{t('integration.page.repositoriesHelp')}</p>
+      <p className="hint">
+        {t(picks ? 'integration.page.repositoriesPicked' : 'integration.page.repositoriesHelp')}
+        {picks && <> <button type="button" className="link" onClick={() => setDialog('repositories')}>
+          {t('integration.page.changeRepositories')}
+        </button></>}
+      </p>
       <div className="models-head">
         <h3>{t('mcp.page.tools')}</h3>
         <span className="muted">{t('mcp.page.toolsCount', { total: integration.tools.length, count: allowed.size })}</span>
@@ -131,10 +145,18 @@ export function IntegrationPage({ integrationId, onRemoved }: {
       {problem && <p className="alert error" role="alert"><Icon name="alert" /> {problem}</p>}
       <McpToolTable server={integration} tools={integration.tools} allowed={allowed} busy={saving}
         onToggle={(tool) => void toggle(tool)} />
-      <p className="note"><Icon name="info" size={14} /> {t('integration.page.readOnly')}</p>
-      {dialog === 'token' && (
+      <p className="note"><Icon name="info" size={14} /> {t('integration.page.readOnly', { name: integration.name })}</p>
+      {dialog === 'token' && !picks && (
         <ConnectGitHubDialog integration={integration} onClose={() => setDialog(null)}
-          onDone={(next) => { setDialog(null); setCheck({ state: 'replaced' }); setState({ status: 'ready', integration: next }); }} />
+          onDone={(next) => show(next, { state: 'replaced' })} />
+      )}
+      {dialog === 'token' && picks && (
+        <ConnectBitbucketDialog integration={integration} onClose={() => setDialog(null)}
+          onDone={(next) => show(next, { state: 'replaced' })} />
+      )}
+      {dialog === 'repositories' && (
+        <PickRepositoriesDialog integration={integration} onClose={() => setDialog(null)}
+          onDone={(next) => show(next, { state: 'picked' })} />
       )}
       {dialog === 'remove' && (
         <RemoveIntegrationDialog integration={integration} onClose={() => setDialog(null)}
@@ -144,21 +166,25 @@ export function IntegrationPage({ integrationId, onRemoved }: {
   );
 }
 
-/** How Check now went, or that the token was replaced, read out once it arrives. */
-function CheckResult({ check }: { check: Check }) {
+/** How Check now went, or that the token or the repositories changed, read out once it arrives. */
+function CheckResult({ check, name }: { check: Check; name: string }) {
   const t = useT();
   let text = '';
   let failed = false;
   if (check.state === 'error') {
-    text = t('integration.check.unreachable');
+    text = t('integration.check.unreachable', { name });
     failed = true;
   } else if (check.state === 'replaced') {
     text = t('integration.replaced');
+  } else if (check.state === 'picked') {
+    text = t('integration.picked');
   } else if (check.state === 'done' && check.check.works) {
     const count = check.check.integration.repositories.length;
-    text = t(count === 1 ? 'integration.check.works_one' : 'integration.check.works', { count });
+    text = t(count === 1 ? 'integration.check.works_one' : 'integration.check.works', { count, name });
   } else if (check.state === 'done') {
-    text = t(check.check.error === 'sign-in-needed' ? 'integration.check.sign-in-needed' : 'integration.check.unreachable');
+    const error = check.check.error;
+    text = t(error === 'sign-in-needed' || error === 'refused' || error === 'repositories-lost'
+      ? `integration.check.${error}` : 'integration.check.unreachable', { name });
     failed = true;
   }
   return <p className={failed ? 'status-line failed' : 'status-line'} role="status">{text}</p>;

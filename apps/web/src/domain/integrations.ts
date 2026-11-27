@@ -1,8 +1,14 @@
-/** Tools a workspace connects through their own API, GitHub first (ADR 0019). */
+/** Tools a workspace connects through their own API: GitHub (ADR 0019) and Bitbucket (ADR 0020). */
 
 import type { McpAgentUse, McpServer, McpStatus, McpTool } from './mcps';
 
-export type IntegrationKind = 'GITHUB';
+export type IntegrationKind = 'GITHUB' | 'BITBUCKET';
+
+/** What the Add menu offers, in this order. */
+export const INTEGRATION_KINDS: IntegrationKind[] = ['GITHUB', 'BITBUCKET'];
+
+/** The name people see. */
+export const KIND_NAMES: Record<IntegrationKind, string> = { GITHUB: 'GitHub', BITBUCKET: 'Bitbucket' };
 
 export interface Integration {
   id: string;
@@ -45,8 +51,31 @@ export function githubTokenProblem(token: string): 'empty' | 'classic' | null {
   return value.startsWith(GITHUB_TOKEN_PREFIX) ? null : 'classic';
 }
 
-/** Stands for GitHub's mark, which the logo draws inline in the text color, so it shows in both themes. */
+/** Stand for GitHub's and Bitbucket's marks, which the logo draws inline in the text color, so they show in both themes. */
 export const GITHUB_ICON = 'conxist:github';
+export const BITBUCKET_ICON = 'conxist:bitbucket';
+
+export function kindIcon(kind: IntegrationKind): string {
+  return kind === 'BITBUCKET' ? BITBUCKET_ICON : GITHUB_ICON;
+}
+
+/** Atlassian account API tokens; Bitbucket's app passwords are being retired. */
+export const ATLASSIAN_TOKEN_PREFIX = 'ATATT';
+export const ATLASSIAN_NEW_TOKEN_URL = 'https://id.atlassian.com/manage-profile/security/api-tokens';
+export const MAX_ATLASSIAN_TOKEN = 500;
+export const MAX_EMAIL = 254;
+
+export type BitbucketProblem = 'email-empty' | 'email-invalid' | 'token-empty' | 'token-not-api' | null;
+
+/** What is wrong with a typed email and pasted token before asking Bitbucket. */
+export function bitbucketCredentialProblem(email: string, token: string): BitbucketProblem {
+  const address = email.trim();
+  if (address === '') return 'email-empty';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return 'email-invalid';
+  const value = token.trim();
+  if (value === '') return 'token-empty';
+  return value.startsWith(ATLASSIAN_TOKEN_PREFIX) ? null : 'token-not-api';
+}
 
 /**
  * The integration as the agent page lists tool servers: agents pick its tools as they pick an MCP server's, by its
@@ -58,7 +87,7 @@ export function asToolServer(integration: Integration): McpServer & { kind: 'api
     name: integration.name,
     address: '',
     auth: 'TOKEN',
-    icon: GITHUB_ICON,
+    icon: kindIcon(integration.kind),
     status: integration.status,
     tools: integration.tools,
     addedAt: integration.addedAt,

@@ -17,7 +17,10 @@ import org.springframework.stereotype.Repository;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Integrations, with the token sealed by the platform's SecretBox and bound to its workspace and row. */
+/**
+ * Integrations, with the token (for Bitbucket, the email and the token) sealed by the platform's SecretBox and bound
+ * to its workspace and row.
+ */
 @Repository
 class JdbcIntegrationRepository implements IntegrationRepository {
 
@@ -65,7 +68,7 @@ class JdbcIntegrationRepository implements IntegrationRepository {
                     .param("account", integration.account())
                     .param("repositories", json.writeValueAsString(integration.repositories()))
                     .param("ending", integration.tokenEnding())
-                    .param("allowed", json.writeValueAsString(Integration.ordered(integration.allowedTools())))
+                    .param("allowed", json.writeValueAsString(integration.orderedAllowedTools()))
                     .param("status", integration.status().name())
                     .param("sealed", seal(integration.workspaceId(), integration.id(), token))
                     .param("addedAt", Timestamp.from(integration.addedAt()))
@@ -89,7 +92,7 @@ class JdbcIntegrationRepository implements IntegrationRepository {
                 .param("account", integration.account())
                 .param("repositories", json.writeValueAsString(integration.repositories()))
                 .param("ending", integration.tokenEnding())
-                .param("allowed", json.writeValueAsString(Integration.ordered(integration.allowedTools())))
+                .param("allowed", json.writeValueAsString(integration.orderedAllowedTools()))
                 .param("status", integration.status().name())
                 .param("checkedAt", Timestamp.from(integration.checkedAt()))
                 .update();

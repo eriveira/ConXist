@@ -143,3 +143,16 @@
   .variables-h { display: none; }
   .variable:not(.editing) { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
+
+/* Settings › Integrations: the Add menu and Bitbucket's repository picker (ADR 0020). */
+.kind-picker { margin: 0; }
+.kind-option { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.kind-option:hover:not(:disabled) { border-color: var(--cx-action); }
+.kind-option:focus-visible { outline: 2px solid var(--cx-action); outline-offset: 2px; }
+.kind-option:disabled { cursor: default; }
+.kind-option { flex-wrap: nowrap; }
+.kind-option .grow { flex-basis: auto; min-width: 0; }
+.repo-picker { border: 0; margin: 0; padding: 0; min-width: 0; }
+.repo-options { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; }
+.repo-options .check { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-height: 44px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); cursor: pointer; overflow-wrap: anywhere; }
+.repo-options input { width: 18px; height: 18px; flex: none; accent-color: var(--cx-action); }
