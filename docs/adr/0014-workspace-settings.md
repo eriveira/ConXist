@@ -11,6 +11,8 @@
 - Amended 2026-11-26 (owner): a workspace connects its own Anthropic key in Settings, checked before it is saved and
   stored encrypted (table V17, `SecretBox` moved to `platform`); test, replace and disconnect. This replaces the
   earlier "keys saved in Settings wait for sign-in". Mock `App/mocks/workspace-settings-v4/`. See "Provider keys".
+- Amended 2026-11-27 (owner): OpenAI is a second provider beside Anthropic, connected the same way (its own key per
+  workspace, no new table). Mock `App/mocks/workspace-settings-v5/`. See "OpenAI".
 
 ## Context
 
@@ -79,6 +81,25 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   `/api/topics` (GET, POST, PUT and DELETE `/{id}`) acts for the workspace in `X-Workspace-Id`.
 - Not shown for now (owner, 2026-11-25): more providers, the zero data retention rule and a monthly limit per
   provider.
+
+### OpenAI (amendment, 2026-11-27)
+
+- `OpenAiModel` in `runs/adapter/model` is a second `ModelPort`, on the official OpenAI Java SDK (`openai-java`). Each
+  turn is one Chat Completions call: the run's rules as the developer message, strict function tools, a strict JSON
+  schema when the agent gives back a shape, and the agent's effort as `reasoning_effort` for the models that reason
+  (GPT-5 and the o-series; GPT-4.1 and GPT-4o refuse the field, so they get none). Earlier turns go back as OpenAI sent
+  them. Chat Completions has no error flag on a tool result, so a failed tool's text starts with "Error:".
+- OpenAI's Models API lists every model a key can use, with no display name. Settings keeps only the GPT and o-series
+  chat models that take tools and structured output (`OpenAiModels.runsAgents`); image, audio, speech, embedding,
+  search, Codex and older models are left out, and the screen says so. Names are made from the id ("GPT-5.2 mini").
+- A new workspace allows no OpenAI model until it ticks one: `conxist.runs.models` lists Anthropic's only, since
+  OpenAI's ids change more often than the settings would.
+- Settings lists the providers in the order of the `ModelPort` beans (Anthropic, then OpenAI), not from the settings'
+  models. The key table, endpoints, problem codes and audit log are the same for both; `CONXIST_OPENAI_API_KEY` is the
+  computer's fallback key, like `CONXIST_ANTHROPIC_API_KEY`. The dev fake (`mvn spring-boot:test-run`) takes any OpenAI
+  key starting with `sk-fake-` and has no computer key for OpenAI.
+- A test run sends the meeting to the provider the agent runs on. Before hosting, the conditions under "Provider
+  keys" hold for both providers.
 
 ## Consequences
 

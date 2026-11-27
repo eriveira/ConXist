@@ -56,6 +56,10 @@ conxist:
     anthropic-api-key: ${CONXIST_ANTHROPIC_API_KEY:}
     # Blank for Anthropic's own API.
     anthropic-base-url: ${CONXIST_ANTHROPIC_BASE_URL:}
+    # The owner's own OpenAI key (ADR 0014); blank means a workspace connects its own in Settings.
+    openai-api-key: ${CONXIST_OPENAI_API_KEY:}
+    # Blank for OpenAI's own API; otherwise the address ends in /v1.
+    openai-base-url: ${CONXIST_OPENAI_BASE_URL:}
     # The models a workspace allows until it ticks its own in Settings, and how to call them (ADR 0014). Settings lists
     # every model the provider offers; an agent keeps its own provider, model and effort.
     models:

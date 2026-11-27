@@ -94,7 +94,7 @@ export function ProviderRow({ provider, users, onConnected, onDisconnected }: {
 function describe(provider: LlmProvider, brand: string, t: Translate, language: string): string {
   const { connection } = provider;
   if (connection.source === 'NONE') return t('settings.provider.none', { provider: brand });
-  if (connection.source === 'COMPUTER') return t('settings.provider.computer');
+  if (connection.source === 'COMPUTER') return t('settings.provider.computer', { variable: `CONXIST_${provider.id.toUpperCase()}_API_KEY` });
   const ending = connection.keyEnding ?? '';
   const added = connection.addedAt
     ? new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' }).format(new Date(connection.addedAt)) : '';

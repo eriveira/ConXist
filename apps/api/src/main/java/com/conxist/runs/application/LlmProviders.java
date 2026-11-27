@@ -44,9 +44,9 @@ public final class LlmProviders implements AgentModels {
         this.clock = clock;
     }
 
-    /** Each provider with the models this workspace allows. Nothing is asked of the provider. */
+    /** Each provider ConXist can call, with the models this workspace allows. Nothing is asked of the provider. */
     public View view() {
-        List<ProviderView> providers = catalog.providers().stream().map(this::providerView).toList();
+        List<ProviderView> providers = ports.stream().map(ModelPort::provider).map(this::providerView).toList();
         return new View(providers, defaultForNewAgents());
     }
 
@@ -104,7 +104,7 @@ public final class LlmProviders implements AgentModels {
 
     /**
      * Keeps how the provider answered about the workspace's key, so Settings shows when it last worked. Listing the
-     * models in Settings records it too, so a key revoked at Anthropic shows as refused on the next visit.
+     * models in Settings records it too, so a key revoked at the provider shows as refused on the next visit.
      */
     void recordCheck(String provider, ProviderKeys.Key key, ProviderModelLists.Listing listing) {
         if (listing.answered()) {

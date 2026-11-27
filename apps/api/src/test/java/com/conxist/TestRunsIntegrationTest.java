@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import com.conxist.testing.FakeClaudeServer;
+import com.conxist.testing.FakeOpenAiServer;
 import com.conxist.testing.FakePlaudConfiguration;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,84 @@ class TestRunsIntegrationTest {
     FakeClaudeServer claude;
 
     @Autowired
+    FakeOpenAiServer openAi;
+
+    @Autowired
     JdbcClient jdbc;
+
+    @Test
+    void openai_is_not_connected_until_a_workspace_pastes_its_key_then_an_allowed_gpt_model_runs() throws Exception {
+        String workspace = workspace("OpenAI");
+        mvc.perform(get("/api/llm-providers").header(HEADER, workspace))
+                .andExpect(jsonPath("$.providers[0].id").value("anthropic"))
+                .andExpect(jsonPath("$.providers[1].id").value("openai"))
+                .andExpect(jsonPath("$.providers[1].connected").value(false))
+                .andExpect(jsonPath("$.providers[1].connection.source").value("NONE"))
+                .andExpect(jsonPath("$.providers[1].models").isEmpty());
+
+        mvc.perform(put("/api/llm-providers/openai/key").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"apiKey\":\"sk-proj-wrong-0000\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("provider.key-refused"));
+        String key = FakeOpenAiServer.ANY_KEY_PREFIX + "workspace-k2Mw";
+        mvc.perform(put("/api/llm-providers/openai/key").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"apiKey\":\"" + key + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connection.source").value("WORKSPACE"))
+                .andExpect(jsonPath("$.connection.keyEnding").value("k2Mw"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(key))));
+
+        mvc.perform(get("/api/llm-providers/openai/models").header(HEADER, workspace))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.models.length()").value(4))
+                .andExpect(jsonPath("$.models[0].id").value("gpt-5.2-mini"))
+                .andExpect(jsonPath("$.models[0].label").value("GPT-5.2 mini"))
+                .andExpect(jsonPath("$.models[0].allowed").value(false));
+        mvc.perform(put("/api/llm-providers/openai/models/gpt-image-1").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowed\":true}"))
+                .andExpect(jsonPath("$.code").value("model.not-offered"));
+        mvc.perform(put("/api/llm-providers/openai/models/gpt-5.2").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"allowed\":true}"))
+                .andExpect(status().isOk());
+        mvc.perform(put("/api/llm-providers/default").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"provider\":\"openai\",\"model\":\"gpt-5.2\",\"effort\":\"MEDIUM\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("openai"));
+
+        String source = source(workspace, "Specs");
+        String meeting = upload(workspace, source, "# Kickoff\nAna: we need guest checkout.");
+        String agent = agent(workspace, "Analyst");
+        mvc.perform(get("/api/agents/{id}", agent).header(HEADER, workspace))
+                .andExpect(jsonPath("$.draft.model.provider").value("openai"))
+                .andExpect(jsonPath("$.draft.model.model").value("gpt-5.2"));
+        mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"revision":1,"draft":{"name":"Analyst","purpose":"","instructions":"Find the requirements.",
+                                "knowledgeSources":[],"skills":[],"tools":["GET_TRANSCRIPT", "LIST_SOURCES"],
+                                "model":{"provider":"openai","model":"gpt-5.2","effort":"HIGH"},
+                                "style":"PRECISE","accepts":["TRANSCRIPT"],"givesBack":"REQUIREMENTS",
+                                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                                """))
+                .andExpect(jsonPath("$.problems").isEmpty());
+        int claudeBefore = claude.requests().size();
+        mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("ANSWERED"))
+                .andExpect(jsonPath("$.matchesShape").value(true))
+                .andExpect(jsonPath("$.model").value("gpt-5.2"))
+                .andExpect(jsonPath("$.structured.requirements[0].type").value("BUG"));
+        org.assertj.core.api.Assertions.assertThat(openAi.requests().getLast().path("reasoning_effort").asString())
+                .isEqualTo("high");
+        org.assertj.core.api.Assertions.assertThat(claude.requests()).hasSize(claudeBefore);
+
+        mvc.perform(delete("/api/llm-providers/openai/key").header(HEADER, workspace))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.providers[1].connected").value(false))
+                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("anthropic"));
+    }
 
     @Test
     void a_workspace_connects_its_own_key_which_is_checked_stored_sealed_and_never_shown() throws Exception {

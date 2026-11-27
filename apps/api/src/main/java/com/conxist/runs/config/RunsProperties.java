@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import com.conxist.runs.adapter.model.ClaudeModel;
+import com.conxist.runs.adapter.model.OpenAiModel;
 import com.conxist.runs.application.ApiKey;
 import com.conxist.runs.application.ModelCatalog;
 import com.conxist.runs.application.ModelChoice;
@@ -19,15 +20,17 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * The models a workspace allows until it ticks its own, how to call them, where a new agent starts, how long a
- * provider's model list is kept, and this computer's key, used by workspaces that have not connected their own
+ * provider's model list is kept, and this computer's keys, used by workspaces that have not connected their own
  * (ADR 0012, ADR 0014). Model ids are settings, not code (TOOL_CALLING_STANDARDS.md §6). A blank key is allowed: the
- * API starts, and a workspace without its own key shows the provider as not connected.
+ * API starts, and a workspace without its own key shows that provider as not connected.
  */
 @Validated
 @ConfigurationProperties("conxist.runs")
 public record RunsProperties(
         String anthropicApiKey,
         String anthropicBaseUrl,
+        String openaiApiKey,
+        String openaiBaseUrl,
         @NotEmpty List<@Valid Model> models,
         @NotNull @Valid Start newAgents,
         @Positive long defaultMaxTokens,
@@ -56,8 +59,14 @@ public record RunsProperties(
 
     /** This computer's keys by provider; empty when none is set. */
     Map<String, ApiKey> computerKeys() {
-        return anthropicApiKey == null || anthropicApiKey.isBlank() ? Map.of()
-                : Map.of(ClaudeModel.PROVIDER, new ApiKey(anthropicApiKey.strip()));
+        Map<String, ApiKey> keys = new java.util.LinkedHashMap<>();
+        if (anthropicApiKey != null && !anthropicApiKey.isBlank()) {
+            keys.put(ClaudeModel.PROVIDER, new ApiKey(anthropicApiKey.strip()));
+        }
+        if (openaiApiKey != null && !openaiApiKey.isBlank()) {
+            keys.put(OpenAiModel.PROVIDER, new ApiKey(openaiApiKey.strip()));
+        }
+        return Map.copyOf(keys);
     }
 
     /** Never printed: the key stays out of logs and error pages. */

@@ -110,6 +110,52 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('An agent runs on this model now.', { exact: false })).not.toBeInTheDocument();
   });
 
+  it('shows OpenAI beside Anthropic, connects it with its own key, and groups the default by provider', async () => {
+    const openAiOff = { id: 'openai', connected: false, connection: { ...NO_KEY }, models: [] };
+    const openAiOn = {
+      id: 'openai', connected: true,
+      connection: { source: 'WORKSPACE' as const, keyEnding: 'k2Mw', addedAt: '2026-11-27T01:00:00Z', checkedAt: '2026-11-27T01:00:00Z', refused: false },
+      models: [{ id: 'gpt-5.2', label: 'GPT-5.2' }],
+    };
+    let connected = false;
+    const calls = stubApi({
+      'GET /api/llm-providers': () => ({ body: { ...LLM_PROVIDERS, providers: [ANTHROPIC, connected ? openAiOn : openAiOff] } }),
+      'GET /api/llm-providers/anthropic/models': () => ({ body: OFFERED }),
+      'GET /api/llm-providers/openai/models': () => ({ body: { provider: 'openai', connected: true, listError: null, models: [
+        { id: 'gpt-5.2', label: 'GPT-5.2', allowed: true, listed: true },
+        { id: 'gpt-5.2-mini', label: 'GPT-5.2 mini', allowed: false, listed: true },
+      ] } }),
+      'GET /api/agents': () => ({ body: [] }),
+      'PUT /api/llm-providers/openai/key': () => {
+        connected = true;
+        return { body: openAiOn };
+      },
+    });
+    const { container } = open('#/settings/llm');
+
+    expect(await screen.findByText('OpenAI (GPT)')).toBeInTheDocument();
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Anthropic models' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'OpenAI models' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
+    const dialog = screen.getByRole('dialog', { name: 'Connect OpenAI' });
+    const field = within(dialog).getByLabelText('API key');
+    expect(field).toHaveAttribute('placeholder', 'sk-...');
+    await userEvent.type(field, 'sk-proj-new-key-k2Mw');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Check and connect' }));
+
+    expect(await screen.findByRole('heading', { name: 'OpenAI models' })).toBeInTheDocument();
+    expect(await screen.findByText(/Image, audio, speech and embedding models are left out/)).toBeInTheDocument();
+    expect(await screen.findByRole('checkbox', { name: 'GPT-5.2 mini' })).not.toBeChecked();
+    expect(calls.some((call) => call.key === 'PUT /api/llm-providers/openai/key')).toBe(true);
+    const model = await screen.findByRole('combobox', { name: 'Model for new agents' });
+    expect(within(model).getByRole('group', { name: 'Anthropic' })).toBeInTheDocument();
+    expect(within(within(model).getByRole('group', { name: 'OpenAI' })).getByRole('option', { name: 'GPT-5.2' }))
+      .toHaveValue('openai/gpt-5.2');
+    expect(await accessibilityViolations(container)).toEqual([]);
+  });
+
   it('connects Anthropic with a pasted key, says when the key is refused, and offers no default until then', async () => {
     const none = { ...ANTHROPIC, connected: false, connection: { ...NO_KEY } };
     let connected = false;
