@@ -49,7 +49,7 @@ when ticked; the tick is the approval (no approval per change).
   up to 3 redirects (sites often send acme.com to www.acme.com), and every address passes the same guard as the
   server's; a page is read up to 512 KB, and an icon only when it is an image up to 100 KB. When neither site has an
   icon (gmailmcp.googleapis.com), ConXist asks Google's public favicon service with the host name only (owner's
-  choice pending, 2026-11-27; `CONXIST_FAVICON_SERVICE=false` turns it off). Check refreshes the logo for servers
+  choice, 2026-11-27; `CONXIST_FAVICON_SERVICE=false` turns it off). Check refreshes the logo for servers
   already added; icon requests carry no token.
 
 ## Consequences
