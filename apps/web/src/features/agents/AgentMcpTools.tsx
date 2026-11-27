@@ -9,7 +9,8 @@ import { settingsHref } from '../../navigation';
 import { McpLogo } from '../mcps/McpParts';
 
 /**
- * The tools of the workspace's MCP servers that agents may use, one group per server (ADR 0017). A pick the workspace
+ * The tools of the workspace's MCP servers and integrations that agents may use, one group per server (ADR 0017,
+ * ADR 0019). A pick the workspace
  * no longer allows shows as a problem with a way to remove it. Descriptions come from the server: shown as text.
  */
 export function AgentMcpTools({ draft, servers, onChange }: {
@@ -29,7 +30,8 @@ export function AgentMcpTools({ draft, servers, onChange }: {
       {usable.map((server) => (
         <fieldset key={server.id} className="choice mcp-group">
           <legend>
-            <McpLogo name={server.name} icon={server.icon} size="sm" /> {server.name} <Pill tone="info">{t('agent.tools.mcp')}</Pill>
+            <McpLogo name={server.name} icon={server.icon} size="sm" /> {server.name}{' '}
+            <Pill tone="info">{t('kind' in server && server.kind === 'api' ? 'integration.kind' : 'agent.tools.mcp')}</Pill>
           </legend>
           {allowedTools(server).map((tool) => {
             const pick = { serverId: server.id, tool: tool.name };
@@ -54,7 +56,10 @@ export function AgentMcpTools({ draft, servers, onChange }: {
         </p>
       ))}
       {full && <p className="hint">{t('agent.tools.mcpFull', { max: MAX_MCP_TOOLS_PER_AGENT })}</p>}
-      <p className="hint">{t('agent.tools.mcpMore')} <a href={settingsHref('mcps')}>{t('agent.tools.mcpSettings')}</a>.</p>
+      <p className="hint">
+        {t('agent.tools.mcpMore')} <a href={settingsHref('mcps')}>{t('agent.tools.mcpSettings')}</a>{' '}
+        {t('agent.tools.integrationMore')} <a href={settingsHref('integrations')}>{t('agent.tools.integrationSettings')}</a>.
+      </p>
     </>
   );
 }

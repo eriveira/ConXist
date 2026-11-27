@@ -59,6 +59,8 @@ conxist:
     allow-loopback: false
     connect-timeout: 10s
     read-timeout: 30s
+    # GitHub's REST API, for the GitHub integration (ADR 0019).
+    github-api: https://api.github.com
   runs:
     # Test runs (ADR 0012). The owner's own Anthropic key; blank means test runs say a key is missing.
     anthropic-api-key: ${CONXIST_ANTHROPIC_API_KEY:}

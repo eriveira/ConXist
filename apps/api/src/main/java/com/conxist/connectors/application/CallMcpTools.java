@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import com.conxist.connectors.McpToolbox;
+import com.conxist.connectors.domain.Integration;
 import com.conxist.connectors.domain.McpServer;
 import com.conxist.connectors.domain.McpTool;
 import com.conxist.connectors.domain.McpToolNames;
@@ -19,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The current workspace's MCP tools as a run offers and calls them (ADR 0017). A tool is offered and called only while
+ * The current workspace's MCP tools, and its integrations' tools (ADR 0019), as a run offers and calls them (ADR 0017). A tool is offered and called only while
  * the workspace allows it and the server marks it read-only, checked again on every call. What a tool answers is
  * untrusted data, cut to {@link #MAX_ANSWER_CHARACTERS}; a run wraps it as data before the model reads it.
  */
@@ -38,14 +39,18 @@ public final class CallMcpTools implements McpToolbox {
     private final McpServerRepository servers;
     private final McpCredentials credentials;
     private final McpGateway gateway;
+    private final IntegrationRepository integrations;
+    private final GitHubApi github;
     private final CurrentWorkspace workspace;
     private final Clock clock;
 
     public CallMcpTools(McpServerRepository servers, McpCredentials credentials, McpGateway gateway,
-            CurrentWorkspace workspace, Clock clock) {
+            IntegrationRepository integrations, GitHubApi github, CurrentWorkspace workspace, Clock clock) {
         this.servers = servers;
         this.credentials = credentials;
         this.gateway = gateway;
+        this.integrations = integrations;
+        this.github = github;
         this.workspace = workspace;
         this.clock = clock;
     }
@@ -57,9 +62,19 @@ public final class CallMcpTools implements McpToolbox {
         }
         Map<UUID, McpServer> byId = servers.findAll(workspace.id()).stream()
                 .collect(Collectors.toMap(McpServer::id, Function.identity()));
+        Map<UUID, Integration> integrationsById = integrations.findAll(workspace.id()).stream()
+                .collect(Collectors.toMap(Integration::id, Function.identity()));
         Set<String> taken = new HashSet<>();
         List<OfferedTool> offered = new ArrayList<>();
         for (ToolRef pick : picks) {
+            Integration integration = integrationsById.get(pick.serverId());
+            if (integration != null && integration.allows(pick.tool())) {
+                McpTool tool = integration.tool(pick.tool()).orElseThrow();
+                String name = McpToolNames.forModel(integration.name(), tool.name(), taken);
+                taken.add(name);
+                offered.add(new OfferedTool(pick, name, tool.description(), tool.inputSchema()));
+                continue;
+            }
             McpServer server = byId.get(pick.serverId());
             if (server == null || !server.allows(pick.tool())) {
                 continue;
@@ -74,6 +89,10 @@ public final class CallMcpTools implements McpToolbox {
 
     @Override
     public Result call(ToolRef ref, Map<String, Object> arguments) {
+        Optional<Integration> integration = integrations.find(workspace.id(), ref.serverId());
+        if (integration.isPresent()) {
+            return callIntegration(integration.get(), ref.tool(), arguments == null ? Map.of() : arguments);
+        }
         Optional<McpServer> found = servers.find(workspace.id(), ref.serverId());
         if (found.isEmpty() || !found.get().allows(ref.tool())) {
             return new Result("This tool is no longer allowed in this workspace.", true);
@@ -98,6 +117,40 @@ public final class CallMcpTools implements McpToolbox {
             log.info("Workspace {}: MCP server {} could not be reached for a tool call", server.workspaceId(),
                     server.id());
             return new Result("The server could not be reached. Try again later.", true);
+        }
+    }
+
+    /** One of ConXist's own tools for an integration (ADR 0019); its answer is GitHub's data, untrusted. */
+    private Result callIntegration(Integration integration, String tool, Map<String, Object> arguments) {
+        if (!integration.allows(tool)) {
+            return new Result("This tool is no longer allowed in this workspace.", true);
+        }
+        if (String.valueOf(arguments).length() > MAX_ARGUMENT_CHARACTERS) {
+            return new Result("The arguments are too long. Send this tool only what it asks for.", true);
+        }
+        String token = integrations.token(integration.workspaceId(), integration.id()).orElse(null);
+        if (token == null) {
+            return new Result("This integration is no longer in this workspace.", true);
+        }
+        try {
+            return new Result(capped(github.call(integration, token, tool, arguments), MAX_ANSWER_CHARACTERS), false);
+        } catch (GitHubApi.Problem problem) {
+            return new Result(problem.getMessage(), true);
+        } catch (GitHubApi.Missing missing) {
+            return new Result("GitHub has nothing there, or the token can't see it.", true);
+        } catch (GitHubApi.Refused refused) {
+            log.info("Workspace {}: GitHub refused a call to {} on integration {}", integration.workspaceId(), tool,
+                    integration.id());
+            return new Result("GitHub refused this request. It may be limiting requests: try again later.", true);
+        } catch (GitHubApi.TokenRefused refused) {
+            integrations.update(integration.withStatus(Integration.Status.SIGN_IN_NEEDED, clock.instant()));
+            log.info("Workspace {}: GitHub refused the token of integration {}", integration.workspaceId(),
+                    integration.id());
+            return new Result("GitHub refused ConXist's token. A person replaces it in Settings.", true);
+        } catch (GitHubApi.Unreachable unreachable) {
+            log.info("Workspace {}: GitHub could not be reached for integration {}", integration.workspaceId(),
+                    integration.id());
+            return new Result("GitHub could not be reached. Try again later.", true);
         }
     }
 

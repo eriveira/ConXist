@@ -51,8 +51,25 @@ class CallMcpToolsTest {
         public void saveCredential(UUID workspaceId, UUID serverId, McpCredential credential) { }
         public boolean delete(UUID workspaceId, UUID serverId) { return stored.remove(serverId) != null; }
     };
+    /** No integrations here: GitHub's tools are tested in GitHubToolCallsTest and IntegrationsIntegrationTest. */
+    private final IntegrationRepository noIntegrations = new IntegrationRepository() {
+        public List<com.conxist.connectors.domain.Integration> findAll(UUID workspaceId) { return List.of(); }
+        public Optional<com.conxist.connectors.domain.Integration> find(UUID workspaceId, UUID id) { return Optional.empty(); }
+        public boolean insertIfKindFree(com.conxist.connectors.domain.Integration integration, String token) { return false; }
+        public void update(com.conxist.connectors.domain.Integration integration) { }
+        public Optional<String> token(UUID workspaceId, UUID id) { return Optional.empty(); }
+        public void saveToken(UUID workspaceId, UUID id, String token) { }
+        public boolean delete(UUID workspaceId, UUID id) { return false; }
+    };
+    private final GitHubApi noGitHub = new GitHubApi() {
+        public Account account(String token) { throw new UnsupportedOperationException(); }
+        public String call(com.conxist.connectors.domain.Integration integration, String token, String tool,
+                Map<String, Object> arguments) {
+            throw new UnsupportedOperationException();
+        }
+    };
     private final CallMcpTools toolbox = new CallMcpTools(servers, new McpCredentials(servers, gateway, CLOCK), gateway,
-            () -> WORKSPACE, CLOCK);
+            noIntegrations, noGitHub, () -> WORKSPACE, CLOCK);
 
     @Test
     void a_tool_unticked_after_it_was_offered_is_not_called() {

@@ -14,7 +14,8 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
  * The fake Claude takes any key that starts with {@code sk-ant-fake-}; it is also this computer's key unless
  * {@code CONXIST_FAKE_COMPUTER_KEY=false}, to try Settings with no key at all. The fake OpenAI takes any key that
  * starts with {@code sk-fake-} and is never this computer's key. Three fake MCP servers ({@link FakeMcpServers}) log
- * their addresses at start.
+ * their addresses at start, and a fake GitHub API ({@link FakeGitHubServer}) takes any token that starts with
+ * {@code github_pat_fake}.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class FakePlaudConfiguration {
@@ -45,9 +46,15 @@ public class FakePlaudConfiguration {
         return FakeMcpServers.start();
     }
 
+    /** GitHub's API for Settings › Integrations: any token that starts with github_pat_fake. */
+    @Bean(destroyMethod = "close")
+    FakeGitHubServer fakeGitHub() throws IOException {
+        return new FakeGitHubServer();
+    }
+
     @Bean
     DynamicPropertyRegistrar fakePlaudProperties(FakePlaudServer fake, FakePlaudMcpServer mcp,
-            FakeClaudeServer claude, FakeOpenAiServer openAi) {
+            FakeClaudeServer claude, FakeOpenAiServer openAi, FakeGitHubServer github) {
         byte[] key = new byte[32];
         new SecureRandom().nextBytes(key);
         String secretsKey = Base64.getEncoder().encodeToString(key);
@@ -65,6 +72,7 @@ public class FakePlaudConfiguration {
             registry.add("conxist.runs.openai-api-key", () -> "");
             // The fake MCP servers run on this computer, over plain http.
             registry.add("conxist.connectors.allow-loopback", () -> "true");
+            registry.add("conxist.connectors.github-api", () -> github.baseUrl().toString());
         };
     }
 }
