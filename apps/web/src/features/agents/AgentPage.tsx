@@ -6,6 +6,7 @@ import { type PinnedSkill, SKILL_PROBLEMS, type SkillSummary, skillRowProblems, 
 import type { Source } from '../../domain/model';
 import { type LlmProviders, modelAvailable } from '../../domain/settings';
 import { type McpServer, pickAllowed } from '../../domain/mcps';
+import type { Variable } from '../../domain/variables';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { AGENTS_HREF, goWithNotice } from '../../navigation';
@@ -21,7 +22,8 @@ import { type ActResult, blockedBy, useAgentEditor } from './useAgentEditor';
 export type Choices =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[]; providers: LlmProviders; mcps: McpServer[] | null };
+  | { status: 'ready'; sources: Source[]; tools: AgentToolInfo[]; skills: SkillSummary[]; providers: LlmProviders; mcps: McpServer[] | null;
+      variables: Variable[] | null };
 
 type Busy = 'publish' | 'archive' | null;
 
@@ -46,8 +48,9 @@ export function AgentPage({ agentId }: { agentId: string }) {
     setChoices({ status: 'loading' });
     Promise.all([api.sources(), api.agentTools(), api.skills(), api.llmProviders(),
       // MCP servers load on their own terms: when they can't, the rest of the agent still edits.
-      api.mcps().catch(() => null)])
-      .then(([sources, tools, skills, providers, mcps]) => setChoices({ status: 'ready', sources, tools, skills, providers, mcps }))
+      api.mcps().catch(() => null), api.variables().catch(() => null)])
+      .then(([sources, tools, skills, providers, mcps, variables]) =>
+        setChoices({ status: 'ready', sources, tools, skills, providers, mcps, variables }))
       .catch(() => setChoices({ status: 'error' }));
   }, []);
 

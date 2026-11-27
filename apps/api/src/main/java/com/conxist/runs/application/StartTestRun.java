@@ -13,6 +13,7 @@ import com.conxist.agents.AgentBrief;
 import com.conxist.agents.AgentBriefs;
 import com.conxist.capture.MeetingLibrary;
 import com.conxist.platform.CurrentWorkspace;
+import com.conxist.platform.WorkspaceVariables;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
 import com.conxist.runs.domain.OutputShape;
@@ -35,10 +36,17 @@ public final class StartTestRun {
     private final LlmProviders providers;
     private final AnswerReader reader;
     private final CurrentWorkspace workspace;
+    private final WorkspaceVariables variables;
     private final Clock clock;
 
     public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
             AnswerReader reader, CurrentWorkspace workspace, Clock clock) {
+        this(agents, library, tools, providers, reader, workspace, WorkspaceVariables.none(), clock);
+    }
+
+    public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
+            AnswerReader reader, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
+        this.variables = variables;
         this.agents = agents;
         this.library = library;
         this.tools = tools;
@@ -112,7 +120,7 @@ public final class StartTestRun {
             this.scope = new RunTools.Scope(agent.tools(), agent.knowledgeSources(), meeting.sourceId(), meeting.id(),
                     tools.mcpTools(agent));
             this.offered = tools.specs(scope);
-            this.system = RunPrompt.system(agent, tools.descriptions(scope));
+            this.system = RunPrompt.system(agent, tools.descriptions(scope), variables.of(workspace.id()));
             this.started = clock.instant();
             this.deadline = started.plusSeconds(agent.timeoutSeconds());
         }

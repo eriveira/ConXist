@@ -1,4 +1,4 @@
-/* A workspace's Settings: section menu, cards, models table, topics. Tokens only. */
+/* A workspace's Settings: section menu, cards, models table, MCPs, variables. Tokens only. */
 .settings-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; max-width: 1040px; }
 .settings-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; }
 .settings-nav a {
@@ -127,4 +127,23 @@
 .mcp-tools tbody th small { overflow-wrap: anywhere; }
 @media (max-width: 760px) {
   .mcp-tools thead .kind, .mcp-tools td.kind { display: none; }
+}
+
+/* Variables: a name, its value, and the form that edits either in place. */
+.variables { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); overflow: hidden; }
+.variables-h, .variable:not(.editing) { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr) auto; gap: 16px; align-items: start; padding: 12px 14px; }
+.variables-h { background: var(--cx-surface); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--cx-fg-muted); }
+.variables-h span:last-child { grid-column: 2 / 4; }
+.variable { border-top: 1px solid var(--cx-border); }
+.variable.editing { padding: 14px; }
+.variable-name { font-weight: 700; overflow-wrap: anywhere; padding-top: 6px; }
+.variable-value { white-space: pre-wrap; overflow-wrap: anywhere; padding-top: 6px; }
+.variable-actions { display: flex; gap: 8px; }
+.variable-form .field { margin-bottom: 12px; }
+.variable-form .hint.full { color: var(--cx-warn-fg); }
+.variable-name, .variable-form .input.mono { font-family: var(--cx-font-mono); }
+.variable-form-actions { display: flex; gap: 8px; }
+@media (max-width: 640px) {
+  .variables-h { display: none; }
+  .variable:not(.editing) { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }

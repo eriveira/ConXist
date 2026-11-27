@@ -1,16 +1,5 @@
 import type { AgentModel, AgentSummary, Effort } from './agents';
 
-/** A subject the team talks about, that the topic classifier sorts meetings into. */
-export interface Topic {
-  id: string;
-  name: string;
-  description: string;
-}
-
-export const MAX_TOPIC_NAME = 60;
-export const MAX_TOPIC_DESCRIPTION = 300;
-export const MAX_TOPICS = 50;
-
 export interface LlmModel {
   id: string;
   label: string;

@@ -5,6 +5,7 @@
 - Deciders: owner, Claude
 - Changes: ADR 0010's "agents name a setting (Fast, Balanced, Thorough), never a model"
 - Changed by: ADR 0015 (2026-11-25): template tiers removed; `conxist.runs.new-agents` is where new agents start.
+- Changed by: ADR 0018 (2026-11-27): Topics became Variables; `workspace_topics` was moved into a `topics` variable and dropped (V19).
 - Amended 2026-11-25 (owner): LLM providers keeps only what adding a provider needs, Anthropic only; Settings lists
   every model the provider offers and the workspace ticks the ones agents may pick (mock
   `App/mocks/workspace-settings-v3/`). See "Allowed models" below.

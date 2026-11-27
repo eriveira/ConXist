@@ -21,7 +21,7 @@ const OFFERED: OfferedModels = {
 };
 const ANTHROPIC = LLM_PROVIDERS.providers[0];
 const NO_KEY = { source: 'NONE' as const, keyEnding: null, addedAt: null, checkedAt: null, refused: false };
-const CHECKOUT = { id: 't1', name: 'Checkout', description: 'Cart and payment' };
+const COMPANY = { id: 'v1', name: 'company_name', value: 'Acme Inc.' };
 
 function open(section: string) {
   window.location.hash = section;
@@ -256,73 +256,86 @@ describe('SettingsPage', () => {
     open('#/settings/connectors');
 
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
-    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['General', 'LLM providers', 'MCPs', 'Topics']);
+    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['General', 'LLM providers', 'MCPs', 'Variables']);
     expect(within(nav).getByRole('link', { name: 'General' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('starts with no topics, adds one with its description, and refuses a taken name under the field', async () => {
+  it('starts with no variables, adds one in place, and refuses a name that is taken or not made for braces', async () => {
     let added = 0;
-    stubApi({
-      'GET /api/topics': () => ({ body: [] }),
-      'POST /api/topics': (init) => (added++ === 0
-        ? { status: 201, body: { id: 't1', ...JSON.parse(String(init?.body)) } }
-        : { status: 422, body: { code: 'topic.name-taken', detail: 'taken' } }),
+    const calls = stubApi({
+      'GET /api/variables': () => ({ body: [] }),
+      'POST /api/variables': (init) => (added++ === 0
+        ? { status: 201, body: { id: 'v1', ...JSON.parse(String(init?.body)) } }
+        : { status: 422, body: { code: 'variable.name-taken', detail: 'taken' } }),
     });
-    const { container } = open('#/settings/topics');
+    const { container } = open('#/settings/variables');
 
-    expect(await screen.findByText('No topics yet')).toBeInTheDocument();
+    expect(await screen.findByText('No variables yet')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    let dialog = screen.getByRole('dialog', { name: 'New topic' });
-    expect(within(dialog).getByLabelText('Name')).toHaveFocus();
-    await userEvent.type(within(dialog).getByLabelText('Name'), ' Checkout ');
-    await userEvent.type(within(dialog).getByLabelText(/What belongs here/), 'Cart and payment');
-    expect(dialog).toHaveTextContent('16 / 300');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    let form = screen.getByRole('form', { name: 'New variable' });
+    expect(within(form).getByLabelText('Name')).toHaveFocus();
+    await userEvent.type(within(form).getByLabelText('Name'), 'company name');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(within(form).getByText('Use letters, digits and underscores, starting with a letter.')).toBeInTheDocument();
+    expect(calls.filter((call) => call.key === 'POST /api/variables')).toHaveLength(0);
 
-    expect(await screen.findByText('Checkout added.')).toBeInTheDocument();
-    expect(screen.getByRole('list')).toHaveTextContent('CheckoutCart and payment');
-    expect(screen.getByText('1 of 50 topics')).toBeInTheDocument();
+    await userEvent.clear(within(form).getByLabelText('Name'));
+    await userEvent.type(within(form).getByLabelText('Name'), ' company_name ');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(within(form).getByText('Give the variable a value.')).toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText('Value'), 'Acme Inc.');
+    expect(form).toHaveTextContent('9 / 2000');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('company_name added.')).toBeInTheDocument();
+    expect(JSON.parse(String(calls.find((call) => call.key === 'POST /api/variables')?.init?.body)))
+      .toEqual({ name: 'company_name', value: 'Acme Inc.' });
+    expect(screen.getByRole('list', { name: 'Variables' })).toHaveTextContent('company_nameAcme Inc.');
+    expect(screen.getByText('1 of 100 variables.')).toBeInTheDocument();
     expect(await accessibilityViolations(container)).toEqual([]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    dialog = screen.getByRole('dialog', { name: 'New topic' });
-    await userEvent.type(within(dialog).getByLabelText('Name'), 'checkout');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-    expect(await within(dialog).findByText('There is already a topic with this name.')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Name')).toHaveFocus();
+    form = screen.getByRole('form', { name: 'New variable' });
+    await userEvent.type(within(form).getByLabelText('Name'), 'Company_Name');
+    await userEvent.type(within(form).getByLabelText('Value'), 'x');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(await within(form).findByText('This workspace already has a variable with this name.')).toBeInTheDocument();
+    expect(within(form).getByLabelText('Name')).toHaveFocus();
   });
 
-  it('edits a topic and removes one after asking', async () => {
+  it('edits a variable in its row and deletes one after asking', async () => {
     const calls = stubApi({
-      'GET /api/topics': () => ({ body: [CHECKOUT] }),
-      'PUT /api/topics/t1': (init) => ({ body: { id: 't1', ...JSON.parse(String(init?.body)) } }),
-      'DELETE /api/topics/t1': () => ({ status: 204, body: null }),
+      'GET /api/variables': () => ({ body: [COMPANY] }),
+      'PUT /api/variables/v1': (init) => ({ body: { id: 'v1', ...JSON.parse(String(init?.body)) } }),
+      'DELETE /api/variables/v1': () => ({ status: 204, body: null }),
     });
-    open('#/settings/topics');
+    open('#/settings/variables');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit Checkout' }));
-    const name = within(screen.getByRole('dialog', { name: 'Edit topic' })).getByLabelText('Name');
-    expect(name).toHaveValue('Checkout');
-    await userEvent.clear(name);
-    await userEvent.type(name, 'Payments');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText('Payments saved.')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit company_name' }));
+    const form = screen.getByRole('form', { name: 'Edit company_name' });
+    expect(within(form).getByLabelText('Value')).toHaveValue('Acme Inc.');
+    await userEvent.clear(within(form).getByLabelText('Value'));
+    await userEvent.type(within(form).getByLabelText('Value'), 'Acme Corporation');
+    await userEvent.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('company_name saved.')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Variables' })).toHaveTextContent('Acme Corporation');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove Payments' }));
-    const confirm = screen.getByRole('dialog', { name: 'Remove Payments?' });
-    await userEvent.click(within(confirm).getByRole('button', { name: 'Remove' }));
-    expect(await screen.findByText('Payments removed.')).toBeInTheDocument();
-    expect(screen.getByText('No topics yet')).toBeInTheDocument();
-    expect(calls.map((call) => call.key)).toContain('DELETE /api/topics/t1');
+    await userEvent.click(screen.getByRole('button', { name: 'Delete company_name' }));
+    const confirm = screen.getByRole('dialog', { name: 'Delete company_name?' });
+    expect(confirm).toHaveTextContent('write {{company_name}} get the text as written');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('company_name deleted.')).toBeInTheDocument();
+    expect(screen.getByText('No variables yet')).toBeInTheDocument();
+    expect(calls.map((call) => call.key)).toContain('DELETE /api/variables/v1');
   });
 
-  it('turns Add off at fifty topics and says why', async () => {
+  it('turns Add off at a hundred variables and says why', async () => {
     stubApi({
-      'GET /api/topics': () => ({ body: Array.from({ length: 50 }, (_, i) => ({ id: `t${i}`, name: `Topic ${i}`, description: '' })) }),
+      'GET /api/variables': () => ({ body: Array.from({ length: 100 }, (_, i) => ({ id: `v${i}`, name: `variable_${i}`, value: 'x' })) }),
     });
-    open('#/settings/topics');
+    open('#/settings/variables');
 
-    expect(await screen.findByText(/has 50 topics, the most it can keep/)).toBeInTheDocument();
+    expect(await screen.findByText(/has 100 variables, the most it can keep/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
   });
 });

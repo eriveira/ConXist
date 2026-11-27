@@ -1,7 +1,10 @@
 package com.conxist.runs.domain;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.conxist.agents.AgentBrief;
 
@@ -32,6 +35,15 @@ public final class RunPrompt {
 
     /** The system prompt; {@code tools} are the tool names this run offers, so the model knows what each is for. */
     public static String system(AgentBrief agent, List<ToolDescription> tools) {
+        return system(agent, tools, Map.of());
+    }
+
+    /**
+     * The system prompt with the workspace's {@code variables} (lower-case name to value) in place of each
+     * {@code {{name}}} in the agent's purpose and instructions and in its skills (ADR 0018). A name the workspace does
+     * not have stays as it is written.
+     */
+    public static String system(AgentBrief agent, List<ToolDescription> tools, Map<String, String> variables) {
         StringBuilder text = new StringBuilder(RULES).append("\n\n");
         if (!tools.isEmpty()) {
             text.append("Tools you may use:\n");
@@ -40,15 +52,27 @@ public final class RunPrompt {
             text.append('\n');
         }
         text.append("<agent name=\"").append(attribute(agent.name())).append("\">\n")
-                .append("Purpose: ").append(neutralized(agent.purpose().strip())).append("\n\n")
-                .append(neutralized(agent.instructions().strip())).append("\n</agent>\n");
+                .append("Purpose: ").append(neutralized(filled(agent.purpose().strip(), variables))).append("\n\n")
+                .append(neutralized(filled(agent.instructions().strip(), variables))).append("\n</agent>\n");
         for (AgentBrief.Skill skill : agent.skills()) {
             text.append("\n<skill name=\"").append(attribute(skill.name())).append("\" version=\"")
                     .append(skill.version()).append("\" source=\"").append(skill.source().toLowerCase())
-                    .append("\">\n").append(neutralized(skill.instructions().strip())).append("\n</skill>\n");
+                    .append("\">\n").append(neutralized(filled(skill.instructions().strip(), variables)))
+                    .append("\n</skill>\n");
         }
         text.append('\n').append(style(agent.style())).append('\n').append(answer(agent.givesBack()));
         return text.toString();
+    }
+
+    private static final Pattern VARIABLE = Pattern.compile("\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*)\\s*}}");
+
+    /** The text with each {@code {{name}}} the workspace has replaced by its value; other braces stay as written. */
+    public static String filled(String text, Map<String, String> variables) {
+        if (variables.isEmpty() || !text.contains("{{")) {
+            return text;
+        }
+        return VARIABLE.matcher(text).replaceAll(match -> Matcher.quoteReplacement(
+                variables.getOrDefault(match.group(1).toLowerCase(Locale.ROOT), match.group())));
     }
 
     /** The most text of one meeting a run sends, whether handed in or read with a tool. */
