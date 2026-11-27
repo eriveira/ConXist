@@ -10,7 +10,12 @@ import { IntegrationsSection } from '../integrations/IntegrationsSection';
 import { McpsSection } from '../mcps/McpsSection';
 
 /** A workspace's Settings, opened from the workspace menu: General, LLM providers, MCPs, Integrations and Variables. */
-export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onSaved: (workspace: Workspace) => void }) {
+export function SettingsPage({ workspace, onSaved, canDelete, onDeleted }: {
+  workspace: Workspace; onSaved: (workspace: Workspace) => void;
+  /** False for the only workspace, which stays. */
+  canDelete: boolean;
+  onDeleted: (workspace: Workspace) => void;
+}) {
   const t = useT();
   const section = useSettingsSection();
   const title = useRef<HTMLHeadingElement>(null);
@@ -33,7 +38,9 @@ export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onS
           ))}
         </nav>
         <div className="settings-content">
-          {section === 'general' && <GeneralSection workspace={workspace} onSaved={onSaved} />}
+          {section === 'general' && (
+            <GeneralSection workspace={workspace} onSaved={onSaved} canDelete={canDelete} onDeleted={onDeleted} />
+          )}
           {section === 'llm' && <LlmProvidersSection />}
           {section === 'mcps' && <McpsSection />}
           {section === 'integrations' && <IntegrationsSection workspaceName={workspace.name} />}

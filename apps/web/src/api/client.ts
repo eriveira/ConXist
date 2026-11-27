@@ -115,6 +115,11 @@ export const api = {
   /** A new name and description for a workspace; names stay unique. */
   updateWorkspace: (workspaceId: string, workspace: NewWorkspace) =>
     putJson<Workspace>(`/api/workspaces/${encodeURIComponent(workspaceId)}`, workspace),
+  /** Deletes the workspace and everything in it for good; `name` is what the person typed to confirm. */
+  deleteWorkspace: (workspaceId: string, name: string) =>
+    request<void>(`/api/workspaces/${encodeURIComponent(workspaceId)}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    }),
   variables: () => request<Variable[]>('/api/variables'),
   addVariable: (variable: Omit<Variable, 'id'>) => postJson<Variable>('/api/variables', variable),
   changeVariable: (id: string, variable: Omit<Variable, 'id'>) =>

@@ -1,10 +1,13 @@
 package com.conxist.workspaces.config;
 
 import java.time.Clock;
+import java.util.List;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.UnitOfWork;
+import com.conxist.platform.WorkspaceData;
 import com.conxist.workspaces.application.CountSources;
 import com.conxist.workspaces.application.CreateWorkspace;
+import com.conxist.workspaces.application.DeleteWorkspace;
 import com.conxist.workspaces.application.ListWorkspaces;
 import com.conxist.workspaces.application.ManageVariables;
 import com.conxist.workspaces.application.VariableRepository;
@@ -25,6 +28,11 @@ class WorkspacesConfiguration {
     @Bean
     UpdateWorkspace updateWorkspace(WorkspaceRepository workspaces, UnitOfWork unitOfWork) {
         return new UpdateWorkspace(workspaces, unitOfWork);
+    }
+
+    @Bean
+    DeleteWorkspace deleteWorkspace(WorkspaceRepository workspaces, List<WorkspaceData> data, UnitOfWork unitOfWork) {
+        return new DeleteWorkspace(workspaces, data, unitOfWork);
     }
 
     @Bean

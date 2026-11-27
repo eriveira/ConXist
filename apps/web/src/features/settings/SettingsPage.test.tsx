@@ -25,7 +25,7 @@ const COMPANY = { id: 'v1', name: 'company_name', value: 'Acme Inc.' };
 
 function open(section: string) {
   window.location.hash = section;
-  return render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} />);
+  return render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} canDelete onDeleted={vi.fn()} />);
 }
 
 describe('SettingsPage', () => {
@@ -360,5 +360,37 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText(/has 100 variables, the most it can keep/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+  });
+
+  it('deletes the workspace only once its name is typed exactly, and keeps the only workspace', async () => {
+    const onDeleted = vi.fn();
+    const calls = stubApi({
+      'DELETE /api/workspaces/w1': (init) => (JSON.parse(String(init?.body)).name === 'Acme Product'
+        ? { status: 204, body: null } : { status: 422, body: { code: 'workspace.name-mismatch' } }),
+    });
+    window.location.hash = '#/settings';
+    const { container, unmount } = render(
+      <SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} canDelete onDeleted={onDeleted} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete workspace…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Acme Product?' });
+    const field = within(dialog).getByLabelText('Type Acme Product to confirm');
+    const remove = within(dialog).getByRole('button', { name: 'Delete workspace' });
+    expect(field).toHaveFocus();
+    expect(remove).toBeDisabled();
+    await userEvent.type(field, 'acme product');
+    expect(remove).toBeDisabled();
+    expect(await accessibilityViolations(container)).toEqual([]);
+
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Acme Product{Enter}');
+
+    await vi.waitFor(() => expect(onDeleted).toHaveBeenCalledWith(WORKSPACE));
+    expect(calls.filter((call) => call.key === 'DELETE /api/workspaces/w1')).toHaveLength(1);
+    unmount();
+
+    render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} canDelete={false} onDeleted={onDeleted} />);
+    expect(screen.getByRole('button', { name: 'Delete workspace…' })).toBeDisabled();
+    expect(screen.getByText(/is your only workspace, so it stays/)).toBeInTheDocument();
   });
 });

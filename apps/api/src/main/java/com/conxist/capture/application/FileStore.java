@@ -10,4 +10,7 @@ public interface FileStore {
 
     /** Removes a stored file, for example when saving its document failed. */
     void delete(String key);
+
+    /** Deletes every file stored for the workspace. */
+    void deleteWorkspace(UUID workspaceId);
 }

@@ -84,6 +84,14 @@ class JdbcWorkspaceRepository implements WorkspaceRepository {
     }
 
     @Override
+    public void delete(UUID workspaceId) {
+        for (String table : List.of("workspace_variables", "workspace_topics_v13", "workspace_sources")) {
+            jdbc.sql("delete from " + table + " where workspace_id = :id").param("id", workspaceId).update();
+        }
+        jdbc.sql("delete from workspaces where id = :id").param("id", workspaceId).update();
+    }
+
+    @Override
     public boolean exists(UUID workspaceId) {
         return jdbc.sql("select exists(select 1 from workspaces where id = :id)")
                 .param("id", workspaceId)

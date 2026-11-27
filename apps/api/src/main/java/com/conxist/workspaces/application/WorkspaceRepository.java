@@ -25,6 +25,9 @@ public interface WorkspaceRepository {
 
     boolean nameTaken(String name);
 
+    /** Deletes the workspace with its variables and its record of sources. */
+    void delete(UUID workspaceId);
+
     /** Counts a source towards its workspace. Safe to call twice for the same source. */
     void recordSource(UUID workspaceId, UUID sourceId);
 }

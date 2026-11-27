@@ -26,7 +26,7 @@ const GMAIL: Integration = {
 
 function open(hash: string) {
   window.location.hash = hash;
-  return render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} />);
+  return render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} canDelete onDeleted={vi.fn()} />);
 }
 
 const bodyOf = (calls: ReturnType<typeof stubApi>, key: string) =>

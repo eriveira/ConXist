@@ -76,10 +76,17 @@ export function useWorkspaces() {
     open(workspaces, state.current.id === workspace.id ? workspace : state.current);
   }, [state, open]);
 
+  /** Forgets a deleted workspace and opens the first one left. */
+  const deleted = useCallback((workspaceId: string) => {
+    if (state.status !== 'ready') return;
+    const workspaces = state.workspaces.filter((w) => w.id !== workspaceId);
+    open(workspaces, pickWorkspace(workspaces, null));
+  }, [state, open]);
+
   /** Brings source counts up to date, keeping the current workspace. */
   const refresh = useCallback(() => {
     if (state.status === 'ready') void load(state.current.id);
   }, [state, load]);
 
-  return { state, retry, switchTo, created, updated, refresh };
+  return { state, retry, switchTo, created, updated, deleted, refresh };
 }
