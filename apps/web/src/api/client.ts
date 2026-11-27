@@ -4,7 +4,7 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
-import type { Integration, IntegrationCheck, TokenCheck } from '../domain/integrations';
+import type { GmailSignIn, Integration, IntegrationCheck, IntegrationKind, TokenCheck } from '../domain/integrations';
 import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
 import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels } from '../domain/settings';
 import type { Variable } from '../domain/variables';
@@ -150,6 +150,15 @@ export const api = {
     putJson<Integration>(`${integrationPath(id)}/repositories`, { repositories }),
   replaceIntegrationToken: (id: string, token: string, email?: string) =>
     putJson<Integration>(`${integrationPath(id)}/token`, email === undefined ? { token } : { email, token }),
+  integrationKinds: () => request<IntegrationKind[]>('/api/integrations/kinds'),
+  startGmailSignIn: (integrationId?: string) =>
+    postJson<GmailSignIn>('/api/integrations/gmail/sign-in', integrationId ? { integrationId } : {}),
+  gmailSignIn: (id: string) => request<GmailSignIn>(`/api/integrations/gmail/sign-in/${encodeURIComponent(id)}`),
+  relistGmailLabels: (id: string) =>
+    postJson<GmailSignIn>(`/api/integrations/gmail/sign-in/${encodeURIComponent(id)}/labels`, {}),
+  addGmail: (signInId: string, labels: string[], allowedTools: string[]) =>
+    postJson<Integration>('/api/integrations/gmail', { signInId, labels, allowedTools }),
+  replaceGoogleSignIn: (id: string, signInId: string) => putJson<Integration>(`${integrationPath(id)}/google`, { signInId }),
   removeIntegration: (id: string) => request<void>(integrationPath(id), { method: 'DELETE' }),
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
   /** Where this workspace's new blank agents start; agents already made keep their own pick. */

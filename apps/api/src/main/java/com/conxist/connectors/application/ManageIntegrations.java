@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.conxist.agents.AgentBriefs;
+import com.conxist.connectors.domain.GmailTools;
 import com.conxist.connectors.domain.Integration;
 import com.conxist.connectors.domain.InvalidIntegration;
 import com.conxist.platform.Conflict;
@@ -21,8 +22,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The integrations a workspace connected, GitHub (ADR 0019) and Bitbucket (ADR 0020): check a credential, add it with
- * the tools agents may use (and, for Bitbucket, the repositories they may read), change those, check it again,
+ * The integrations a workspace connected, GitHub (ADR 0019), Bitbucket (ADR 0020) and Gmail (ADR 0021): check a
+ * credential, add it with the tools agents may use (and, for Bitbucket, the repositories they may read; for Gmail, the
+ * labels), change those, check it again,
  * replace the credential, remove it. A tool or an integration agents use stays: the person removes it from those
  * agents first.
  */
@@ -69,8 +71,18 @@ public final class ManageIntegrations {
      */
     public IntegrationViews.IntegrationView add(Integration.Kind kind, String email, String token,
             List<String> repositories, Set<String> allowed) {
+        return insert(kind, IntegrationCredentials.checked(kind, email, token), repositories, allowed);
+    }
+
+    /** Adds Gmail with the refresh token of a finished Google sign-in (ADR 0021), as {@link #add} does a token. */
+    IntegrationViews.IntegrationView addSignedIn(Integration.Kind kind, String credential, List<String> labels,
+            Set<String> allowed) {
+        return insert(kind, credential, labels, allowed);
+    }
+
+    private IntegrationViews.IntegrationView insert(Integration.Kind kind, String credential,
+            List<String> repositories, Set<String> allowed) {
         UUID workspaceId = workspace.id();
-        String credential = IntegrationCredentials.checked(kind, email, token);
         if (integrations.findAll(workspaceId).stream().anyMatch(each -> each.kind() == kind)) {
             throw taken(kind);
         }
@@ -78,7 +90,7 @@ public final class ManageIntegrations {
         List<String> reachable = kind.picksRepositories() ? picked(kind, repositories, account.repositories())
                 : account.repositories();
         Integration integration = new Integration(UUID.randomUUID(), workspaceId, kind, account.login(), reachable,
-                Integration.endingOf(IntegrationCredentials.tokenOf(credential)), allowed, Integration.Status.WORKS,
+                ending(credential, account), allowed, Integration.Status.WORKS,
                 clock.instant(), clock.instant());
         if (!integrations.insertIfKindFree(integration, credential)) {
             throw taken(kind);
@@ -158,17 +170,35 @@ public final class ManageIntegrations {
     /** Saves a new credential once the service accepts it, with what it reaches. */
     public IntegrationViews.IntegrationView replaceToken(UUID integrationId, String email, String token) {
         Integration integration = load(integrationId);
-        String credential = IntegrationCredentials.checked(integration.kind(), email, token);
+        return replace(integration, IntegrationCredentials.checked(integration.kind(), email, token));
+    }
+
+    /** Gmail signed in with Google again (ADR 0021): the new refresh token replaces the old one. */
+    IntegrationViews.IntegrationView replaceSignedIn(UUID integrationId, String credential) {
+        return replace(load(integrationId), credential);
+    }
+
+    private IntegrationViews.IntegrationView replace(Integration integration, String credential) {
         IntegrationApi.Account account = account(integration.kind(), credential);
+        if (account.tag() != null && !account.tag().equals(integration.tokenEnding())) {
+            log.info("Workspace {} signed in again to integration {} with another account; nothing changed",
+                    integration.workspaceId(), integration.id());
+            throw new InvalidIntegration(integration.kind().code("other-account"), "This is not the mailbox "
+                    + integration.account() + ". Sign in with that one, or remove " + integration.name()
+                    + " and connect the other.");
+        }
         List<String> reachable = stillReachable(integration, account);
         if (reachable.isEmpty()) {
-            throw new InvalidIntegration(integration.kind().code("repositories-lost"), "This token reaches none of"
-                    + " the picked repositories. Use a token of an account that can see them.");
+            throw new InvalidIntegration(integration.kind().code("repositories-lost"),
+                    integration.kind() == Integration.Kind.GMAIL
+                            ? "This mailbox has none of the picked labels. Sign in with the mailbox that has them."
+                            : "This token reaches none of the picked repositories. Use a token of an account that can"
+                                    + " see them.");
         }
-        Integration replaced = integration.checked(account.login(), reachable,
-                Integration.endingOf(IntegrationCredentials.tokenOf(credential)), clock.instant());
+        Integration replaced = integration.checked(account.login(), reachable, ending(credential, account),
+                clock.instant());
         integrations.replaceToken(replaced, credential);
-        log.info("Workspace {} replaced the token of integration {}", integration.workspaceId(), integrationId);
+        log.info("Workspace {} replaced the token of integration {}", integration.workspaceId(), integration.id());
         return views.view(replaced);
     }
 
@@ -202,7 +232,7 @@ public final class ManageIntegrations {
         if (!integration.kind().picksRepositories()) {
             return account.repositories();
         }
-        if (account.repositories().size() >= Integration.MAX_REPOSITORIES) {
+        if (integration.allMail() || account.repositories().size() >= Integration.MAX_REPOSITORIES) {
             return integration.repositories();
         }
         return integration.repositories().stream()
@@ -212,7 +242,14 @@ public final class ManageIntegrations {
     /** The picked repositories as the service writes them, each one it reaches. */
     private static List<String> picked(Integration.Kind kind, List<String> repositories, List<String> reachable) {
         if (repositories == null || repositories.isEmpty()) {
-            throw new InvalidIntegration("repositories-required", "Pick at least one repository.");
+            throw new InvalidIntegration("repositories-required", kind == Integration.Kind.GMAIL
+                    ? "Pick at least one label, or all email." : "Pick at least one repository.");
+        }
+        if (kind == Integration.Kind.GMAIL && repositories.contains(GmailTools.ALL_MAIL)) {
+            if (repositories.size() > 1) {
+                throw new InvalidIntegration("labels-or-all-mail", "Pick labels or all email, not both.");
+            }
+            return List.of(GmailTools.ALL_MAIL);
         }
         Map<String, String> byName = new LinkedHashMap<>();
         reachable.forEach(name -> byName.put(name.toLowerCase(Locale.ROOT), name));
@@ -227,10 +264,15 @@ public final class ManageIntegrations {
         return List.copyOf(picked);
     }
 
+    /** The token's last 4 characters, or the account's own mark when it has one (Gmail: never part of a token). */
+    private static String ending(String credential, IntegrationApi.Account account) {
+        return account.tag() != null ? account.tag() : Integration.endingOf(IntegrationCredentials.tokenOf(credential));
+    }
+
     private IntegrationApi.Account account(Integration.Kind kind, String credential) {
         try {
             IntegrationApi.Account account = api(kind).account(credential);
-            if (account.repositories().isEmpty()) {
+            if (account.repositories().isEmpty() && kind != Integration.Kind.GMAIL) {
                 throw new InvalidIntegration(kind.code("no-repositories"), kind == Integration.Kind.GITHUB
                         ? "This token reaches no repositories. On GitHub, pick at least one for it."
                         : "This account reaches no repositories on " + kind.label() + ".");

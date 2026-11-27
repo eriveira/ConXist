@@ -5,7 +5,8 @@ import java.util.Map;
 import com.conxist.connectors.domain.Integration;
 
 /**
- * Reads one service's API with a person's credential: GitHub (ADR 0019) or Bitbucket (ADR 0020). It only reads.
+ * Reads one service's API with a person's credential: GitHub (ADR 0019), Bitbucket (ADR 0020) or Gmail (ADR 0021). It
+ * only reads.
  * Everything the service answers is untrusted customer data. Failures are the exceptions below.
  */
 public interface IntegrationApi {
@@ -15,7 +16,7 @@ public interface IntegrationApi {
 
     /**
      * The credential's account and the repositories it reaches, as {@code owner/name}, by name, at most
-     * {@link Integration#MAX_REPOSITORIES}.
+     * {@link Integration#MAX_REPOSITORIES}. For Gmail, the mailbox's own labels.
      */
     Account account(String credential);
 
@@ -27,7 +28,17 @@ public interface IntegrationApi {
      */
     String call(Integration integration, String credential, String tool, Map<String, Object> arguments);
 
-    record Account(String login, List<String> repositories) {
+    /**
+     * What a credential reaches.
+     *
+     * @param tag a short mark that stays the same for the same account and differs for another one (Gmail's mailbox,
+     *            ADR 0021), kept in place of a token's ending; {@code null} keeps the token's last 4 characters
+     */
+    record Account(String login, List<String> repositories, String tag) {
+
+        public Account(String login, List<String> repositories) {
+            this(login, repositories, null);
+        }
     }
 
     /** A wrong argument: the words tell the model what to send instead. */

@@ -11,14 +11,16 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * A tool a workspace connected through its own API: GitHub (ADR 0019) or Bitbucket (ADR 0020). ConXist knows its
- * tools; the workspace picks the ones agents may use. The token itself is kept apart, encrypted; only its last
- * characters are here.
+ * A tool a workspace connected through its own API: GitHub (ADR 0019), Bitbucket (ADR 0020) or Gmail (ADR 0021).
+ * ConXist knows its tools; the workspace picks the ones agents may use. The credential itself is kept apart,
+ * encrypted; only its last characters are here.
  *
  * @param account      the account the token belongs to
  * @param repositories the repositories agents may read, as {@code owner/name}: for GitHub all the token reached when
- *                     last checked (the person picks them on GitHub), for Bitbucket the ones the person picked here
- * @param tokenEnding  the token's last 4 characters, to tell tokens apart
+ *                     last checked (the person picks them on GitHub), for Bitbucket the ones the person picked here;
+ *                     for Gmail the labels agents may read, by name, or {@link GmailTools#ALL_MAIL} alone
+ * @param tokenEnding  the token's last 4 characters, to tell tokens apart; for Gmail the mailbox's mark instead
+ *                     (4 hex characters of its address's SHA-256), so no part of the refresh token is kept
  */
 public record Integration(UUID id, UUID workspaceId, Kind kind, String account, List<String> repositories,
         String tokenEnding, Set<String> allowedTools, Status status, Instant addedAt, Instant checkedAt) {
@@ -27,7 +29,9 @@ public record Integration(UUID id, UUID workspaceId, Kind kind, String account, 
 
     public enum Kind {
         GITHUB("GitHub", GitHubTools.ALL, GitHubTools.REPOSITORY, false),
-        BITBUCKET("Bitbucket", BitbucketTools.ALL, BitbucketTools.REPOSITORY, true);
+        BITBUCKET("Bitbucket", BitbucketTools.ALL, BitbucketTools.REPOSITORY, true),
+        /** Its "repositories" are labels; it signs in with Google, never with a pasted token. */
+        GMAIL("Gmail", GmailTools.ALL, GmailTools.LABEL, true);
 
         private final String label;
         private final List<McpTool> tools;
@@ -51,14 +55,14 @@ public record Integration(UUID id, UUID workspaceId, Kind kind, String account, 
             return tools;
         }
 
-        /** How the service writes a repository, {@code owner/name}. */
+        /** How the service writes a repository, {@code owner/name}, or for Gmail a label. */
         public Pattern repository() {
             return repository;
         }
 
         /**
-         * Whether the person picks the repositories in ConXist: a Bitbucket token reaches all of its person's, while
-         * a GitHub fine-grained token reaches only those picked on GitHub.
+         * Whether the person picks the repositories (Gmail: labels) in ConXist: a Bitbucket token or a Google sign-in
+         * reaches all of its person's, while a GitHub fine-grained token reaches only those picked on GitHub.
          */
         public boolean picksRepositories() {
             return picksRepositories;
@@ -112,6 +116,11 @@ public record Integration(UUID id, UUID workspaceId, Kind kind, String account, 
 
     public Optional<McpTool> tool(String name) {
         return tools().stream().filter(tool -> tool.name().equals(name)).findFirst();
+    }
+
+    /** Whether agents may read all of a mailbox but Spam and Trash, rather than some labels (Gmail). */
+    public boolean allMail() {
+        return repositories.equals(List.of(GmailTools.ALL_MAIL));
     }
 
     /** The listed repository written this way, ignoring case, as GitHub does. */

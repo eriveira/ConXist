@@ -84,7 +84,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, and the
   default for new agents, grouped by provider),
-  MCPs (ADR 0017, below), Integrations (ADR 0019 and 0020, below), and Variables (ADR 0018, below).
+  MCPs (ADR 0017, below), Integrations (ADR 0019, 0020 and 0021, below), and Variables (ADR 0018, below).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - MCPs (ADR 0017, owner 2026-11-27): a `connectors` module and Settings › MCPs. Add any MCP server by its https
@@ -105,6 +105,12 @@ Sources page does not show it for now, owner decision 2026-11-17).
   `get_file`, `list_pull_requests`, `get_pull_request`, `list_commits`. Integrations share one `IntegrationApi` port
   with an adapter per service; error codes that name a service start with its kind (`integration.bitbucket-…`).
   `mvn spring-boot:test-run` runs a fake Bitbucket API that takes any email with a token starting with `ATATTfake`.
+- Gmail (ADR 0021, owner 2026-11-27): the third integration (V22 adds the kind). Sign in with Google for read-only
+  Gmail only (`gmail.readonly`, PKCE); a sign-in granting more is refused. The sealed credential is the refresh token;
+  the account shows shortened (`al…@acme.test`). The person picks the labels agents may read, or all email but Spam
+  and Trash (`*`). Four read tools: `search_emails`, `get_email`, `get_thread`, `list_labels`; every email is checked
+  against the labels. Offered only when `CONXIST_GOOGLE_CLIENT_ID` and `CONXIST_GOOGLE_CLIENT_SECRET` are set.
+  `mvn spring-boot:test-run` runs a fake Google that signs in as `alex@acme.test`.
 - Variables (ADR 0018, owner 2026-11-27): Settings › Variables replaces Topics. A name (letters, digits, underscores,
   starting with a letter; unique ignoring case) and a value up to 2,000 characters, up to 100 per workspace, edited in
   place. Agents' and skills' instructions use one as `{{name}}`; a run puts the value in its place, and a name the

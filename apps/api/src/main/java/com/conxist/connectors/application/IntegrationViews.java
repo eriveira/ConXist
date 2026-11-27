@@ -26,7 +26,19 @@ public final class IntegrationViews {
     public record TokenCheckView(String account, List<String> repositories, List<McpViews.ToolView> tools) {
     }
 
-    /** @param error why not: sign-in-needed or unreachable; null when it works */
+    /**
+     * A Google sign-in for Gmail being made (ADR 0021). The refresh token never appears.
+     *
+     * @param status    SIGNING_IN, READY or FAILED
+     * @param signInUrl Google's page, while SIGNING_IN
+     * @param labels    the mailbox's own labels, once READY
+     * @param error     why it failed: sign-in-refused, scope-refused or unreachable
+     */
+    public record GmailSignInView(UUID id, GmailSignIns.Status status, java.net.URI signInUrl, String account,
+            List<String> labels, List<McpViews.ToolView> tools, String error) {
+    }
+
+    /** @param error why not: sign-in-needed, refused, repositories-lost or unreachable; null when it works */
     public record CheckView(boolean works, String error, IntegrationView integration) {
     }
 

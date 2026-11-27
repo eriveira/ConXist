@@ -13,6 +13,8 @@ const tool = (name: string, allowed = false, users: string[] = []): McpTool => (
   name, title: name, description: `About ${name}.`, readOnly: true, allowed,
   usedBy: users.map((agentName) => ({ agentId: agentName, agentName, where: 'DRAFT', archived: false })),
 });
+/** Without a Google OAuth client, the API offers no Gmail. */
+const KINDS = ['GITHUB', 'BITBUCKET'];
 const NAMES = ['search_code', 'get_file', 'list_issues', 'get_issue', 'get_pull_request'];
 const GITHUB: Integration = {
   id: ID, kind: 'GITHUB', name: 'GitHub', account: 'alex-acme', repositories: ['acme/api', 'acme/web'],
@@ -36,6 +38,7 @@ describe('Settings › Integrations', () => {
 
   it('connects GitHub with a fine-grained token, shows what it reaches, and adds the ticked tools', async () => {
     const calls = stubApi({
+      'GET /api/integrations/kinds': () => ({ body: KINDS }),
       'GET /api/integrations': () => ({ body: [] }),
       'POST /api/integrations/github/check': () => ({
         body: { account: 'alex-acme', repositories: ['acme/api', 'acme/web'], tools: NAMES.map((name) => tool(name)) },
@@ -84,6 +87,7 @@ describe('Settings › Integrations', () => {
 
   it('says why GitHub refused a token', async () => {
     stubApi({
+      'GET /api/integrations/kinds': () => ({ body: KINDS }),
       'GET /api/integrations': () => ({ body: [] }),
       'POST /api/integrations/github/check': () => ({ status: 422, body: { code: 'integration.github-token-refused', message: 'x' } }),
     });
@@ -100,6 +104,7 @@ describe('Settings › Integrations', () => {
   it('manages GitHub: ticks save at once, a used tool stays, and Remove names the agents that use it', async () => {
     const calls = stubApi({
       [`GET /api/integrations/${ID}`]: () => ({ body: GITHUB }),
+      'GET /api/integrations/kinds': () => ({ body: KINDS }),
       'GET /api/integrations': () => ({ body: [GITHUB] }),
       [`PUT /api/integrations/${ID}`]: (init) => {
         const allowed = (JSON.parse(String(init?.body)) as { allowedTools: string[] }).allowedTools;
@@ -136,6 +141,7 @@ describe('Settings › Integrations', () => {
       addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
     };
     const calls = stubApi({
+      'GET /api/integrations/kinds': () => ({ body: KINDS }),
       'GET /api/integrations': () => ({ body: [GITHUB] }),
       'POST /api/integrations/bitbucket/check': () => ({
         body: { account: 'alex@acme.test', repositories: ['acme/api', 'acme/mobile', 'acme/web'],
@@ -180,6 +186,7 @@ describe('Settings › Integrations', () => {
     };
     const calls = stubApi({
       'GET /api/integrations/88888888-8888-8888-8888-888888888888': () => ({ body: BITBUCKET }),
+      'GET /api/integrations/kinds': () => ({ body: KINDS }),
       'GET /api/integrations': () => ({ body: [BITBUCKET] }),
       'POST /api/integrations/88888888-8888-8888-8888-888888888888/reachable': () => ({
         body: { account: 'alex@acme.test', repositories: ['acme/api', 'acme/web'], tools: [] },
@@ -208,6 +215,7 @@ describe('Settings › Integrations', () => {
     let asked = 0;
     stubApi({
       'GET /api/integrations/88888888-8888-8888-8888-888888888888': () => ({ body: BITBUCKET }),
+      'GET /api/integrations/kinds': () => ({ body: KINDS }),
       'GET /api/integrations': () => ({ body: [BITBUCKET] }),
       'POST /api/integrations/88888888-8888-8888-8888-888888888888/reachable': () => (++asked === 1
         ? { status: 422, body: { code: 'integration.bitbucket-unreachable', message: 'x' } }
@@ -224,7 +232,7 @@ describe('Settings › Integrations', () => {
   });
 
   it('goes back from Connect Bitbucket to the list of what can be added', async () => {
-    stubApi({ 'GET /api/integrations': () => ({ body: [] }) });
+    stubApi({ 'GET /api/integrations/kinds': () => ({ body: KINDS }), 'GET /api/integrations': () => ({ body: [] }) });
     open('#/settings/integrations');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Add' }));

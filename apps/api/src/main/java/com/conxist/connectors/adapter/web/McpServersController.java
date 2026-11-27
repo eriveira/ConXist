@@ -1,9 +1,5 @@
 package com.conxist.connectors.adapter.web;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -18,7 +14,6 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,20 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 class McpServersController {
 
     private static final int MAX_ADDRESS = 2_000;
-
-    /** Shown in the sign-in window after the server sends the person back. Fixed text: nothing is echoed. */
-    private static final String DONE_PAGE = """
-            <!doctype html><html lang="en"><head><meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1"><title>ConXist</title></head>
-            <body style="font-family: system-ui, sans-serif; padding: 32px; line-height: 1.5">
-            <h1 style="font-size: 20px">Back to ConXist</h1>
-            <p>You can close this window. ConXist shows the result in the window you came from.</p>
-            <p lang="es">Puedes cerrar esta ventana. ConXist muestra el resultado en la ventana de la que viniste.</p>
-            <script>window.close()</script></body></html>
-            """;
-    /** Only the one inline script above may run on that page, and it may load nothing. */
-    private static final String DONE_PAGE_POLICY = "default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-"
-            + scriptHash("window.close()") + "'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
     private final ConnectMcpServer connect;
     private final ManageMcpServers servers;
@@ -82,12 +63,7 @@ class McpServersController {
             @RequestParam(required = false) @Size(max = 4096) String code,
             @RequestParam(required = false) @Size(max = 256) String error) {
         connect.finish(state, code, error);
-        return ResponseEntity.ok()
-                .contentType(MediaType.TEXT_HTML)
-                .cacheControl(CacheControl.noStore())
-                .header("Referrer-Policy", "no-referrer")
-                .header("Content-Security-Policy", DONE_PAGE_POLICY)
-                .body(DONE_PAGE);
+        return SignInDonePage.response();
     }
 
     @PostMapping
@@ -146,14 +122,5 @@ class McpServersController {
 
     private static <T> ResponseEntity<T> noStore(T body) {
         return ResponseEntity.status(HttpStatus.OK).cacheControl(CacheControl.noStore()).body(body);
-    }
-
-    private static String scriptHash(String script) {
-        try {
-            return Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256")
-                    .digest(script.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException(impossible);
-        }
     }
 }

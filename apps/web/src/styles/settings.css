@@ -156,3 +156,13 @@
 .repo-options { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; }
 .repo-options .check { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-height: 44px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); cursor: pointer; overflow-wrap: anywhere; }
 .repo-options input { width: 18px; height: 18px; flex: none; accent-color: var(--cx-action); }
+.label-choice { display: grid; gap: 10px; }
+.label-option { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); padding: 8px 14px 12px; min-width: 0; }
+.label-option.on { border-color: var(--cx-accent); }
+.label-choice { border: 0; margin: 0; padding: 0; min-width: 0; }
+.label-option .radio { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding-top: 12px; cursor: pointer; }
+.label-option .radio > span { min-width: 0; }
+.label-option .radio input { width: 18px; height: 18px; accent-color: var(--cx-accent); flex: none; margin: 2px 0 0; }
+.label-option > .hint { margin: 0 0 8px 28px; }
+.label-option .repo-picker { margin-top: 6px; }
+.gmail-wait { display: flex; align-items: center; gap: 10px; }

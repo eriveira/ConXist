@@ -6,7 +6,8 @@ import com.conxist.connectors.domain.InvalidIntegration;
 
 /**
  * What a credential must look like before ConXist sends it to the service, and how it is kept: GitHub's is its token
- * (ADR 0019); Bitbucket's is the person's Atlassian email and API token, kept together as one sealed value (ADR 0020).
+ * (ADR 0019); Bitbucket's is the person's Atlassian email and API token, kept together as one sealed value (ADR 0020);
+ * Gmail's is the refresh token Google gave when the person signed in (ADR 0021), never pasted.
  */
 public final class IntegrationCredentials {
 
@@ -28,6 +29,7 @@ public final class IntegrationCredentials {
         return switch (kind) {
             case GITHUB -> github(value);
             case BITBUCKET -> bitbucket(email == null ? "" : email.strip(), value);
+            case GMAIL -> throw new InvalidIntegration("gmail-sign-in-only", "Gmail connects with Sign in with Google.");
         };
     }
 

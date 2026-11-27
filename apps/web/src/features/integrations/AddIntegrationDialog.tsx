@@ -1,13 +1,17 @@
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
-import { INTEGRATION_KINDS, type IntegrationKind, KIND_NAMES, kindIcon } from '../../domain/integrations';
+import { type IntegrationKind, KIND_NAMES, kindIcon } from '../../domain/integrations';
 import { useT } from '../../i18n/i18n';
 import { McpLogo } from '../mcps/McpParts';
 
-/** What can be added (ADR 0020): each service once per workspace, so a connected one shows as connected. */
-export function AddIntegrationDialog({ connected, onPick, onClose }: {
-  connected: ReadonlySet<IntegrationKind>; onPick: (kind: IntegrationKind) => void; onClose: () => void;
+/**
+ * What can be added (ADR 0020): each service this ConXist offers, once per workspace, so a connected one shows as
+ * connected. Gmail is offered only once a Google OAuth client is set up (ADR 0021).
+ */
+export function AddIntegrationDialog({ kinds, connected, onPick, onClose }: {
+  kinds: readonly IntegrationKind[]; connected: ReadonlySet<IntegrationKind>; onPick: (kind: IntegrationKind) => void;
+  onClose: () => void;
 }) {
   const t = useT();
   return (
@@ -17,7 +21,7 @@ export function AddIntegrationDialog({ connected, onPick, onClose }: {
       footer={<><span className="grow" /><button type="button" className="btn" onClick={onClose}>{t('dialog.cancel')}</button></>}>
       <div className="m-body">
       <ul className="vendors kind-picker">
-        {INTEGRATION_KINDS.map((kind) => {
+        {kinds.map((kind) => {
           const done = connected.has(kind);
           return (
             <li key={kind} className="vendor-item">

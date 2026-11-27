@@ -36,7 +36,7 @@ export function SettingsPage({ workspace, onSaved }: { workspace: Workspace; onS
           {section === 'general' && <GeneralSection workspace={workspace} onSaved={onSaved} />}
           {section === 'llm' && <LlmProvidersSection />}
           {section === 'mcps' && <McpsSection />}
-          {section === 'integrations' && <IntegrationsSection />}
+          {section === 'integrations' && <IntegrationsSection workspaceName={workspace.name} />}
           {section === 'variables' && <VariablesSection />}
         </div>
       </div>

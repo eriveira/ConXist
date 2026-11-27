@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { Pill } from '../../components/Pill';
 import { type McpServer, type McpStatus, type McpTool, safeIcon } from '../../domain/mcps';
-import { BITBUCKET_ICON, GITHUB_ICON } from '../../domain/integrations';
+import { BITBUCKET_ICON, GMAIL_ICON, GITHUB_ICON } from '../../domain/integrations';
 import { useT } from '../../i18n/i18n';
 
 /** GitHub's mark (ADR 0019), drawn in the text color. */
@@ -9,15 +9,17 @@ const GITHUB_MARK = 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.
 
 /** Bitbucket's bucket (ADR 0020), drawn in the text color with its window cut out. */
 const BITBUCKET_MARK = 'M1.2 1.5h13.6a.5.5 0 0 1 .5.58l-2 12.3a.6.6 0 0 1-.6.5H3.3a.6.6 0 0 1-.6-.5L.7 2.08a.5.5 0 0 1 .5-.58ZM6.1 5.6l.6 4h2.6l.7-4Z';
+/** An envelope with an M cut out, in the text color: Gmail's shape without its colors. */
+const GMAIL_MARK = 'M1 3.6A1.6 1.6 0 0 1 2.6 2h.5L8 5.7 12.9 2h.5A1.6 1.6 0 0 1 15 3.6v8.8a1.6 1.6 0 0 1-1.6 1.6H12V6.4L8 9.4 4 6.4V14H2.6A1.6 1.6 0 0 1 1 12.4Z';
 
 /** The server's logo, or the first letter of its name when it gives none. Decorative: its name is beside it. */
 export function McpLogo({ name, icon, size = 'md' }: { name: string; icon: string | null; size?: 'sm' | 'md' }) {
   const [broken, setBroken] = useState<string | null>(null);
-  if (icon === GITHUB_ICON || icon === BITBUCKET_ICON) {
+  if (icon === GITHUB_ICON || icon === BITBUCKET_ICON || icon === GMAIL_ICON) {
     return (
       <span className={`mcp-logo ${size}`} aria-hidden="true">
         <svg viewBox="0 0 16 16" width="62%" height="62%" fill="currentColor" fillRule="evenodd" focusable="false">
-          <path d={icon === GITHUB_ICON ? GITHUB_MARK : BITBUCKET_MARK} />
+          <path d={icon === GITHUB_ICON ? GITHUB_MARK : icon === GMAIL_ICON ? GMAIL_MARK : BITBUCKET_MARK} />
         </svg>
       </span>
     );

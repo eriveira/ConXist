@@ -1,20 +1,36 @@
-/** Tools a workspace connects through their own API: GitHub (ADR 0019) and Bitbucket (ADR 0020). */
+/** Tools a workspace connects through their own API: GitHub (ADR 0019), Bitbucket (ADR 0020) and Gmail (ADR 0021). */
 
 import type { McpAgentUse, McpServer, McpStatus, McpTool } from './mcps';
 
-export type IntegrationKind = 'GITHUB' | 'BITBUCKET';
+export type IntegrationKind = 'GITHUB' | 'BITBUCKET' | 'GMAIL';
 
-/** What the Add menu offers, in this order. */
-export const INTEGRATION_KINDS: IntegrationKind[] = ['GITHUB', 'BITBUCKET'];
+/** Every kind, in the Add menu's order; the API says which this ConXist offers (Gmail needs a Google client). */
+export const INTEGRATION_KINDS: IntegrationKind[] = ['GITHUB', 'BITBUCKET', 'GMAIL'];
 
 /** The name people see. */
-export const KIND_NAMES: Record<IntegrationKind, string> = { GITHUB: 'GitHub', BITBUCKET: 'Bitbucket' };
+export const KIND_NAMES: Record<IntegrationKind, string> = { GITHUB: 'GitHub', BITBUCKET: 'Bitbucket', GMAIL: 'Gmail' };
+
+/** Gmail's labels stand where repositories do; this alone means all email but Spam and Trash. */
+export const ALL_MAIL = '*';
+
+/** A Google sign-in for Gmail being made: the refresh token never reaches the app. */
+export interface GmailSignIn {
+  id: string;
+  status: 'SIGNING_IN' | 'READY' | 'FAILED';
+  signInUrl: string | null;
+  account: string | null;
+  labels: string[] | null;
+  tools: McpTool[];
+  /** sign-in-refused, scope-refused or unreachable, when FAILED. */
+  error: string | null;
+}
 
 export interface Integration {
   id: string;
   kind: IntegrationKind;
   name: string;
   account: string;
+  /** For Gmail, the labels agents may read, or only {@link ALL_MAIL}. */
   repositories: string[];
   /** The token's last 4 characters. */
   tokenEnding: string;
@@ -54,9 +70,15 @@ export function githubTokenProblem(token: string): 'empty' | 'classic' | null {
 /** Stand for GitHub's and Bitbucket's marks, which the logo draws inline in the text color, so they show in both themes. */
 export const GITHUB_ICON = 'conxist:github';
 export const BITBUCKET_ICON = 'conxist:bitbucket';
+export const GMAIL_ICON = 'conxist:gmail';
 
 export function kindIcon(kind: IntegrationKind): string {
-  return kind === 'BITBUCKET' ? BITBUCKET_ICON : GITHUB_ICON;
+  return kind === 'BITBUCKET' ? BITBUCKET_ICON : kind === 'GMAIL' ? GMAIL_ICON : GITHUB_ICON;
+}
+
+/** Whether agents may read all of the mailbox but Spam and Trash, rather than some labels. */
+export function readsAllMail(integration: Pick<Integration, 'kind' | 'repositories'>): boolean {
+  return integration.kind === 'GMAIL' && integration.repositories.length === 1 && integration.repositories[0] === ALL_MAIL;
 }
 
 /** Atlassian account API tokens; Bitbucket's app passwords are being retired. */
