@@ -16,17 +16,16 @@
 .ws-button.open .ws-badge { background: var(--cx-surface-raised); }
 .ws-badge.lg { width: 32px; height: 32px; font-size: 15px; }
 .ws-menu { width: 320px; }
-.ws-top { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
-.ws-top .mname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ws-top .btn { flex: none; }
 .ws-list { list-style: none; margin: 0; padding: 0; max-height: min(360px, 60vh); overflow: auto; }
-.ws-list .mitem { min-height: 52px; }
+.ws-list .mitem { min-height: 44px; }
+.ws-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.mitem.current .ws-item-name { font-weight: 700; }
 .mitem.current { background: var(--cx-accent-soft); }
 .mitem.current .ws-badge { background: var(--cx-surface-raised); }
 .ws-check { color: var(--cx-accent-text); display: grid; }
 .menu-sep { height: 1px; background: var(--cx-border); margin: 8px 4px; }
 .ws-new { color: var(--cx-accent-text); font-weight: 700; min-height: 48px; }
-.ws-plus { display: grid; place-items: center; width: 32px; height: 32px; }
+.ws-plus { display: grid; place-items: center; width: 24px; height: 24px; }
 
 /* main menu */
 .main-nav { align-self: stretch; display: flex; align-items: stretch; gap: 4px; min-width: 0; }

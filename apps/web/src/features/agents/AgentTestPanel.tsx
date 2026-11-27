@@ -9,13 +9,17 @@ import { providerLabel, type Translate, useLanguage, useT } from '../../i18n/i18
 import type { MessageKey } from '../../i18n/messages';
 import { ApiError } from '../../api/client';
 import { problemMessage } from '../../i18n/problems';
-import { SOURCES_HREF } from '../../navigation';
 
 /** Why Run is off for now, if it is. */
 export type RunBlock = 'problems' | 'saving' | 'unsaved' | 'archived' | null;
 
 type Status = 'checking' | 'ready' | 'no-key' | 'error';
 type Meetings = { status: 'loading' } | { status: 'error' } | { status: 'ready'; groups: RunChoiceGroup[] };
+/** What a run reads: text pasted or read from a file for this run only, or a meeting ConXist keeps. */
+type Mode = 'text' | 'file' | 'meeting';
+type Given = { title: string; text: string };
+/** The most text one run takes, as the API checks it. */
+export const MAX_RUN_TEXT = 150_000;
 type Run = { status: 'idle' } | { status: 'running'; started: number } | { status: 'done'; result: TestRunResult }
   | { status: 'failed'; problem: unknown };
 
@@ -32,7 +36,8 @@ interface Props {
 }
 
 /**
- * The Test panel (ADR 0012): pick a meeting, run the saved draft once and see what it gives back, whether that has
+ * The Test panel (ADR 0012): paste text, read a text file, or pick a meeting when the workspace has some; run the saved
+ * draft once and see what it gives back, whether that has
  * the agent's shape, and what it did on the way. Nothing of a run is kept.
  */
 export function AgentTestPanel({ agentId, reads, givesBack, sources, block, provider }: Props) {
@@ -41,6 +46,9 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
   const [status, setStatus] = useState<Status>('checking');
   const [meetings, setMeetings] = useState<Meetings>({ status: 'loading' });
   const [picked, setPicked] = useState('');
+  const [mode, setMode] = useState<Mode>('text');
+  const [pasted, setPasted] = useState('');
+  const [file, setFile] = useState<Given | null>(null);
   const [run, setRun] = useState<Run>({ status: 'idle' });
   const pickId = useId();
   const language = useLanguage();
@@ -79,7 +87,7 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
   useEffect(() => {
     runCount.current += 1;
     setRun({ status: 'idle' });
-  }, [agentId, picked]);
+  }, [agentId, picked, mode]);
 
   const start = async () => {
     if (run.status === 'running') return;
@@ -87,7 +95,8 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
     const count = ++runCount.current;
     setRun({ status: 'running', started: Date.now() });
     try {
-      const result = await api.startTestRun(agentId, sourceId, meetingId);
+      const result = mode === 'meeting' ? await api.startTestRun(agentId, sourceId, meetingId)
+        : await api.startTestRunOnText(agentId, mode === 'file' && file ? file : { title: '', text: pasted });
       if (count === runCount.current) setRun({ status: 'done', result });
     } catch (problem) {
       if (count === runCount.current) setRun({ status: 'failed', problem });
@@ -95,7 +104,10 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
   };
 
   const running = run.status === 'running';
-  const canRun = status === 'ready' && meetings.status === 'ready' && picked !== '' && block === null;
+  const hasMeetings = meetings.status === 'ready' && meetings.groups.length > 0;
+  const given = mode === 'meeting' ? picked !== '' : mode === 'file' ? file !== null
+    : pasted.trim() !== '' && pasted.length <= MAX_RUN_TEXT;
+  const canRun = status === 'ready' && given && block === null;
 
   return (
     <div className="side-card test-card">
@@ -115,10 +127,26 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
         </div>
       )}
       {(status === 'ready' || status === 'no-key') && (
-        <MeetingPicker id={pickId} meetings={meetings} picked={picked} onPick={setPicked} disabled={running}
-          onRetry={loadMeetings} />
+        <>
+          <fieldset className="choice segmented test-modes">
+            <legend>{t('run.on')}</legend>
+            {(['text', 'file', ...(hasMeetings ? ['meeting' as const] : [])] as Mode[]).map((each) => (
+              <label key={each}>
+                <input type="radio" name={`${pickId}-mode`} checked={mode === each} disabled={running}
+                  onChange={() => setMode(each)} />
+                <span><b>{t(`run.on.${each}`)}</b></span>
+              </label>
+            ))}
+          </fieldset>
+          {mode === 'text' && <PastedText id={pickId} value={pasted} onChange={setPasted} disabled={running} />}
+          {mode === 'file' && <TextFile id={pickId} file={file} onFile={setFile} disabled={running} />}
+          {mode === 'meeting' && (
+            <MeetingPicker id={pickId} meetings={meetings} picked={picked} onPick={setPicked} disabled={running}
+              onRetry={loadMeetings} />
+          )}
+        </>
       )}
-      {status === 'ready' && meetings.status === 'ready' && meetings.groups.length > 0 && (
+      {status === 'ready' && (
         <>
           <p className="test-note"><Icon name="info" size={16} /> {providerName ? t('run.noteTo', { provider: providerName }) : t('run.note')}</p>
           {/* Kept focusable while it runs, so a keyboard user stays on it. */}
@@ -159,9 +187,6 @@ function MeetingPicker({ id, meetings, picked, onPick, disabled, onRetry }: {
       </p>
     );
   }
-  if (meetings.groups.length === 0) {
-    return <p className="test-empty">{t('run.meetings.empty')} <a href={SOURCES_HREF}>{t('run.meetings.add')}</a></p>;
-  }
   const date = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' });
   return (
     <div className="field test-pick">
@@ -177,6 +202,81 @@ function MeetingPicker({ id, meetings, picked, onPick, disabled, onRetry }: {
       </select>
     </div>
   );
+}
+
+/** Text pasted for this run only; it is sent once and not kept. */
+function PastedText({ id, value, onChange, disabled }: {
+  id: string; value: string; onChange: (value: string) => void; disabled: boolean;
+}) {
+  const t = useT();
+  const language = useLanguage();
+  const tooLong = value.length > MAX_RUN_TEXT;
+  const number = new Intl.NumberFormat(language);
+  return (
+    <div className="field test-pick">
+      <label htmlFor={`${id}-text`}>{t('run.text')}</label>
+      <textarea id={`${id}-text`} value={value} rows={6} disabled={disabled} placeholder={t('run.text.placeholder')}
+        aria-invalid={tooLong || undefined} aria-describedby={`${id}-text-hint`}
+        onChange={(event) => onChange(event.target.value)} />
+      <small id={`${id}-text-hint`} className={tooLong ? 'hint error' : 'hint'}>
+        {t(tooLong ? 'run.text.tooLong' : 'run.text.hint',
+          { count: number.format(value.length), max: number.format(MAX_RUN_TEXT) })}
+      </small>
+    </div>
+  );
+}
+
+/** A text file read in the browser for this run only: its text is sent, the file is not uploaded or kept. */
+function TextFile({ id, file, onFile, disabled }: {
+  id: string; file: Given | null; onFile: (file: Given | null) => void; disabled: boolean;
+}) {
+  const t = useT();
+  const language = useLanguage();
+  const [problem, setProblem] = useState<string | null>(null);
+  const number = new Intl.NumberFormat(language);
+
+  async function read(picked: File | undefined) {
+    setProblem(null);
+    onFile(null);
+    if (!picked) return;
+    if (!/\.(txt|md|markdown|vtt|srt)$/i.test(picked.name)) {
+      setProblem(t('run.file.kind'));
+      return;
+    }
+    let text: string;
+    try {
+      text = await textOf(picked);
+    } catch {
+      setProblem(t('run.file.unreadable'));
+      return;
+    }
+    if (text.trim() === '') setProblem(t('run.file.empty'));
+    else if (text.length > MAX_RUN_TEXT) setProblem(t('run.file.tooLong', { max: number.format(MAX_RUN_TEXT) }));
+    else onFile({ title: picked.name, text });
+  }
+
+  return (
+    <div className="field test-pick">
+      <label htmlFor={`${id}-file`}>{t('run.file')}</label>
+      <input id={`${id}-file`} type="file" accept=".txt,.md,.markdown,.vtt,.srt,text/plain,text/markdown,text/vtt"
+        disabled={disabled} aria-invalid={problem ? true : undefined} aria-describedby={`${id}-file-hint`}
+        onChange={(event) => void read(event.target.files?.[0])} />
+      <small id={`${id}-file-hint`} className={problem ? 'hint error' : 'hint'} role={problem ? 'alert' : undefined}>
+        {problem ?? (file ? t('run.file.read', { name: file.title, count: number.format(file.text.length) })
+          : t('run.file.hint'))}
+      </small>
+    </div>
+  );
+}
+
+/** A file's text, read with FileReader so older browsers without File.text() read it too. */
+function textOf(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
 }
 
 /** The running timer on the Run button, so a long run reads as working. */

@@ -260,6 +260,9 @@ export const api = {
   /** Runs the agent's saved draft once on one meeting; answers when the run is done. Nothing is kept. */
   startTestRun: (agentId: string, sourceId: string, meetingId: string) =>
     postJson<TestRunResult>(`${agentPath(agentId)}/test-runs`, { sourceId, meetingId }),
+  /** Runs on text given for this run only: pasted, or read from a file in the browser. Nothing of it is kept. */
+  startTestRunOnText: (agentId: string, given: { title: string; text: string }) =>
+    postJson<TestRunResult>(`${agentPath(agentId)}/test-runs`, given),
   sync: (sourceId: string) => request<SyncResult>(`/api/sources/${sourceId}/sync`, { method: 'POST' }),
 };
 

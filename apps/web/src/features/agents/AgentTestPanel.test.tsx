@@ -43,9 +43,10 @@ describe('AgentTestPanel', () => {
     const calls = api();
     const { container } = render(panel());
 
+    await userEvent.click(await screen.findByRole('radio', { name: 'A meeting' }));
     const meeting = await screen.findByRole('combobox', { name: 'Meeting' });
     expect(within(meeting).getByRole('option', { name: /Weekly sync/ })).toBeInTheDocument();
-    expect(screen.getByText(/The meeting is sent to OpenAI \(GPT\) to run the model/)).toBeInTheDocument();
+    expect(screen.getByText(/What it runs on is sent to OpenAI \(GPT\) to run the model/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     expect(await screen.findByText('Done. This is what it gives back.')).toBeInTheDocument();
@@ -79,16 +80,46 @@ describe('AgentTestPanel', () => {
     expect(screen.getByText('Fix what the page lists, then run a test.')).toBeInTheDocument();
   });
 
-  it('points to Sources when there is no meeting to run on', async () => {
-    api({ [`GET /api/sources/${SOURCE.id}/documents`]: () => ({ body: [] }) });
+  it('runs on pasted text, and offers no meeting when the workspace has none', async () => {
+    const calls = api({ [`GET /api/sources/${SOURCE.id}/documents`]: () => ({ body: [] }) });
+    const { container } = render(panel());
+    const run = await screen.findByRole('button', { name: 'Run' });
+    expect(screen.getByRole('radio', { name: 'Pasted text' })).toBeChecked();
+    expect(screen.queryByRole('radio', { name: 'A meeting' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(run).toBeDisabled();
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Text to run on' }), 'Ana: export does nothing.');
+    await userEvent.click(run);
+
+    expect(await screen.findByText('Done. This is what it gives back.')).toBeInTheDocument();
+    expect(JSON.parse(String(calls.find((call) => call.key === `POST /api/agents/${ID}/test-runs`)?.init?.body)))
+      .toEqual({ title: '', text: 'Ana: export does nothing.' });
+    expect(await accessibilityViolations(container)).toEqual([]);
+  });
+
+  it('reads a text file for the run only, and says when a file cannot be used', async () => {
+    const calls = api();
     render(panel());
-    expect(await screen.findByRole('link', { name: 'Go to Sources' })).toHaveAttribute('href', '#/sources');
-    expect(screen.queryByRole('button', { name: 'Run' })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('radio', { name: 'A text file' }));
+    const input = screen.getByLabelText('Text file');
+
+    await userEvent.upload(input, new File(['%PDF'], 'notes.pdf', { type: 'application/pdf' }), { applyAccept: false });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Pick a .txt, .md, .vtt or .srt file.');
+    expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled();
+
+    await userEvent.upload(input, new File(['Ana: guest checkout'], 'sync.md', { type: 'text/markdown' }));
+    expect(await screen.findByText('sync.md: 19 characters, ready to run.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Run' }));
+    expect(await screen.findByText('Done. This is what it gives back.')).toBeInTheDocument();
+    expect(JSON.parse(String(calls.find((call) => call.key === `POST /api/agents/${ID}/test-runs`)?.init?.body)))
+      .toEqual({ title: 'sync.md', text: 'Ana: guest checkout' });
   });
 
   it('says why a run was refused, and stopped runs say which limit', async () => {
     api({ [`POST /api/agents/${ID}/test-runs`]: () => ({ status: 422, body: { code: 'run.model-key-rejected' } }) });
     const { unmount } = render(panel());
+    await userEvent.click(await screen.findByRole('radio', { name: 'A meeting' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Run' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('OpenAI (GPT) refused this workspace’s key');
     unmount();
@@ -96,6 +127,7 @@ describe('AgentTestPanel', () => {
     api({ [`POST /api/agents/${ID}/test-runs`]: () => ({ body: { ...RESULT, outcome: 'TOOL_LIMIT', answer: null,
       structured: null, matchesShape: null } }) });
     render(panel());
+    await userEvent.click(await screen.findByRole('radio', { name: 'A meeting' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Run' }));
     expect(await screen.findByText(/reached the Tool calls limit/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Answer' })).not.toBeInTheDocument();
@@ -105,7 +137,8 @@ describe('AgentTestPanel', () => {
     api({ [`POST /api/agents/${ID}/test-runs`]: () => ({ body: { ...RESULT, answer: 'Just some words', structured: null,
       matchesShape: false } }) });
     render(panel());
-    await userEvent.click(await screen.findByRole('button', { name: 'Run' }));
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Text to run on' }), 'Notes');
+    await userEvent.click(screen.getByRole('button', { name: 'Run' }));
     expect(await screen.findByText('Does not match Requirements')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'What the model wrote' })).toHaveTextContent('Just some words');
   });

@@ -21,7 +21,7 @@ import com.conxist.runs.domain.RunOutcome;
 import com.conxist.runs.domain.RunPrompt;
 
 /**
- * Runs an agent's draft once on a meeting the person picked (ADR 0012). The loop, not the prompt, keeps the agent's
+ * Runs an agent's draft once on a meeting the person picked, or on text they pasted or read from a file (ADR 0012). The loop, not the prompt, keeps the agent's
  * limits: model turns, tool calls and time. The run only reads; its answer is returned, never kept.
  */
 public final class StartTestRun {
@@ -57,6 +57,33 @@ public final class StartTestRun {
     }
 
     public TestRunResult run(UUID agentId, UUID sourceId, UUID meetingId) {
+        AgentBrief agent = runnable(agentId);
+        LlmProviders.Call call = providers.callFor(agent).orElseThrow(StartTestRun::notReady);
+        MeetingLibrary.Text meeting = library.read(sourceId, meetingId)
+                .orElseThrow(() -> new NotFound("run.meeting-not-found", "This meeting is no longer in ConXist."));
+        return new Loop(agent, meeting, call).run();
+    }
+
+    /**
+     * Runs on text the person gave for this run only: it is not kept, has no id, and tools cannot read it again. It is
+     * marked as data like a meeting.
+     */
+    public TestRunResult runOnText(UUID agentId, String title, String text) {
+        if (text == null || text.isBlank()) {
+            throw new RuleViolation("run.text-empty", "Paste the text to run on, or pick a file.");
+        }
+        if (text.length() > RunPrompt.MAX_TEXT_CHARACTERS) {
+            throw new RuleViolation("run.text-too-long",
+                    "The text is longer than " + RunPrompt.MAX_TEXT_CHARACTERS + " characters.");
+        }
+        AgentBrief agent = runnable(agentId);
+        LlmProviders.Call call = providers.callFor(agent).orElseThrow(StartTestRun::notReady);
+        String named = title == null || title.isBlank() ? "Pasted text" : title.strip();
+        return new Loop(agent, new MeetingLibrary.Text(null, null, named, null, text), call).run();
+    }
+
+    /** The agent's draft, when it can run now. */
+    private AgentBrief runnable(UUID agentId) {
         AgentBrief agent = agents.draft(agentId)
                 .orElseThrow(() -> new NotFound("agent.not-found", "This agent no longer exists."));
         if (agent.archived()) {
@@ -73,10 +100,7 @@ public final class StartTestRun {
         if (!agent.problems().isEmpty()) {
             throw notReady();
         }
-        LlmProviders.Call call = providers.callFor(agent).orElseThrow(StartTestRun::notReady);
-        MeetingLibrary.Text meeting = library.read(sourceId, meetingId)
-                .orElseThrow(() -> new NotFound("run.meeting-not-found", "This meeting is no longer in ConXist."));
-        return new Loop(agent, meeting, call).run();
+        return agent;
     }
 
     private static RuleViolation notReady() {

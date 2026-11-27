@@ -8,9 +8,6 @@ export const shellEn = {
 
   'workspace.switch': 'Workspace: {name}. Switch workspace',
   'workspace.menu': 'Your workspaces',
-  'workspace.sources': '{count} sources',
-  'workspace.sources_one': '1 source',
-  'workspace.noSources': 'No sources yet',
   'workspace.new': 'New workspace',
   'workspace.new.subtitle': 'Sources and captures stay separate in each workspace.',
   'workspace.first.title': 'Create your workspace',
@@ -51,9 +48,6 @@ export const shellEs: Record<keyof typeof shellEn, string> = {
 
   'workspace.switch': 'Espacio de trabajo: {name}. Cambiar de espacio',
   'workspace.menu': 'Tus espacios de trabajo',
-  'workspace.sources': '{count} fuentes',
-  'workspace.sources_one': '1 fuente',
-  'workspace.noSources': 'Aún sin fuentes',
   'workspace.new': 'Nuevo espacio',
   'workspace.new.subtitle': 'Las fuentes y lo capturado quedan separados en cada espacio.',
   'workspace.first.title': 'Crea tu espacio de trabajo',

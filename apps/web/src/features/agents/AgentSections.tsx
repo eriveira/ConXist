@@ -12,7 +12,7 @@ import { unknownVariables, type Variable } from '../../domain/variables';
 import { characterCount } from '../../domain/workspaces';
 import { type Translate, toolDescription, toolLabel, useT } from '../../i18n/i18n';
 import { MESSAGES, type MessageKey } from '../../i18n/messages';
-import { SOURCES_HREF, settingsHref } from '../../navigation';
+import { settingsHref } from '../../navigation';
 import type { Choices } from './AgentPage';
 import { AgentMcpTools } from './AgentMcpTools';
 import { AgentModelPicker } from './AgentModelPicker';
@@ -240,7 +240,7 @@ function Knowledge({ draft, sources, onChange }: Pick<AgentSectionsProps, 'draft
   return (
     <>
       {sources.length === 0 ? (
-        <p className="muted">{t('agent.knowledge.none')} <a href={SOURCES_HREF}>{t('agent.knowledge.addSource')}</a></p>
+        <p className="muted">{t('agent.knowledge.none')}</p>
       ) : (
         <div className="choice">
           {sources.map((source) => {

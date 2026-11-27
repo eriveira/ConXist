@@ -1,7 +1,6 @@
 /** The words of a workspace's Settings: General, LLM providers, Connectors and Topics. */
 export const settingsEn = {
   'settings.open': 'Settings',
-  'workspace.switchTo': 'Switch workspace',
   'settings.title': 'Settings',
   'settings.lead': '{name}: set it up once, and every agent and source in this workspace uses it.',
   'settings.sections': 'Settings sections',
@@ -135,7 +134,6 @@ export const settingsEn = {
 
 export const settingsEs: Record<keyof typeof settingsEn, string> = {
   'settings.open': 'Ajustes',
-  'workspace.switchTo': 'Cambiar de espacio',
   'settings.title': 'Ajustes',
   'settings.lead': '{name}: configúralo una vez y cada agente y fuente de este espacio lo usa.',
   'settings.sections': 'Secciones de ajustes',

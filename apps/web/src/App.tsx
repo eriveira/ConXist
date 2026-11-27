@@ -71,7 +71,7 @@ function Workspaces(settings: SettingsProps) {
     setNewOpen(false);
     created(workspace);
     setNotice(t('workspace.created', { name: workspace.name }));
-    go('sources');
+    go('agents');
   }
 
   if (state.status === 'loading') {

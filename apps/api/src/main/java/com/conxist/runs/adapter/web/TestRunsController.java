@@ -1,10 +1,11 @@
 package com.conxist.runs.adapter.web;
 
 import java.util.UUID;
+import com.conxist.platform.RuleViolation;
 import com.conxist.runs.application.StartTestRun;
 import com.conxist.runs.application.TestRunResult;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,10 +30,23 @@ class TestRunsController {
 
     @PostMapping("/api/agents/{agentId}/test-runs")
     TestRunResult run(@PathVariable UUID agentId, @Valid @RequestBody RunRequest request) {
+        if (request.text() != null) {
+            return startTestRun.runOnText(agentId, request.title(), request.text());
+        }
+        if (request.sourceId() == null || request.meetingId() == null) {
+            throw new RuleViolation("run.nothing-to-run-on", "Pick a meeting, or give the text to run on.");
+        }
         return startTestRun.run(agentId, request.sourceId(), request.meetingId());
     }
 
-    record RunRequest(@NotNull UUID sourceId, @NotNull UUID meetingId) {
+    /** A meeting ConXist keeps, by its source and id; or text given for this run only, with an optional title. */
+    record RunRequest(UUID sourceId, UUID meetingId, @Size(max = 200) String title, @Size(max = 150_000) String text) {
+
+        @Override
+        public String toString() {
+            return "RunRequest[sourceId=" + sourceId + ", meetingId=" + meetingId + ", text=" + (text == null ? "none"
+                    : text.length() + " characters") + "]";
+        }
     }
 
     record Status(boolean ready) {

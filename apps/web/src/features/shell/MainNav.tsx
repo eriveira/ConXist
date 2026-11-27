@@ -5,10 +5,10 @@ import type { MessageKey } from '../../i18n/messages';
 import { hrefOf, PAGES, type Page, type RoutePage } from './useRoute';
 
 const ICONS: Record<Page, IconName> = {
-  home: 'home', agents: 'agents', skills: 'skill', sources: 'sources',
+  home: 'home', agents: 'agents', skills: 'skill',
 };
 
-/** Home, Agents, Skills, Sources. The current page is underlined. */
+/** Home, Agents, Skills. The current page is underlined. */
 export function MainNav({ page }: { page: RoutePage }) {
   const t = useT();
   const navRef = useRef<HTMLElement>(null);
