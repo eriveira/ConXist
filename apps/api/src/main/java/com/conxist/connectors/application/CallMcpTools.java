@@ -74,7 +74,7 @@ public final class CallMcpTools implements McpToolbox {
                 McpTool tool = integration.tool(pick.tool()).orElseThrow();
                 String name = McpToolNames.forModel(integration.name(), tool.name(), taken);
                 taken.add(name);
-                offered.add(new OfferedTool(pick, name, tool.description(), tool.inputSchema()));
+                offered.add(new OfferedTool(pick, name, tool.description(), tool.inputSchema(), !tool.readOnly()));
                 continue;
             }
             McpServer server = byId.get(pick.serverId());
@@ -84,7 +84,7 @@ public final class CallMcpTools implements McpToolbox {
             McpTool tool = server.tool(pick.tool()).orElseThrow();
             String name = McpToolNames.forModel(server.name(), tool.name(), taken);
             taken.add(name);
-            offered.add(new OfferedTool(pick, name, description(server, tool), tool.inputSchema()));
+            offered.add(new OfferedTool(pick, name, description(server, tool), tool.inputSchema(), !tool.readOnly()));
         }
         return List.copyOf(offered);
     }

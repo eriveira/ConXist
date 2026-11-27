@@ -38,6 +38,7 @@ export const LLM_PROVIDERS: LlmProviders = {
       { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' },
       { id: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
     ],
+    defaultModel: { provider: 'anthropic', model: 'claude-sonnet-5-5', effort: 'MEDIUM' },
   }],
   defaultForNewAgents: { provider: 'anthropic', model: 'claude-sonnet-5-5', effort: 'MEDIUM' },
 };

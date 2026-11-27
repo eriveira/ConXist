@@ -45,7 +45,10 @@ public final class HttpMcpGateway implements McpGateway {
     private static final int MAX_ICON_BYTES = 100 * 1024;
     private static final Pattern DATA_ICON =
             Pattern.compile("data:(image/(?:png|jpeg|webp|svg\\+xml));base64,([A-Za-z0-9+/=]+)");
-    private static final Set<String> ICON_TYPES = Set.of("image/png", "image/jpeg", "image/webp", "image/svg+xml");
+    private static final Set<String> ICON_TYPES = Set.of("image/png", "image/jpeg", "image/webp", "image/svg+xml",
+            "image/x-icon", "image/vnd.microsoft.icon");
+    /** Where sites keep their icon, most useful first. */
+    private static final List<String> SITE_ICON_PATHS = List.of("/apple-touch-icon.png", "/favicon.ico");
 
     private final RestClient http;
     private final AddressGuard guard;
@@ -95,8 +98,9 @@ public final class HttpMcpGateway implements McpGateway {
             }
         }
         log.info("MCP server on {} listed {} tools", address.getHost(), tools.size());
-        return new ServerFacts(text(info.path("name"), 200), text(info.path("title"), 200), icon(info.path("icons")),
-                List.copyOf(tools));
+        String icon = icon(info.path("icons"));
+        return new ServerFacts(text(info.path("name"), 200), text(info.path("title"), 200),
+                icon != null ? icon : siteIcon(address), List.copyOf(tools));
     }
 
     @Override
@@ -216,6 +220,47 @@ public final class HttpMcpGateway implements McpGateway {
             }
         }
         return null;
+    }
+
+    /**
+     * The site's own icon, for a server that names no logo: the touch icon, then the favicon, on the server's host and
+     * then on its parent domain (mcp.acme.com, then acme.com). Each address passes the same guard as the server's, is
+     * read only when it is a small image, and no redirect is followed. Null when none is found.
+     */
+    private String siteIcon(URI address) {
+        for (URI candidate : siteIconAddresses(address)) {
+            try {
+                String found = fetched(candidate.toString());
+                if (found != null) {
+                    return found;
+                }
+            } catch (RuntimeException unusable) {
+                log.debug("No site icon at a candidate address: {}", unusable.getClass().getSimpleName());
+            }
+        }
+        return null;
+    }
+
+    static List<URI> siteIconAddresses(URI address) {
+        String host = address.getHost();
+        if (host == null) {
+            return List.of();
+        }
+        List<String> hosts = new ArrayList<>(List.of(host));
+        String[] labels = host.split("\\.");
+        boolean name = labels.length >= 3 && !host.matches("[0-9.]+") && !host.contains(":");
+        if (name) {
+            hosts.add(host.substring(host.indexOf('.') + 1));
+        }
+        String origin = address.getScheme() + "://";
+        String port = address.getPort() < 0 ? "" : ":" + address.getPort();
+        List<URI> addresses = new ArrayList<>();
+        for (String each : hosts) {
+            for (String path : SITE_ICON_PATHS) {
+                addresses.add(URI.create(origin + each + port + path));
+            }
+        }
+        return addresses;
     }
 
     private static String dataIcon(String src) {

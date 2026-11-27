@@ -160,9 +160,42 @@ class LlmProvidersTest {
 
     @Test
     void a_saved_default_that_can_no_longer_run_falls_back_to_where_the_settings_start_new_agents() {
-        defaults.saved.put(FixedWorkspace.standard().id(),
-                new ModelStart("anthropic", "claude-retired", ModelChoice.Effort.LOW));
+        defaults.saved.put("anthropic", new ModelStart("anthropic", "claude-retired", ModelChoice.Effort.LOW));
 
+        assertThat(providers.start().model()).isEqualTo(TestModels.SONNET);
+    }
+
+    @Test
+    void each_provider_keeps_its_own_default_and_new_agents_start_on_the_provider_picked() {
+        TestPort openAi = new TestPort("openai");
+        LlmProviders two = new LlmProviders(TestModels.catalog(), List.of(anthropic, openAi), defaults, allowed,
+                TestModels.lists(), keys, FixedWorkspace.standard(), TestClock.fixed());
+        computerKeys.put("openai", new ApiKey("sk-openai-computer-0001"));
+        assertCode(() -> two.startNewAgentsOn("openai"), "model.unavailable");
+        allowed.save(FixedWorkspace.standard().id(), new AllowedModelsRepository.Choice("openai",
+                new ProviderModel("gpt-5.5", "GPT-5.5"), true), TestClock.NOW);
+
+        assertThat(two.view().providers()).extracting(LlmProviders.ProviderView::defaultModel).containsExactly(
+                new ModelStart("anthropic", TestModels.SONNET, ModelChoice.Effort.MEDIUM),
+                new ModelStart("openai", "gpt-5.5", ModelChoice.Effort.MEDIUM));
+        two.setDefault("anthropic", TestModels.OPUS, "HIGH");
+        two.setDefault("openai", "gpt-5.5", "LOW");
+        assertThat(two.start()).isEqualTo(new AgentModels.Start("anthropic", TestModels.OPUS, "HIGH"));
+
+        LlmProviders.View view = two.startNewAgentsOn("openai");
+
+        assertThat(view.defaultForNewAgents()).isEqualTo(new ModelStart("openai", "gpt-5.5", ModelChoice.Effort.LOW));
+        assertThat(view.providers().get(0).defaultModel().model()).isEqualTo(TestModels.OPUS);
+        computerKeys.remove("openai");
+        assertThat(two.start()).isEqualTo(new AgentModels.Start("anthropic", TestModels.OPUS, "HIGH"));
+        assertCode(() -> two.startNewAgentsOn("mistral"), "provider.unknown");
+    }
+
+    @Test
+    void a_provider_that_allows_no_model_has_no_default() {
+        TestModels.catalog().models().forEach(m -> tick(new ProviderModel(m.id(), m.label()), false));
+
+        assertThat(providers.view().providers().get(0).defaultModel()).isNull();
         assertThat(providers.start().model()).isEqualTo(TestModels.SONNET);
     }
 

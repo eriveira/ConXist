@@ -10,7 +10,7 @@ import { McpLogo } from '../mcps/McpParts';
 
 /**
  * The tools of the workspace's MCP servers and integrations that agents may use, one group per server (ADR 0017,
- * ADR 0019). A pick the workspace
+ * ADR 0019). Tools that change things carry a label: the workspace allowed them after a warning. A pick the workspace
  * no longer allows shows as a problem with a way to remove it. Descriptions come from the server: shown as text.
  */
 export function AgentMcpTools({ draft, servers, onChange }: {
@@ -43,7 +43,9 @@ export function AgentMcpTools({ draft, servers, onChange }: {
                   <b className="mono">{tool.name}</b>
                   {(tool.description || tool.title) && <small>{tool.description || tool.title}</small>}
                 </span>
-                <Pill tone="live">{t('agent.tool.readOnly')}</Pill>
+                {tool.readOnly
+                  ? <Pill tone="live">{t('agent.tool.readOnly')}</Pill>
+                  : <Pill tone="preview">{t('mcp.tool.changes')}</Pill>}
               </label>
             );
           })}

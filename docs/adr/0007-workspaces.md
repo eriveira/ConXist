@@ -3,6 +3,7 @@
 - Status: **Proposed** (needs the owner's go before migration V8 is applied anywhere shared)
 - Date: 2026-11-19
 - Decided by: Eugenio Riviera (workspace setup mock approved, "build it", project thread, 2026-11-19)
+- Changed by: ADR 0022 (2026-11-27): a workspace can be deleted by typing its name; Sources leaves the menu.
 
 ## Context
 

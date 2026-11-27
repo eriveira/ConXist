@@ -19,9 +19,11 @@ export function AgentModelPicker({ value, providers, onChange }: {
   const gone = value !== null && !modelAvailable(providers, value);
   const effort = value?.effort ?? providers.defaultForNewAgents.effort;
 
+  /** An agent that switches provider starts on that provider's default model and effort. */
   function pickProvider(id: string) {
     const next = connected.find((each) => each.id === id);
-    if (next?.models[0]) onChange({ provider: next.id, model: next.models[0].id, effort });
+    if (next?.defaultModel) onChange(next.defaultModel);
+    else if (next?.models[0]) onChange({ provider: next.id, model: next.models[0].id, effort });
   }
 
   return (

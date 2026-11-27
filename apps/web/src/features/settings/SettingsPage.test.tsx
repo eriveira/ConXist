@@ -25,7 +25,7 @@ const COMPANY = { id: 'v1', name: 'company_name', value: 'Acme Inc.' };
 
 function open(section: string) {
   window.location.hash = section;
-  return render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} />);
+  return render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} canDelete onDeleted={vi.fn()} />);
 }
 
 describe('SettingsPage', () => {
@@ -34,7 +34,7 @@ describe('SettingsPage', () => {
     window.location.hash = '';
   });
 
-  it('lists each model with who uses it at what effort, and saves where new agents start', async () => {
+  it('lists each model with who uses it at what effort, and saves the provider\'s default model', async () => {
     const calls = stubApi({
       'GET /api/llm-providers': () => ({ body: LLM_PROVIDERS }),
       'GET /api/llm-providers/anthropic/models': () => ({ body: OFFERED }),
@@ -43,23 +43,30 @@ describe('SettingsPage', () => {
         agent('Analyst', { provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' }),
       ] }),
       'PUT /api/llm-providers/default': (init) => ({
-        body: { ...LLM_PROVIDERS, defaultForNewAgents: JSON.parse(String(init?.body)) },
+        body: { ...LLM_PROVIDERS, providers: [{ ...ANTHROPIC, defaultModel: JSON.parse(String(init?.body)) }] },
       }),
     });
     const { container } = open('#/settings/llm');
 
-    const model = await screen.findByRole('combobox', { name: 'Model for new agents' });
+    const model = await screen.findByRole('combobox', { name: 'Anthropic default model' });
+    await screen.findByText('3 allowed of 4');
+    expect(screen.queryByRole('checkbox', { name: 'Claude Haiku 5.5' })).not.toBeInTheDocument();
+    const list = screen.getByRole('button', { name: 'Anthropic models' });
+    expect(list).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(list);
+    expect(list).toHaveAttribute('aria-expanded', 'true');
     await screen.findByRole('checkbox', { name: 'Claude Haiku 5.5' });
     expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /Claude Haiku 5.5/ })).toHaveTextContent('Topic classifier (low)');
     expect(screen.getByRole('row', { name: /Claude Opus 5.5/ })).toHaveTextContent('Analyst (high)');
     expect(screen.getByRole('row', { name: /Claude Sonnet 5.5/ })).toHaveTextContent('No agents yet');
     expect(screen.queryByText(/More providers/)).not.toBeInTheDocument();
-    expect(model).toHaveValue('anthropic/claude-sonnet-5-5');
+    expect(model).toHaveValue('claude-sonnet-5-5');
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 
-    await userEvent.selectOptions(model, 'anthropic/claude-opus-5-5');
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Effort for new agents' }), 'HIGH');
+    await userEvent.selectOptions(model, 'claude-opus-5-5');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Anthropic default effort' }), 'HIGH');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('Saved')).toBeInTheDocument();
@@ -86,12 +93,13 @@ describe('SettingsPage', () => {
     });
     const { container } = open('#/settings/llm');
 
+    await userEvent.click(await screen.findByRole('button', { name: 'Anthropic models' }));
     const fable = await screen.findByRole('checkbox', { name: 'Claude Fable 5.2' });
-    expect(screen.getByText('Offered: 4. Allowed: 3.')).toBeInTheDocument();
+    expect(screen.getByText('3 allowed of 4')).toBeInTheDocument();
     expect(fable).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Claude Haiku 5.5' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Claude Haiku 5.5' })).toHaveAccessibleDescription(/Agents run on it/);
-    expect(screen.getByRole('checkbox', { name: 'Claude Sonnet 5.5' })).toHaveAccessibleDescription(/New agents start on it/);
+    expect(screen.getByRole('checkbox', { name: 'Claude Sonnet 5.5' })).toHaveAccessibleDescription(/this provider’s default/);
     expect(await accessibilityViolations(container)).toEqual([]);
 
     await userEvent.click(fable);
@@ -110,12 +118,13 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('An agent runs on this model now.', { exact: false })).not.toBeInTheDocument();
   });
 
-  it('shows OpenAI beside Anthropic, connects it with its own key, and groups the default by provider', async () => {
-    const openAiOff = { id: 'openai', connected: false, connection: { ...NO_KEY }, models: [] };
+  it('shows OpenAI beside Anthropic, connects it with its own key, and picks the provider new agents start on', async () => {
+    const openAiOff = { id: 'openai', connected: false, connection: { ...NO_KEY }, models: [], defaultModel: null };
     const openAiOn = {
       id: 'openai', connected: true,
       connection: { source: 'WORKSPACE' as const, keyEnding: 'k2Mw', addedAt: '2026-11-27T01:00:00Z', checkedAt: '2026-11-27T01:00:00Z', refused: false },
       models: [{ id: 'gpt-5.2', label: 'GPT-5.2' }],
+      defaultModel: { provider: 'openai', model: 'gpt-5.2', effort: 'MEDIUM' as const },
     };
     let connected = false;
     const calls = stubApi({
@@ -130,6 +139,9 @@ describe('SettingsPage', () => {
         connected = true;
         return { body: openAiOn };
       },
+      'PUT /api/llm-providers/new-agents': () => ({ body: {
+        providers: [ANTHROPIC, openAiOn], defaultForNewAgents: openAiOn.defaultModel,
+      } }),
     });
     const { container } = open('#/settings/llm');
 
@@ -146,13 +158,17 @@ describe('SettingsPage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Check and connect' }));
 
     expect(await screen.findByRole('heading', { name: 'OpenAI models' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'OpenAI models' }));
     expect(await screen.findByText(/Image, audio, speech and embedding models are left out/)).toBeInTheDocument();
     expect(await screen.findByRole('checkbox', { name: 'GPT-5.2 mini' })).not.toBeChecked();
     expect(calls.some((call) => call.key === 'PUT /api/llm-providers/openai/key')).toBe(true);
-    const model = await screen.findByRole('combobox', { name: 'Model for new agents' });
-    expect(within(model).getByRole('group', { name: 'Anthropic' })).toBeInTheDocument();
-    expect(within(within(model).getByRole('group', { name: 'OpenAI' })).getByRole('option', { name: 'GPT-5.2' }))
-      .toHaveValue('openai/gpt-5.2');
+    const model = await screen.findByRole('combobox', { name: 'OpenAI default model' });
+    expect(within(model).getByRole('option', { name: 'GPT-5.2' })).toHaveValue('gpt-5.2');
+    expect(screen.getByRole('combobox', { name: 'Anthropic default model' })).toHaveValue('claude-sonnet-5-5');
+    expect(screen.getByRole('radio', { name: 'New agents start on Anthropic' })).toBeChecked();
+    await userEvent.click(screen.getByRole('radio', { name: 'New agents start on OpenAI' }));
+    expect(await screen.findByRole('radio', { name: 'New agents start on OpenAI' })).toBeChecked();
+    expect(calls.find((call) => call.key === 'PUT /api/llm-providers/new-agents')?.init?.body).toBe('{"provider":"openai"}');
     expect(await accessibilityViolations(container)).toEqual([]);
   });
 
@@ -174,7 +190,7 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText('Not connected')).toBeInTheDocument();
     expect(screen.getByText(/Connect a provider to see its models/)).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Model for new agents' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Anthropic default model' })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
     const dialog = screen.getByRole('dialog', { name: 'Connect Anthropic' });
@@ -191,7 +207,7 @@ describe('SettingsPage', () => {
     await userEvent.type(field, 'sk-ant-good-key{Enter}');
     expect(await screen.findByText(/Key ending 3fQa/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(await screen.findByRole('combobox', { name: 'Model for new agents' })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: 'Anthropic default model' })).toBeInTheDocument();
     expect(calls.filter((call) => call.key === 'PUT /api/llm-providers/anthropic/key')).toHaveLength(2);
   });
 
@@ -344,5 +360,37 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText(/has 100 variables, the most it can keep/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+  });
+
+  it('deletes the workspace only once its name is typed exactly, and keeps the only workspace', async () => {
+    const onDeleted = vi.fn();
+    const calls = stubApi({
+      'DELETE /api/workspaces/w1': (init) => (JSON.parse(String(init?.body)).name === 'Acme Product'
+        ? { status: 204, body: null } : { status: 422, body: { code: 'workspace.name-mismatch' } }),
+    });
+    window.location.hash = '#/settings';
+    const { container, unmount } = render(
+      <SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} canDelete onDeleted={onDeleted} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete workspace…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Acme Product?' });
+    const field = within(dialog).getByLabelText('Type Acme Product to confirm');
+    const remove = within(dialog).getByRole('button', { name: 'Delete workspace' });
+    expect(field).toHaveFocus();
+    expect(remove).toBeDisabled();
+    await userEvent.type(field, 'acme product');
+    expect(remove).toBeDisabled();
+    expect(await accessibilityViolations(container)).toEqual([]);
+
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Acme Product{Enter}');
+
+    await vi.waitFor(() => expect(onDeleted).toHaveBeenCalledWith(WORKSPACE));
+    expect(calls.filter((call) => call.key === 'DELETE /api/workspaces/w1')).toHaveLength(1);
+    unmount();
+
+    render(<SettingsPage workspace={WORKSPACE} onSaved={vi.fn()} canDelete={false} onDeleted={onDeleted} />);
+    expect(screen.getByRole('button', { name: 'Delete workspace…' })).toBeDisabled();
+    expect(screen.getByText(/is your only workspace, so it stays/)).toBeInTheDocument();
   });
 });

@@ -11,7 +11,9 @@ import java.util.regex.Pattern;
  * are untrusted text: shown to the person and sent to a model as the tool's description, never followed.
  *
  * @param readOnly true only when the server marks the tool {@code readOnlyHint}; an unmarked tool may change things
- * @param allowed  whether the workspace lets agents use it; only a read-only tool can be allowed
+ * @param allowed  whether the workspace lets agents use it. A tool that may change things starts off, and is allowed
+ *                 only after the person confirmed a warning that agents can then use it without asking (owner,
+ *                 2026-11-27)
  */
 public record McpTool(String name, String title, String description, boolean readOnly,
         Map<String, Object> inputSchema, boolean allowed) {
@@ -30,10 +32,6 @@ public record McpTool(String name, String title, String description, boolean rea
         description = cut(description, MAX_DESCRIPTION_LENGTH);
         inputSchema = Collections.unmodifiableMap(new LinkedHashMap<>(
                 Objects.requireNonNullElse(inputSchema, Map.of("type", "object"))));
-        if (allowed && !readOnly) {
-            throw new InvalidMcp("tool-changes-things",
-                    "Agents can only use tools that read. This tool may change things.");
-        }
     }
 
     public McpTool withAllowed(boolean value) {

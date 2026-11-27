@@ -27,7 +27,9 @@ public interface McpToolbox {
      * @param description the server's description of the tool: untrusted text
      * @param inputSchema the JSON schema of the tool's input, as the server gives it
      */
-    record OfferedTool(ToolRef ref, String modelName, String description, Map<String, Object> inputSchema) {
+    /** @param changesThings false only when the server marks the tool read-only; ConXist's integrations only read */
+    record OfferedTool(ToolRef ref, String modelName, String description, Map<String, Object> inputSchema,
+            boolean changesThings) {
     }
 
     /** @param text what the tool answered, or why it failed when {@code error} is true */

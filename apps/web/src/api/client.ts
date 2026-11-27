@@ -115,6 +115,11 @@ export const api = {
   /** A new name and description for a workspace; names stay unique. */
   updateWorkspace: (workspaceId: string, workspace: NewWorkspace) =>
     putJson<Workspace>(`/api/workspaces/${encodeURIComponent(workspaceId)}`, workspace),
+  /** Deletes the workspace and everything in it for good; `name` is what the person typed to confirm. */
+  deleteWorkspace: (workspaceId: string, name: string) =>
+    request<void>(`/api/workspaces/${encodeURIComponent(workspaceId)}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    }),
   variables: () => request<Variable[]>('/api/variables'),
   addVariable: (variable: Omit<Variable, 'id'>) => postJson<Variable>('/api/variables', variable),
   changeVariable: (id: string, variable: Omit<Variable, 'id'>) =>
@@ -161,8 +166,10 @@ export const api = {
   replaceGoogleSignIn: (id: string, signInId: string) => putJson<Integration>(`${integrationPath(id)}/google`, { signInId }),
   removeIntegration: (id: string) => request<void>(integrationPath(id), { method: 'DELETE' }),
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
-  /** Where this workspace's new blank agents start; agents already made keep their own pick. */
+  /** The provider's default model, where agents that switch to it start; agents already made keep their own pick. */
   setDefaultModel: (pick: AgentModel) => putJson<LlmProviders>('/api/llm-providers/default', pick),
+  /** The provider new blank agents start on, at its default model. */
+  startNewAgentsOn: (provider: string) => putJson<LlmProviders>('/api/llm-providers/new-agents', { provider }),
   /** Every model the provider offers; `refresh` asks the provider now instead of using the list the API kept. */
   offeredModels: (provider: string, refresh = false) =>
     request<OfferedModels>(`/api/llm-providers/${encodeURIComponent(provider)}/models${refresh ? '?refresh=true' : ''}`),
@@ -258,6 +265,9 @@ export const api = {
   /** Runs the agent's saved draft once on one meeting; answers when the run is done. Nothing is kept. */
   startTestRun: (agentId: string, sourceId: string, meetingId: string) =>
     postJson<TestRunResult>(`${agentPath(agentId)}/test-runs`, { sourceId, meetingId }),
+  /** Runs on text given for this run only: pasted, or read from a file in the browser. Nothing of it is kept. */
+  startTestRunOnText: (agentId: string, given: { title: string; text: string }) =>
+    postJson<TestRunResult>(`${agentPath(agentId)}/test-runs`, given),
   sync: (sourceId: string) => request<SyncResult>(`/api/sources/${sourceId}/sync`, { method: 'POST' }),
 };
 

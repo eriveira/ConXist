@@ -14,6 +14,7 @@
   earlier "keys saved in Settings wait for sign-in". Mock `App/mocks/workspace-settings-v4/`. See "Provider keys".
 - Amended 2026-11-27 (owner): OpenAI is a second provider beside Anthropic, connected the same way (its own key per
   workspace, no new table). Mock `App/mocks/workspace-settings-v5/`. See "OpenAI".
+- Changed by: ADR 0022 (2026-11-27): one default for new agents becomes one per provider (V23).
 
 ## Context
 

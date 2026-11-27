@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressProblem, allowedTools, hostOf, pickAllowed, safeIcon, serverUsers, type McpServer, type McpTool } from './mcps';
+import { addressProblem, changingPicks, allowedTools, hostOf, pickAllowed, safeIcon, serverUsers, type McpServer, type McpTool } from './mcps';
 
 const tool = (name: string, readOnly: boolean, allowed: boolean, users: string[] = []): McpTool => ({
   name, title: name, description: '', readOnly, allowed,
@@ -24,13 +24,16 @@ describe('MCP servers', () => {
 
   it('shows a logo only when it is an inline image', () => {
     expect(safeIcon('data:image/png;base64,iVBORw0K')).toBe('data:image/png;base64,iVBORw0K');
+    expect(safeIcon('data:image/x-icon;base64,AAABAAEA')).toBe('data:image/x-icon;base64,AAABAAEA');
     expect(safeIcon('https://evil.test/logo.png')).toBeNull();
     expect(safeIcon('data:text/html;base64,PHNjcmlwdD4=')).toBeNull();
     expect(safeIcon(null)).toBeNull();
   });
 
-  it('counts only read tools that are allowed, and names each agent once', () => {
-    expect(allowedTools(server).map((each) => each.name)).toEqual(['search']);
+  it('counts the tools a person allowed, those that change things too, and names each agent once', () => {
+    expect(allowedTools(server).map((each) => each.name)).toEqual(['search', 'create']);
+    expect(changingPicks([server], [{ serverId: 's1', tool: 'create' }, { serverId: 's1', tool: 'search' },
+      { serverId: 's1', tool: 'create' }])).toEqual(['create']);
     expect(serverUsers(server)).toEqual(['Analyst', 'Zed']);
     expect(pickAllowed([server], { serverId: 's1', tool: 'search' })).toBe(true);
     expect(pickAllowed([server], { serverId: 's1', tool: 'get' })).toBe(false);

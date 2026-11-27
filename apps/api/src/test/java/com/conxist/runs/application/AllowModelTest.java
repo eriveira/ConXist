@@ -84,7 +84,7 @@ class AllowModelTest {
     }
 
     @Test
-    void the_model_new_agents_start_on_stays_allowed() {
+    void the_providers_default_model_stays_allowed() {
         assertCode(() -> allow.allow("anthropic", TestModels.SONNET, false), "model.is-default");
 
         providers.setDefault("anthropic", TestModels.OPUS, "HIGH");

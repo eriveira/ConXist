@@ -89,18 +89,19 @@ export function addressProblem(address: string): 'empty' | 'invalid' | null {
   }
 }
 
-const ICON = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
+const ICON = /^data:image\/(png|jpeg|webp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,[A-Za-z0-9+/=]+$/;
 
 /** The logo only when it is an inline image, so nothing is fetched from the server's host. */
 export function safeIcon(icon: string | null | undefined): string | null {
   return icon && ICON.test(icon) ? icon : null;
 }
 
+/** The tools a person ticked for agents: read tools, and tools that change things they allowed after a warning. */
 export function allowedTools(server: Pick<McpServer, 'tools'>): McpTool[] {
-  return server.tools.filter((tool) => tool.allowed && tool.readOnly);
+  return server.tools.filter((tool) => tool.allowed);
 }
 
-/** The read tools of a list: the ones a person may tick. */
+/** The read tools of a list: the ones ticked to start with. Tools that change things start unticked. */
 export function readTools(tools: readonly McpTool[]): McpTool[] {
   return tools.filter((tool) => tool.readOnly);
 }
@@ -115,6 +116,14 @@ export function serverUsers(server: Pick<McpServer, 'tools'>): string[] {
 export function pickAllowed(servers: readonly McpServer[], pick: McpToolPick): boolean {
   const server = servers.find((each) => each.id === pick.serverId);
   return !!server && allowedTools(server).some((tool) => tool.name === pick.tool);
+}
+
+/** The names of an agent's picked tools that change things, once each, as the workspace lists them. */
+export function changingPicks(servers: readonly McpServer[], picks: readonly McpToolPick[]): string[] {
+  return Array.from(new Set(picks.flatMap((pick) => {
+    const tool = servers.find((server) => server.id === pick.serverId)?.tools.find((each) => each.name === pick.tool);
+    return tool && tool.allowed && !tool.readOnly ? [tool.name] : [];
+  })));
 }
 
 export function samePick(a: McpToolPick, b: McpToolPick): boolean {

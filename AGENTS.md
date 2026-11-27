@@ -48,9 +48,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
-- Capture has file upload (live) and personal Plaud accounts (preview: "Sign in with Plaud" through Plaud's MCP
+- Capture has file upload and personal Plaud accounts (preview: "Sign in with Plaud" through Plaud's MCP
   OAuth sign-in, waiting on Plaud to confirm outside apps may use it; see
-  `docs/adr/0005-plaud-sign-in.md`) on the Sources page. Connecting Plaud lists the
+  `docs/adr/0005-plaud-sign-in.md`) on the Sources page, which is out of the menu for now (ADR 0022: it still answers
+  at `#/sources`, nothing links to it). Connecting Plaud lists the
   newest recordings to pick from (up to 500) and can follow new ones. Each source has its own page
   (`#/sources/{id}`): its meetings, each transcript, and an import history kept 90 days; a meeting can be deleted and is then not imported again (ADR 0006, ADR 0008), and corrected in ConXist (title, speaker names, lines) with the original kept to restore (ADR 0009). The Add menu lists only what can be
   added, so it goes straight to Capture. Plaud Team workspaces (ADR 0003) are on hold: the API code stays,
@@ -58,8 +59,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
   `mvn spring-boot:test-run` runs a fake Plaud that signs in as `alex@acme.test`.
 - Workspaces (ADR 0007): a person keeps several; first run asks for one (name, optional description up to 500
   characters). Every workspace request sends `X-Workspace-Id`; the app keeps the last one used. The header menu is
-  Home (empty for now), Agents, Skills, Sources. Flow, Knowledge, Memories and Ask ConXist come back when they work
-  (owner, 2026-11-27).
+  Home (empty for now), Agents, Skills; the app opens on Agents. Flow, Knowledge, Memories, Ask ConXist and Sources
+  come back when they work (owner, 2026-11-27). The workspace menu lists each workspace on one line. Settings › General
+  deletes a workspace, and everything in it, once its exact name is typed; the last one stays (ADR 0022: each module
+  deletes its rows through the platform port `WorkspaceData`, in one transaction).
 - Agents (ADR 0010, step 1 of 4 the owner set: Agents, Skills, Test run, Schedules): an `agents` module and the
   Agents pages. Create by name (an empty draft; no templates since ADR 0015), edit a draft that saves itself (revision check), publish numbered versions,
   History and Restore, Archive, Delete.
@@ -71,8 +74,8 @@ Sources page does not show it for now, owner decision 2026-11-17).
   and links those agents. Nothing uses an agent yet; flows and schedules will plug
   into the `AgentUses` port.
 - Test run (ADR 0012, step 3): a `runs` module and the Test panel on an agent's page. It runs the saved draft once on
-  a picked meeting with the agent's model (Claude through the Anthropic Java SDK, or OpenAI through the OpenAI Java
-  SDK), with the draft's read tools, sources and limits, and shows the
+  pasted text, a text file (read in the browser, up to 150,000 characters) or a picked meeting (ADR 0022), with the agent's model (Claude through the Anthropic Java SDK, or OpenAI through the OpenAI Java
+  SDK), with the draft's tools, sources and limits, and shows the
   answer, its shape check and each step. Nothing of a run is kept. It runs on the workspace's key for that provider (below);
   without one the panel links to Settings, and agents can't be published either, since their provider is not
   connected (ADR 0014). `mvn spring-boot:test-run` also runs a fake Claude that takes any key starting with
@@ -82,14 +85,15 @@ Sources page does not show it for now, owner decision 2026-11-17).
   General (rename, description), LLM providers (Anthropic and OpenAI, owner 2026-11-27: each connects with a pasted API key
   that ConXist checks and stores encrypted per workspace, Test connection, Replace key, Disconnect; a workspace without
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
-  Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, and the
-  default for new agents, grouped by provider),
+  Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, a default model and effort per provider,
+  and which provider new agents start on, grouped by provider in lists that fold away (ADR 0022, V23)),
   MCPs (ADR 0017, below), Integrations (ADR 0019, 0020 and 0021, below), and Variables (ADR 0018, below).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - MCPs (ADR 0017, owner 2026-11-27): a `connectors` module and Settings › MCPs. Add any MCP server by its https
   address; ConXist finds the sign-in (the server's OAuth sign-in, else a pasted token, else public), shows its logo
-  and tools, and the workspace ticks the read tools (`readOnlyHint`) agents may use; others stay locked. An agent's
+  (else the site's own icon, ADR 0022) and tools, and the workspace ticks the tools agents may use. Read tools
+  (`readOnlyHint`) come ticked; tools that change things start unticked and ask first (ADR 0022). An agent's
   Tools section lists them by server, and test runs call them, results as data. A tool or server agents use cannot
   be unticked or removed. `mvn spring-boot:test-run` runs three fake MCP servers (OAuth, token `mcp-fake-token`,
   public).
@@ -143,8 +147,10 @@ Sources page does not show it for now, owner decision 2026-11-17).
 - ConXist's agents and the MCP server share one tool set. Each tool follows
   `docs/standards/TOOL_CALLING_STANDARDS.md`.
 - Source connections are read-only by default (OAuth scopes and access keys).
-- Nothing is written to a customer's repo, tracker or memory until a person
-  approves it; repo writes go in as pull requests.
+- An agent changes things only through tools a person ticked after a warning
+  (ADR 0022); they start unticked, and the tick approves that tool for every
+  later use. Changes ConXist itself makes to a repo still go in as pull
+  requests, and nothing goes into its memory until a person approves it.
 - Transcripts, documents, tickets and repository content are customer data and
   untrusted input: never instructions, never logged in full.
 

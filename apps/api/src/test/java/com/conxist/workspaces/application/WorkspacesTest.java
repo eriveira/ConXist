@@ -25,6 +25,9 @@ class WorkspacesTest {
     private final ListWorkspaces list = new ListWorkspaces(repository);
     private final CountSources count = new CountSources(repository);
     private final UpdateWorkspace update = new UpdateWorkspace(repository, new ImmediateUnitOfWork());
+    private final List<String> purged = new ArrayList<>();
+    private final DeleteWorkspace delete = new DeleteWorkspace(repository,
+            List.of(module("agents", 40), module("capture", 20), module("sources", 30)), new ImmediateUnitOfWork());
 
     @Test
     void a_created_workspace_is_listed_with_no_sources() {
@@ -95,6 +98,54 @@ class WorkspacesTest {
         assertThat(list.list()).singleElement().extracting(WorkspaceView::sourceCount).isEqualTo(1);
     }
 
+    @Test
+    void a_workspace_is_deleted_with_every_modules_data_once_its_name_is_typed() {
+        WorkspaceView acme = create.create("Acme Product", "");
+        WorkspaceView globex = create.create("Globex", "");
+
+        delete.delete(acme.id(), " Acme Product ");
+
+        assertThat(purged).containsExactly("capture " + acme.id(), "sources " + acme.id(), "agents " + acme.id(),
+                "capture files", "sources files", "agents files");
+        assertThat(list.list()).extracting(WorkspaceView::id).containsExactly(globex.id());
+    }
+
+    @Test
+    void a_delete_needs_the_exact_name_and_keeps_the_last_workspace() {
+        WorkspaceView acme = create.create("Acme Product", "");
+
+        assertCode(() -> delete.delete(acme.id(), "acme product"), "workspace.name-mismatch");
+        assertCode(() -> delete.delete(acme.id(), null), "workspace.name-mismatch");
+        assertCode(() -> delete.delete(acme.id(), "Acme Product"), "workspace.last");
+        assertThatThrownBy(() -> delete.delete(UUID.randomUUID(), "Acme Product")).isInstanceOf(NotFound.class);
+        assertThat(purged).isEmpty();
+        assertThat(list.exists(acme.id())).isTrue();
+    }
+
+    private com.conxist.platform.WorkspaceData module(String name, int order) {
+        return new com.conxist.platform.WorkspaceData() {
+            @Override
+            public int order() {
+                return order;
+            }
+
+            @Override
+            public void deleteAll(UUID workspaceId) {
+                purged.add(name + " " + workspaceId);
+            }
+
+            @Override
+            public void afterDeleted(UUID workspaceId) {
+                purged.add(name + " files");
+            }
+        };
+    }
+
+    private static void assertCode(Runnable action, String code) {
+        assertThatThrownBy(action::run).isInstanceOf(RuleViolation.class)
+                .extracting(e -> ((RuleViolation) e).code()).isEqualTo(code);
+    }
+
     private static final class InMemoryWorkspaces implements WorkspaceRepository {
 
         private final List<Workspace> workspaces = new ArrayList<>();
@@ -140,6 +191,11 @@ class WorkspacesTest {
         @Override
         public boolean nameTaken(String name) {
             return workspaces.stream().anyMatch(w -> w.name().equalsIgnoreCase(name));
+        }
+
+        @Override
+        public void delete(UUID workspaceId) {
+            workspaces.removeIf(w -> w.id().equals(workspaceId));
         }
 
         @Override

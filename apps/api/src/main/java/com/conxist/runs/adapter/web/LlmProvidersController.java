@@ -74,6 +74,12 @@ class LlmProvidersController {
         return providers.setDefault(request.provider(), request.model(), request.effort());
     }
 
+    /** Makes the provider the one new blank agents start on, at its default model. */
+    @PutMapping("/new-agents")
+    LlmProviders.View startNewAgentsOn(@Valid @RequestBody NewAgentsRequest request) {
+        return providers.startNewAgentsOn(request.provider());
+    }
+
     /** {@code toString} hides the key, so it stays out of any log of the request. */
     record KeyRequest(@NotNull @Size(max = 1000) String apiKey) {
         @Override
@@ -83,6 +89,9 @@ class LlmProvidersController {
     }
 
     record AllowRequest(@NotNull Boolean allowed) {
+    }
+
+    record NewAgentsRequest(@NotNull @Size(max = 100) String provider) {
     }
 
     record DefaultRequest(@Size(max = 100) String provider, @Size(max = 100) String model,

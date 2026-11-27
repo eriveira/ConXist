@@ -19,9 +19,19 @@ final class TestPort implements ModelPort {
     ApiKey lastKey;
     int asked;
 
+    private final String provider;
+
+    TestPort() {
+        this(TestModels.ANTHROPIC);
+    }
+
+    TestPort(String provider) {
+        this.provider = provider;
+    }
+
     @Override
     public String provider() {
-        return TestModels.ANTHROPIC;
+        return provider;
     }
 
     @Override

@@ -81,6 +81,11 @@ final class CaptureFakes {
             }
             stored.remove(key);
         }
+
+        @Override
+        public void deleteWorkspace(UUID workspaceId) {
+            stored.keySet().removeIf(key -> key.startsWith(workspaceId + "/"));
+        }
     }
 
     static final class Documents implements CapturedDocumentRepository {

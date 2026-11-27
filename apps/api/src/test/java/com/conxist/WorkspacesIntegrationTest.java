@@ -2,6 +2,7 @@ package com.conxist;
 
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
 import com.conxist.testing.FakePlaudConfiguration;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -43,6 +47,63 @@ class WorkspacesIntegrationTest {
 
     @Autowired
     MockMvc mvc;
+
+    @Autowired
+    JdbcClient jdbc;
+
+    @Test
+    void a_deleted_workspace_takes_everything_in_it_and_leaves_the_others_untouched() throws Exception {
+        String gone = create("{\"name\":\"Old pilot\"}");
+        String kept = create("{\"name\":\"Kept pilot\"}");
+        for (String workspace : List.of(gone, kept)) {
+            String source = JsonPath.read(mvc.perform(post("/api/sources").header(HEADER, workspace)
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"UPLOAD\",\"name\":\"Specs\"}"))
+                    .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
+            mvc.perform(multipart("/api/sources/{id}/files", source).header(HEADER, workspace)
+                            .file(new MockMultipartFile("file", "notes.md", "text/markdown",
+                                    "# Kickoff\nAna: guest checkout.".getBytes(StandardCharsets.UTF_8))))
+                    .andExpect(status().isCreated());
+            mvc.perform(post("/api/agents").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Analyst\"}"))
+                    .andExpect(status().isCreated());
+            mvc.perform(post("/api/variables").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"company\",\"value\":\"Acme\"}"))
+                    .andExpect(status().isCreated());
+        }
+        await().atMost(Duration.ofSeconds(10)).until(() -> rows("hub_items", gone) == 2 && rows("hub_items", kept) == 2);
+
+        mvc.perform(delete("/api/workspaces/{id}", gone).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"old pilot\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("workspace.name-mismatch"));
+        mvc.perform(delete("/api/workspaces/{id}", gone).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Old pilot\"}"))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/workspaces"))
+                .andExpect(jsonPath("$[?(@.id=='" + gone + "')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.id=='" + kept + "')]").isNotEmpty());
+        for (String table : List.of("sources", "captured_documents", "hub_items", "agents", "workspace_variables",
+                "workspace_sources")) {
+            org.assertj.core.api.Assertions.assertThat(rows(table, gone)).as(table).isZero();
+            org.assertj.core.api.Assertions.assertThat(rows(table, kept)).as(table).isPositive();
+        }
+        // Every table that holds a workspace, today's and any added later, keeps nothing of the deleted one.
+        List<String> tables = jdbc.sql("select table_name from information_schema.columns where column_name = 'workspace_id'"
+                        + " and table_schema = current_schema()").query(String.class).list();
+        org.assertj.core.api.Assertions.assertThat(tables).hasSizeGreaterThan(10);
+        for (String table : tables) {
+            org.assertj.core.api.Assertions.assertThat(rows(table, gone)).as(table).isZero();
+        }
+        mvc.perform(get("/api/sources").header(HEADER, gone)).andExpect(status().isNotFound());
+        org.assertj.core.api.Assertions.assertThat(uploads.resolve(gone)).doesNotExist();
+        org.assertj.core.api.Assertions.assertThat(uploads.resolve(kept)).isDirectory();
+    }
+
+    private int rows(String table, String workspace) {
+        return jdbc.sql("select count(*) from " + table + " where workspace_id = :id")
+                .param("id", UUID.fromString(workspace)).query(Integer.class).single();
+    }
 
     @Test
     void a_new_workspace_is_listed_and_counts_its_sources() throws Exception {

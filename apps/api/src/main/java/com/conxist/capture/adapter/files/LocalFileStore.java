@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.stream.Stream;
 import java.util.UUID;
 import com.conxist.platform.SecretBox;
 import com.conxist.capture.application.FileStore;
@@ -47,6 +49,21 @@ public class LocalFileStore implements FileStore {
             Files.deleteIfExists(target);
         } catch (IOException failure) {
             throw new UncheckedIOException("Could not delete a stored file", failure);
+        }
+    }
+
+    @Override
+    public void deleteWorkspace(UUID workspaceId) {
+        Path folder = root.resolve(workspaceId.toString()).normalize();
+        if (!Files.isDirectory(folder)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(folder)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Could not delete a workspace's stored files", failure);
         }
     }
 }

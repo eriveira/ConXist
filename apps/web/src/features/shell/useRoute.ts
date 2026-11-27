@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 
-export const PAGES = ['home', 'agents', 'skills', 'sources'] as const;
+export const PAGES = ['home', 'agents', 'skills'] as const;
 export type Page = (typeof PAGES)[number];
-/** The pages in the address: the menu's, and Settings, opened from the workspace menu. */
-export const ROUTES = [...PAGES, 'settings'] as const;
+/**
+ * The pages in the address: the menu's, Settings (opened from the workspace menu), and Sources, which the menu leaves
+ * out until it is ready to use (owner, 2026-11-27) but whose address still opens it.
+ */
+export const ROUTES = [...PAGES, 'settings', 'sources'] as const;
 export type RoutePage = (typeof ROUTES)[number];
 
-/** Home is empty for now, so the app opens on Sources until Home shows something. */
-export const START_PAGE: Page = 'sources';
+/** Home is empty for now, so the app opens on Agents until Home shows something. */
+export const START_PAGE: Page = 'agents';
 
 export function pageOf(hash: string): RoutePage {
   // #/sources/{id} is one source's page, under Sources; #/skills/{id} one skill's, under Skills.

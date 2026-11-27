@@ -14,6 +14,8 @@ export function useFocusTrap(panel: RefObject<HTMLElement | null>, onClose: () =
     const opener = document.activeElement as HTMLElement | null;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // A question inside the dialog that answers Escape itself, such as the tools warning, keeps the dialog open.
+        if (event.target instanceof Element && event.target.closest('[data-own-escape]')) return;
         event.stopPropagation();
         if (latest.current.closable) latest.current.onClose();
       } else if (event.key === 'Tab') {

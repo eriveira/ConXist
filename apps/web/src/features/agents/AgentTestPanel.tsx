@@ -3,19 +3,20 @@ import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import type { OutputKind } from '../../domain/agents';
 import type { CapturedDocument, Source } from '../../domain/model';
-import { type AnswerPart, type RunChoiceGroup, type TestRunResult, type TestRunStep, answerParts, firstChoice,
+import { type AnswerPart, type TestRunResult, type TestRunStep, answerParts, firstChoice,
   runChoiceGroups } from '../../domain/testRuns';
 import { providerLabel, type Translate, useLanguage, useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { ApiError } from '../../api/client';
+import { type Given, key, keyOrEmpty, MAX_RUN_TEXT, MeetingPicker, type Meetings, PastedText, TextFile } from './TestRunInputs';
 import { problemMessage } from '../../i18n/problems';
-import { SOURCES_HREF } from '../../navigation';
 
 /** Why Run is off for now, if it is. */
 export type RunBlock = 'problems' | 'saving' | 'unsaved' | 'archived' | null;
 
 type Status = 'checking' | 'ready' | 'no-key' | 'error';
-type Meetings = { status: 'loading' } | { status: 'error' } | { status: 'ready'; groups: RunChoiceGroup[] };
+/** What a run reads: text pasted or read from a file for this run only, or a meeting ConXist keeps. */
+type Mode = 'text' | 'file' | 'meeting';
 type Run = { status: 'idle' } | { status: 'running'; started: number } | { status: 'done'; result: TestRunResult }
   | { status: 'failed'; problem: unknown };
 
@@ -29,18 +30,24 @@ interface Props {
   block: RunBlock;
   /** The provider the saved draft runs on, such as openai, named where the run's text goes and whose key failed. */
   provider: string | null;
+  /** The names of the picked tools that change things: a run may use them for real. */
+  changes: string[];
 }
 
 /**
- * The Test panel (ADR 0012): pick a meeting, run the saved draft once and see what it gives back, whether that has
+ * The Test panel (ADR 0012): paste text, read a text file, or pick a meeting when the workspace has some; run the saved
+ * draft once and see what it gives back, whether that has
  * the agent's shape, and what it did on the way. Nothing of a run is kept.
  */
-export function AgentTestPanel({ agentId, reads, givesBack, sources, block, provider }: Props) {
+export function AgentTestPanel({ agentId, reads, givesBack, sources, block, provider, changes }: Props) {
   const t = useT();
   const providerName = provider ? providerLabel(t, provider) : null;
   const [status, setStatus] = useState<Status>('checking');
   const [meetings, setMeetings] = useState<Meetings>({ status: 'loading' });
   const [picked, setPicked] = useState('');
+  const [mode, setMode] = useState<Mode>('text');
+  const [pasted, setPasted] = useState('');
+  const [file, setFile] = useState<Given | null>(null);
   const [run, setRun] = useState<Run>({ status: 'idle' });
   const pickId = useId();
   const language = useLanguage();
@@ -79,7 +86,7 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
   useEffect(() => {
     runCount.current += 1;
     setRun({ status: 'idle' });
-  }, [agentId, picked]);
+  }, [agentId, picked, mode]);
 
   const start = async () => {
     if (run.status === 'running') return;
@@ -87,7 +94,8 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
     const count = ++runCount.current;
     setRun({ status: 'running', started: Date.now() });
     try {
-      const result = await api.startTestRun(agentId, sourceId, meetingId);
+      const result = mode === 'meeting' ? await api.startTestRun(agentId, sourceId, meetingId)
+        : await api.startTestRunOnText(agentId, mode === 'file' && file ? file : { title: '', text: pasted });
       if (count === runCount.current) setRun({ status: 'done', result });
     } catch (problem) {
       if (count === runCount.current) setRun({ status: 'failed', problem });
@@ -95,7 +103,10 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
   };
 
   const running = run.status === 'running';
-  const canRun = status === 'ready' && meetings.status === 'ready' && picked !== '' && block === null;
+  const hasMeetings = meetings.status === 'ready' && meetings.groups.length > 0;
+  const given = mode === 'meeting' ? picked !== '' : mode === 'file' ? file !== null
+    : pasted.trim() !== '' && pasted.length <= MAX_RUN_TEXT;
+  const canRun = status === 'ready' && given && block === null;
 
   return (
     <div className="side-card test-card">
@@ -115,12 +126,40 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
         </div>
       )}
       {(status === 'ready' || status === 'no-key') && (
-        <MeetingPicker id={pickId} meetings={meetings} picked={picked} onPick={setPicked} disabled={running}
-          onRetry={loadMeetings} />
-      )}
-      {status === 'ready' && meetings.status === 'ready' && meetings.groups.length > 0 && (
         <>
-          <p className="test-note"><Icon name="info" size={16} /> {providerName ? t('run.noteTo', { provider: providerName }) : t('run.note')}</p>
+          <fieldset className="choice segmented test-modes">
+            <legend>{t('run.on')}</legend>
+            {(['text', 'file', ...(hasMeetings ? ['meeting' as const] : [])] as Mode[]).map((each) => (
+              <label key={each}>
+                <input type="radio" name={`${pickId}-mode`} checked={mode === each} disabled={running}
+                  onChange={() => setMode(each)} />
+                <span><b>{t(`run.on.${each}`)}</b></span>
+              </label>
+            ))}
+          </fieldset>
+          {mode === 'text' && <PastedText id={pickId} value={pasted} onChange={setPasted} disabled={running} />}
+          {mode === 'file' && <TextFile id={pickId} file={file} onFile={setFile} disabled={running} />}
+          {mode === 'meeting' && (
+            <MeetingPicker id={pickId} meetings={meetings} picked={picked} onPick={setPicked} disabled={running}
+              onRetry={loadMeetings} />
+          )}
+        </>
+      )}
+      {status === 'ready' && (
+        <>
+          {changes.length > 0 ? (
+            <p className="alert warn test-changes">
+              <Icon name="alert" size={16} />
+              <span>
+                {t(changes.length === 1 ? 'run.changes_one' : 'run.changes', { tools: changes.join(', ') })}{' '}
+                {t(changes.length === 1 ? 'run.changesFix_one' : 'run.changesFix')}
+              </span>
+            </p>
+          ) : null}
+          <p className="test-note"><Icon name="info" size={16} />{' '}
+            {t(changes.length > 0 ? (providerName ? 'run.noteToChanges' : 'run.noteChanges') : (providerName ? 'run.noteTo' : 'run.note'),
+              { provider: providerName ?? '' })}
+          </p>
           {/* Kept focusable while it runs, so a keyboard user stays on it. */}
           <button type="button" className="btn primary test-run" onClick={() => void start()} disabled={!canRun}
             aria-disabled={running || undefined} aria-describedby={block ? `${pickId}-block` : undefined}>
@@ -141,45 +180,6 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
   );
 }
 
-const key = (choice: { sourceId: string; meetingId: string }) => `${choice.sourceId}/${choice.meetingId}`;
-const keyOrEmpty = (choice: { sourceId: string; meetingId: string } | null) => (choice ? key(choice) : '');
-
-function MeetingPicker({ id, meetings, picked, onPick, disabled, onRetry }: {
-  id: string; meetings: Meetings; picked: string; onPick: (value: string) => void; disabled: boolean; onRetry: () => void;
-}) {
-  const t = useT();
-  const language = useLanguage();
-  if (meetings.status === 'loading') {
-    return <p className="test-state" role="status"><span className="spin" aria-hidden="true" /> {t('run.meetings.loading')}</p>;
-  }
-  if (meetings.status === 'error') {
-    return (
-      <p className="alert error" role="alert">
-        <Icon name="alert" /> <span>{t('run.meetings.error')} <button type="button" className="link" onClick={onRetry}>{t('run.retry')}</button></span>
-      </p>
-    );
-  }
-  if (meetings.groups.length === 0) {
-    return <p className="test-empty">{t('run.meetings.empty')} <a href={SOURCES_HREF}>{t('run.meetings.add')}</a></p>;
-  }
-  const date = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' });
-  return (
-    <div className="field test-pick">
-      <label htmlFor={id}>{t('run.meeting')}</label>
-      <select id={id} value={picked} onChange={(event) => onPick(event.target.value)} disabled={disabled}>
-        {meetings.groups.map((group) => (
-          <optgroup key={group.sourceId} label={group.read ? t('run.group.reads', { name: group.sourceName }) : group.sourceName}>
-            {group.choices.map((choice) => (
-              <option key={key(choice)} value={key(choice)}>{choice.title} · {date.format(new Date(choice.when))}</option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-/** The running timer on the Run button, so a long run reads as working. */
 function Elapsed({ started }: { started: number }) {
   const t = useT();
   const [now, setNow] = useState(Date.now());

@@ -177,7 +177,7 @@ class JdbcMcpServerRepository implements McpServerRepository {
         }
 
         McpTool tool() {
-            return new McpTool(name, title, description, readOnly, inputSchema, allowed && readOnly);
+            return new McpTool(name, title, description, readOnly, inputSchema, allowed);
         }
     }
 

@@ -94,7 +94,13 @@ class TestRunsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"provider\":\"openai\",\"model\":\"gpt-5.2\",\"effort\":\"MEDIUM\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("openai"));
+                .andExpect(jsonPath("$.providers[1].defaultModel.model").value("gpt-5.2"))
+                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("anthropic"));
+        mvc.perform(put("/api/llm-providers/new-agents").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"openai\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultForNewAgents.provider").value("openai"))
+                .andExpect(jsonPath("$.defaultForNewAgents.model").value("gpt-5.2"));
 
         String source = source(workspace, "Specs");
         String meeting = upload(workspace, source,
@@ -280,6 +286,14 @@ class TestRunsIntegrationTest {
                 .andExpect(jsonPath("$.effort").value("LOW"));
         org.assertj.core.api.Assertions.assertThat(claude.requests().getLast().path("model").asString())
                 .isEqualTo("claude-opus-5-5");
+        mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"" + "x".repeat(150_001) + "\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("run.text-too-long"));
+        mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("run.nothing-to-run-on"));
 
         int before = claude.requests().size();
         mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)

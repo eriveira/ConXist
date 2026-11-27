@@ -54,7 +54,7 @@ interface SettingsProps {
 /** First run asks for a workspace; after that, the header and the current page. */
 function Workspaces(settings: SettingsProps) {
   const t = translator(settings.language);
-  const { state, retry, switchTo, created, updated, refresh } = useWorkspaces();
+  const { state, retry, switchTo, created, updated, deleted, refresh } = useWorkspaces();
   const [page, go] = useRoute();
   const sourceRoute = useSourceRoute();
   const agentsRoute = useAgentsRoute();
@@ -71,7 +71,7 @@ function Workspaces(settings: SettingsProps) {
     setNewOpen(false);
     created(workspace);
     setNotice(t('workspace.created', { name: workspace.name }));
-    go('sources');
+    go('agents');
   }
 
   if (state.status === 'loading') {
@@ -103,7 +103,10 @@ function Workspaces(settings: SettingsProps) {
           ? <SourcePage key={sourceRoute.sourceId} sourceId={sourceRoute.sourceId} />
           : <SourcesPage />)}
         {(page === 'agents' || page === 'skills') && <AgentsArea route={agentsRoute} />}
-        {page === 'settings' && <SettingsPage workspace={state.current} onSaved={updated} />}
+        {page === 'settings' && (
+          <SettingsPage workspace={state.current} onSaved={updated} canDelete={state.workspaces.length > 1}
+            onDeleted={(gone) => { deleted(gone.id); setNotice(t('workspace.deleted', { name: gone.name })); go('agents'); }} />
+        )}
       </main>
       {newOpen && <NewWorkspaceDialog onClose={() => setNewOpen(false)} onCreated={onCreated} />}
     </div>

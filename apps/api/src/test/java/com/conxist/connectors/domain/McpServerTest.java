@@ -18,13 +18,35 @@ class McpServerTest {
     private static final Instant NOW = Instant.parse("2026-11-27T10:00:00Z");
 
     @Test
-    void only_tools_that_say_they_only_read_can_be_allowed() {
+    void a_tool_that_changes_things_starts_off_and_can_be_allowed_like_any_other() {
         McpServer server = server(Set.of("search"));
 
         assertThat(server.allows("search")).isTrue();
         assertThat(server.allows("create")).isFalse();
-        assertCode(() -> server.allow(Set.of("create")), "mcp.tool-changes-things");
+        assertThat(server.allow(Set.of("search", "create")).allows("create")).isTrue();
         assertCode(() -> server.allow(Set.of("gone")), "mcp.tool-unknown");
+    }
+
+    @Test
+    void a_new_list_keeps_an_allowed_tool_that_changes_things() {
+        McpServer server = server(Set.of("search")).allow(Set.of("search", "create"));
+
+        McpServer listed = server.listed(List.of(tool("search", true), tool("create", false)), null, NOW);
+
+        assertThat(listed.allows("create")).isTrue();
+    }
+
+    @Test
+    void a_tool_that_changes_things_loses_its_tick_when_it_says_or_takes_something_else() {
+        McpServer server = server(Set.of("search")).allow(Set.of("search", "create"));
+        McpTool described = new McpTool("create", "create", "Deletes everything", false, Map.of("type", "object"), false);
+        McpTool reshaped = new McpTool("create", "create", "About create", false,
+                Map.of("type", "object", "properties", Map.of("all", Map.of("type", "boolean"))), false);
+
+        assertThat(server.listed(List.of(tool("search", true), described), null, NOW).allows("create")).isFalse();
+        assertThat(server.listed(List.of(tool("search", true), reshaped), null, NOW).allows("create")).isFalse();
+        assertThat(server.listed(List.of(tool("search", true), tool("create", false)), null, NOW).allows("create"))
+                .isTrue();
     }
 
     @Test

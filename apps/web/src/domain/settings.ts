@@ -26,6 +26,8 @@ export interface LlmProvider {
   connection: ProviderConnection;
   /** The models this workspace allows agents to pick. */
   models: LlmModel[];
+  /** Where an agent that switches to this provider starts; null when the workspace allows none of its models. */
+  defaultModel: AgentModel | null;
 }
 
 /** How a test of the connection went: the provider answered, or why it did not, and how long it took. */
@@ -64,15 +66,18 @@ export interface OfferedModels {
   listError: ListError | null;
 }
 
-/** Why a model must stay allowed: agents run on it, or new agents start on it. Null when it may be unticked. */
+/** Why a model must stay allowed: agents run on it, or it is its provider's default. Null when it may be unticked. */
 export function lockReason(providers: LlmProviders, users: readonly ModelUser[], provider: string, model: string):
   'used' | 'default' | null {
   if (users.length > 0) return 'used';
-  const start = providers.defaultForNewAgents;
-  return start.provider === provider && start.model === model ? 'default' : null;
+  const start = providers.providers.find((each) => each.id === provider)?.defaultModel;
+  return start?.model === model ? 'default' : null;
 }
 
-/** The providers a workspace can use (ADR 0014), the models it allows, and where its new blank agents start. */
+/**
+ * The providers a workspace can use (ADR 0014), the models it allows, each one's default, and where new blank agents
+ * start: the default of the provider the workspace picked for them.
+ */
 export interface LlmProviders {
   providers: LlmProvider[];
   defaultForNewAgents: AgentModel;
