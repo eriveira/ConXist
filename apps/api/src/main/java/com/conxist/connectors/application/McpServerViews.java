@@ -32,7 +32,8 @@ public final class McpServerViews {
     }
 
     McpViews.ServerView server(McpServer server, Map<String, List<AgentBriefs.McpToolUse>> uses) {
-        return new McpViews.ServerView(server.id(), server.name(), server.address(), server.auth(), server.icon(),
+        return new McpViews.ServerView(server.id(), server.name(), server.address(), server.auth(), server.shownIcon(),
+                server.logo() == null ? null : new McpViews.LogoView(server.logo().address(), server.logo().fetchedAt()),
                 server.status(), server.tools().stream().map(tool -> tool(tool, uses.getOrDefault(tool.name(),
                         List.of()))).toList(), server.addedAt(), server.checkedAt());
     }

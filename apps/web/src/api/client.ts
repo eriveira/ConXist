@@ -136,6 +136,10 @@ export const api = {
   updateMcp: (serverId: string, name: string, allowedTools: string[]) =>
     putJson<McpServer>(mcpPath(serverId), { name, allowedTools }),
   checkMcp: (serverId: string) => postJson<McpCheck>(`${mcpPath(serverId)}/check`, {}),
+  /** Fetches the image at this address once and shows it as the server's logo. */
+  useMcpLogo: (serverId: string, address: string) => putJson<McpServer>(`${mcpPath(serverId)}/logo`, { address }),
+  /** Goes back to the logo ConXist found. */
+  dropMcpLogo: (serverId: string) => request<McpServer>(`${mcpPath(serverId)}/logo`, { method: 'DELETE' }),
   mcpSignedIn: (serverId: string, connectionId: string) =>
     postJson<McpServer>(`${mcpPath(serverId)}/credential`, { connectionId }),
   removeMcp: (serverId: string) => request<void>(mcpPath(serverId), { method: 'DELETE' }),

@@ -30,6 +30,7 @@ class CallMcpToolsTest {
     private boolean failing;
     private final McpGateway gateway = new McpGateway() {
         public URI checked(String address) { throw new UnsupportedOperationException(); }
+        public String image(URI address) { throw new UnsupportedOperationException(); }
         public ServerFacts list(URI address, String bearer) { throw new UnsupportedOperationException(); }
         public Optional<SignIn> signInFor(URI address) { throw new UnsupportedOperationException(); }
         public URI authorizationUrl(SignIn signIn, String state, String verifier) { throw new UnsupportedOperationException(); }
@@ -47,6 +48,7 @@ class CallMcpToolsTest {
         }
         public boolean insertIfNameFree(McpServer server, McpCredential credential) { stored.put(server.id(), server); return true; }
         public boolean update(McpServer server) { stored.put(server.id(), server); return true; }
+        public boolean saveLogo(UUID workspaceId, UUID serverId, McpServer.Logo logo) { return false; }
         public Optional<McpCredential> credential(UUID workspaceId, UUID serverId) { return Optional.of(McpCredential.none()); }
         public void saveCredential(UUID workspaceId, UUID serverId, McpCredential credential) { }
         public boolean delete(UUID workspaceId, UUID serverId) { return stored.remove(serverId) != null; }

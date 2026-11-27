@@ -88,6 +88,18 @@ class McpServersController {
         return servers.check(serverId);
     }
 
+    /** Fetches the image at this address once and shows it as the server's logo. */
+    @PutMapping("/{serverId}/logo")
+    McpViews.ServerView useLogo(@PathVariable UUID serverId, @Valid @RequestBody LogoRequest request) {
+        return servers.useLogo(serverId, request.address());
+    }
+
+    /** Goes back to the logo ConXist found. */
+    @DeleteMapping("/{serverId}/logo")
+    McpViews.ServerView dropLogo(@PathVariable UUID serverId) {
+        return servers.dropLogo(serverId);
+    }
+
     /** Saves the sign-in a connection for this server got. */
     @PostMapping("/{serverId}/credential")
     McpViews.ServerView signedIn(@PathVariable UUID serverId, @Valid @RequestBody CredentialRequest request) {
@@ -115,6 +127,9 @@ class McpServersController {
 
     record UpdateRequest(@Size(max = McpServer.MAX_NAME_LENGTH * 2) String name,
             @NotNull @Size(max = McpServer.MAX_TOOLS) List<@NotNull @Pattern(regexp = McpTool.NAME_PATTERN) String> allowedTools) {
+    }
+
+    record LogoRequest(@NotNull @Size(max = MAX_ADDRESS) String address) {
     }
 
     record CredentialRequest(@NotNull UUID connectionId) {

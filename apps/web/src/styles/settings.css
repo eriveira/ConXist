@@ -114,6 +114,16 @@
 .mcp-logo { display: grid; place-items: center; flex: none; overflow: hidden; width: 40px; height: 40px; border-radius: var(--cx-radius-sm); background: var(--cx-surface); border: 1px solid var(--cx-border); color: var(--cx-fg); font-weight: 800; font-size: 17px; }
 .mcp-logo.sm { width: 24px; height: 24px; font-size: 12px; border-radius: var(--cx-radius-sm); }
 .mcp-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.mcp-logo.lg { width: 48px; height: 48px; font-size: 20px; }
+.mcp-logo-box { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); padding: 14px 16px; margin: 4px 0 18px; max-width: 720px; }
+.mcp-logo-box h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
+.mcp-logo-box > p { margin: 0 0 10px; font-size: 13.5px; color: var(--cx-fg-muted); }
+.mcp-logo-row { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-start; }
+.mcp-logo-row .mcp-logo { margin-top: 22px; }
+.mcp-logo-row .field { flex: 1 1 260px; min-width: 0; margin: 0; }
+.mcp-logo-row > .btn { margin-top: 22px; min-height: 44px; }
+.mcp-logo-box .hint.ok { color: var(--cx-ok-fg); display: flex; gap: 6px; align-items: center; }
+.mcp-logo-box .mcp-logo-reset { margin: 10px 0 0; }
 .mcp-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 0; }
 .mcp-head h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 19px; font-weight: 800; overflow-wrap: anywhere; }
 .mcp-address { overflow-wrap: anywhere; }
@@ -196,4 +206,8 @@
 @media (max-width: 760px) {
   .presets tr.tool-ask-row { grid-template-columns: minmax(0, 1fr); padding-top: 0; }
   .presets tr.tool-ask-row td { grid-column: 1 / -1; padding: 0; }
+}
+
+@media (max-width: 560px) {
+  .mcp-logo-row .mcp-logo, .mcp-logo-row > .btn { margin-top: 0; }
 }

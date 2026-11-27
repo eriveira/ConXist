@@ -48,6 +48,7 @@ class CallIntegrationToolsTest {
         public Optional<McpServer> find(UUID workspaceId, UUID serverId) { return Optional.empty(); }
         public boolean insertIfNameFree(McpServer server, McpCredential credential) { return false; }
         public boolean update(McpServer server) { return false; }
+        public boolean saveLogo(UUID workspaceId, UUID serverId, McpServer.Logo logo) { return false; }
         public Optional<McpCredential> credential(UUID workspaceId, UUID serverId) { return Optional.empty(); }
         public void saveCredential(UUID workspaceId, UUID serverId, McpCredential credential) { }
         public boolean delete(UUID workspaceId, UUID serverId) { return false; }

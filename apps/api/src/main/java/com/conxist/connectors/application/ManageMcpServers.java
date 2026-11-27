@@ -1,5 +1,6 @@
 package com.conxist.connectors.application;
 
+import java.net.URI;
 import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -136,6 +137,51 @@ public final class ManageMcpServers {
         connections.forget(connectionId);
         log.info("Workspace {} signed in to MCP server {} again", server.workspaceId(), serverId);
         return views.server(listed);
+    }
+
+    /**
+     * Shows the image at this address as the server's logo (ADR 0022). ConXist fetches it once, through the same guard
+     * as a server's address and without any token, and keeps its own copy.
+     */
+    public McpViews.ServerView useLogo(UUID serverId, String address) {
+        McpServer server = load(serverId);
+        String image;
+        URI at;
+        try {
+            at = gateway.checked(address == null ? "" : address.strip());
+            image = gateway.image(at);
+        } catch (McpGateway.AddressRefused refused) {
+            throw switch (refused.code()) {
+                case "address-not-https" -> new InvalidMcp("logo-not-https", "Use an address that starts with https://.");
+                case "address-private" -> new InvalidMcp("logo-private",
+                        "This address is on a private network. ConXist only fetches logos from the internet.");
+                default -> new InvalidMcp("logo-address-invalid", "This does not look like an image address.");
+            };
+        } catch (McpGateway.Unreachable unreachable) {
+            throw new InvalidMcp("logo-unreachable", "ConXist could not reach this address. Check it and try again.");
+        }
+        if (image == null) {
+            throw new InvalidMcp("logo-not-image",
+                    "That address isn't an image. Use the address of a PNG, JPG, SVG, WebP or ICO up to 100 KB.");
+        }
+        McpServer changed = server.withLogo(new McpServer.Logo(image, at, clock.instant()));
+        saveLogo(changed);
+        log.info("Workspace {} chose a logo for MCP server {}", server.workspaceId(), serverId);
+        return views.server(changed);
+    }
+
+    /** Goes back to the logo ConXist found: the server's own, else its site's. */
+    public McpViews.ServerView dropLogo(UUID serverId) {
+        McpServer changed = load(serverId).withLogo(null);
+        saveLogo(changed);
+        log.info("Workspace {} went back to the found logo for MCP server {}", changed.workspaceId(), serverId);
+        return views.server(changed);
+    }
+
+    private void saveLogo(McpServer server) {
+        if (!servers.saveLogo(server.workspaceId(), server.id(), server.logo())) {
+            throw new NotFound("mcp.not-found", "This MCP server is no longer in this workspace.");
+        }
     }
 
     /** The agents that use the server's tools; while there are any, it can't be removed. */

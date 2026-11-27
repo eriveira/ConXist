@@ -18,7 +18,7 @@ const ready = (overrides: Partial<McpConnection> = {}): McpConnection => ({
   tools: TOOLS, error: null, ...overrides,
 });
 const SERVER: McpServer = {
-  id: SERVER_ID, name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'OAUTH', icon: ICON, status: 'WORKS',
+  id: SERVER_ID, name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'OAUTH', icon: ICON, logo: null, status: 'WORKS',
   tools: [tool('search_docs', true, true, ['Researcher']), tool('get_doc', true, true), tool('create_doc', false)],
   addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
 };
@@ -191,5 +191,39 @@ describe('Settings › MCPs', () => {
     const dialog = screen.getByRole('dialog', { name: 'Remove Acme Docs?' });
     expect(within(dialog).getByText(/Researcher uses its tools/)).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeDisabled();
+  });
+
+  it('a server’s page shows a logo fetched from an address, says when it is not an image, and goes back', async () => {
+    const BRAND = 'data:image/svg+xml;base64,PHN2Zy8+';
+    const chosen = { ...SERVER, icon: BRAND, logo: { address: 'https://acme.test/logo.svg', fetchedAt: '2026-11-27T16:00:00Z' } };
+    const calls = stubApi({
+      'GET /api/mcps': () => ({ body: [SERVER] }),
+      [`GET /api/mcps/${SERVER_ID}`]: () => ({ body: SERVER }),
+      [`PUT /api/mcps/${SERVER_ID}/logo`]: (init) => (String(init?.body).includes('page')
+        ? { status: 422, body: { code: 'mcp.logo-not-image', message: 'Not an image.' } }
+        : { body: chosen }),
+      [`DELETE /api/mcps/${SERVER_ID}/logo`]: () => ({ body: SERVER }),
+    });
+    const { container } = open(`#/settings/mcps/${SERVER_ID}`);
+
+    const field = await screen.findByLabelText('Logo address');
+    expect(screen.getByText(/ConXist found this logo/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use' })).toBeDisabled();
+    await userEvent.type(field, 'https://acme.test/page');
+    await userEvent.click(screen.getByRole('button', { name: 'Use' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('That address isn’t an image.');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+
+    await userEvent.clear(field);
+    await userEvent.type(field, 'https://acme.test/logo.svg');
+    await userEvent.click(screen.getByRole('button', { name: 'Use' }));
+    expect(await screen.findByText(/Saved\. Fetched once on/)).toBeInTheDocument();
+    expect(bodyOf(calls, `PUT /api/mcps/${SERVER_ID}/logo`)).toEqual({ address: 'https://acme.test/logo.svg' });
+    expect(screen.getByText(/Your logo\. ConXist keeps its own copy/)).toBeInTheDocument();
+    expect(await accessibilityViolations(container)).toEqual([]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Use the logo ConXist found' }));
+    expect(await screen.findByText(/ConXist found this logo/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Logo address')).toHaveValue('');
   });
 });

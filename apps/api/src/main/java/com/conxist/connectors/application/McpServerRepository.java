@@ -16,8 +16,11 @@ public interface McpServerRepository {
     /** Saves a new server unless the workspace has another one with its name (ignoring case). */
     boolean insertIfNameFree(McpServer server, McpCredential credential);
 
-    /** Saves the server's name, tools and status. False when the name is taken by another of its servers. */
+    /** Saves the server's name, the logo it found, its tools and status; not the logo a person chose. False when the name is taken by another of its servers. */
     boolean update(McpServer server);
+
+    /** Saves the logo a person chose for the server, or null to show the one ConXist found. False when it is gone. */
+    boolean saveLogo(UUID workspaceId, UUID serverId, McpServer.Logo logo);
 
     Optional<McpCredential> credential(UUID workspaceId, UUID serverId);
 
