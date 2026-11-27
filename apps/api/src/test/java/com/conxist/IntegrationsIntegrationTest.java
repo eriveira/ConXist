@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.List;
 import com.conxist.testing.FakeBitbucketServer;
 import com.conxist.testing.FakeGitHubServer;
+import com.conxist.testing.FakeGoogleServer;
 import com.conxist.testing.FakePlaudConfiguration;
 import com.jayway.jsonpath.JsonPath;
 import org.hamcrest.Matchers;
@@ -33,8 +34,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 /**
- * The GitHub (ADR 0019) and Bitbucket (ADR 0020) integrations end to end: a real PostgreSQL, the real HTTP adapters
- * and fake GitHub and Bitbucket APIs.
+ * The GitHub (ADR 0019), Bitbucket (ADR 0020) and Gmail (ADR 0021) integrations end to end: a real PostgreSQL, the
+ * real HTTP adapters and fake GitHub, Bitbucket and Google APIs.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -63,6 +64,9 @@ class IntegrationsIntegrationTest {
 
     @Autowired
     JdbcClient jdbc;
+
+    @Autowired
+    FakeGoogleServer google;
 
     @Test
     void bitbucket_is_added_with_an_email_and_api_token_for_the_repositories_the_person_picks() throws Exception {
@@ -121,6 +125,75 @@ class IntegrationsIntegrationTest {
         mvc.perform(post("/api/integrations/{id}/check", integration).header(HEADER, workspace))
                 .andExpect(jsonPath("$.works").value(true));
         assertThat(bitbucket.requests()).allMatch(request -> request.startsWith("GET "));
+    }
+
+    @Test
+    void gmail_signs_in_with_google_and_agents_read_only_the_labels_picked() throws Exception {
+        String workspace = workspace("Gmail");
+        mvc.perform(get("/api/integrations/kinds").header(HEADER, workspace))
+                .andExpect(content().json("[\"GITHUB\",\"BITBUCKET\",\"GMAIL\"]"));
+        String signIn = signInWithGoogle(workspace, "{}");
+        mvc.perform(get("/api/integrations/gmail/sign-in/{id}", signIn).header(HEADER, workspace("Outsider")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/integrations/gmail/sign-in/{id}", signIn).header(HEADER, workspace))
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.account").value("al…@acme.test"))
+                .andExpect(jsonPath("$.labels[0]").value("Customers"))
+                .andExpect(jsonPath("$.tools.length()").value(4))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("fake-refresh"))));
+
+        String body = "{\"signInId\":\"" + signIn + "\",\"labels\":%s,\"allowedTools\":[\"search_emails\"]}";
+        mvc.perform(post("/api/integrations/gmail").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.formatted("[\"Secret\"]")))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("integration.repository-unknown"));
+        mvc.perform(post("/api/integrations/gmail").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.formatted("[\"*\",\"Customers\"]")))
+                .andExpect(jsonPath("$.code").value("integration.labels-or-all-mail"));
+        String integration = JsonPath.read(mvc.perform(post("/api/integrations/gmail").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(body.formatted("[\"customers\"]")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.kind").value("GMAIL"))
+                .andExpect(jsonPath("$.repositories[0]").value("Customers"))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("fake-refresh"))))
+                .andReturn().getResponse().getContentAsString(), "$.id");
+        mvc.perform(get("/api/integrations/gmail/sign-in/{id}", signIn).header(HEADER, workspace))
+                .andExpect(status().isNotFound());
+
+        byte[] sealed = jdbc.sql("select token_sealed from integrations where id = cast(:id as uuid)")
+                .param("id", integration).query(byte[].class).single();
+        assertThat(new String(sealed, StandardCharsets.ISO_8859_1)).doesNotContain("fake-refresh");
+        mvc.perform(put("/api/integrations/{id}/repositories", integration).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"repositories\":[\"*\"]}"))
+                .andExpect(jsonPath("$.repositories[0]").value("*"));
+        mvc.perform(post("/api/integrations/{id}/check", integration).header(HEADER, workspace))
+                .andExpect(jsonPath("$.works").value(true));
+
+        String again = signInWithGoogle(workspace, "{\"integrationId\":\"" + integration + "\"}");
+        mvc.perform(put("/api/integrations/{id}/google", integration).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"signInId\":\"" + again + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.repositories[0]").value("*"));
+        mvc.perform(get("/api/integrations/gmail/callback?state=unknown&code=x"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("Back to ConXist")));
+        assertThat(google.requests()).filteredOn(request -> request.contains("/gmail/"))
+                .allMatch(request -> request.startsWith("GET "));
+    }
+
+    /** Starts Sign in with Google, follows Google's page as a browser would, and lands on the callback. */
+    private String signInWithGoogle(String workspace, String body) throws Exception {
+        String started = mvc.perform(post("/api/integrations/gmail/sign-in").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(jsonPath("$.status").value("SIGNING_IN"))
+                .andReturn().getResponse().getContentAsString();
+        java.net.http.HttpResponse<Void> page = java.net.http.HttpClient.newHttpClient().send(
+                java.net.http.HttpRequest.newBuilder(java.net.URI.create(JsonPath.read(started, "$.signInUrl")))
+                        .build(), java.net.http.HttpResponse.BodyHandlers.discarding());
+        java.net.URI back = java.net.URI.create(page.headers().firstValue("Location").orElseThrow());
+        mvc.perform(get(back.getPath() + "?" + back.getRawQuery()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("Back to ConXist")));
+        return JsonPath.read(started, "$.id");
     }
 
     @Test

@@ -8,10 +8,14 @@ import com.conxist.agents.AgentMcpTools;
 import com.conxist.connectors.McpToolbox;
 import com.conxist.connectors.adapter.bitbucket.HttpBitbucketApi;
 import com.conxist.connectors.adapter.github.HttpGitHubApi;
+import com.conxist.connectors.adapter.gmail.GoogleOAuth;
+import com.conxist.connectors.adapter.gmail.HttpGmailApi;
 import com.conxist.connectors.adapter.mcp.HttpMcpGateway;
 import com.conxist.connectors.application.AllowedMcpTools;
 import com.conxist.connectors.application.CallMcpTools;
+import com.conxist.connectors.application.ConnectGmail;
 import com.conxist.connectors.application.ConnectMcpServer;
+import com.conxist.connectors.application.GmailSignIns;
 import com.conxist.connectors.application.IntegrationApi;
 import com.conxist.connectors.application.IntegrationRepository;
 import com.conxist.connectors.application.IntegrationViews;
@@ -54,6 +58,30 @@ class ConnectorsConfiguration {
     @Bean
     IntegrationApi bitbucketApi(ConnectorsProperties properties) {
         return new HttpBitbucketApi(apiClient(properties), properties.bitbucketApi());
+    }
+
+    @Bean
+    GoogleOAuth googleOAuth(ConnectorsProperties properties, Clock clock) {
+        ConnectorsProperties.Google google = properties.google();
+        return new GoogleOAuth(apiClient(properties), new GoogleOAuth.Client(google.clientId(), google.clientSecret(),
+                google.authorizationUri(), google.tokenUri(), google.redirectUri()), clock);
+    }
+
+    /** GET only, with timeouts and no redirects; access tokens come from the person's Google sign-in. */
+    @Bean
+    IntegrationApi gmailApi(ConnectorsProperties properties, GoogleOAuth google, Clock clock) {
+        return new HttpGmailApi(apiClient(properties), properties.gmailApi(), google, clock);
+    }
+
+    @Bean
+    GmailSignIns gmailSignIns(Clock clock) {
+        return new GmailSignIns(clock);
+    }
+
+    @Bean
+    ConnectGmail connectGmail(GoogleOAuth google, List<IntegrationApi> apis, GmailSignIns signIns,
+            IntegrationRepository integrations, ManageIntegrations manage, CurrentWorkspace workspace) {
+        return new ConnectGmail(google, apis, signIns, integrations, manage, workspace);
     }
 
     private static RestClient apiClient(ConnectorsProperties properties) {

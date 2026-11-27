@@ -63,6 +63,16 @@ conxist:
     github-api: https://api.github.com
     # Bitbucket Cloud's REST API, for the Bitbucket integration (ADR 0020).
     bitbucket-api: https://api.bitbucket.org/2.0
+    # Gmail's API for the signed-in person, for the Gmail integration (ADR 0021).
+    gmail-api: https://gmail.googleapis.com/gmail/v1/users/me
+    # This ConXist's Google OAuth client for Gmail (read-only Gmail only). Without an id and a secret, Gmail is not
+    # offered. The redirect URI must be registered on the client.
+    google:
+      client-id: ${CONXIST_GOOGLE_CLIENT_ID:}
+      client-secret: ${CONXIST_GOOGLE_CLIENT_SECRET:}
+      authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+      token-uri: https://oauth2.googleapis.com/token
+      redirect-uri: ${CONXIST_GOOGLE_REDIRECT_URI:http://127.0.0.1:${server.port}/api/integrations/gmail/callback}
   runs:
     # Test runs (ADR 0012). The owner's own Anthropic key; blank means test runs say a key is missing.
     anthropic-api-key: ${CONXIST_ANTHROPIC_API_KEY:}

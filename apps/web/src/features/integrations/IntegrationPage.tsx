@@ -2,16 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
-import { type Integration, type IntegrationCheck, kindIcon } from '../../domain/integrations';
+import { type Integration, type IntegrationCheck, kindIcon, readsAllMail } from '../../domain/integrations';
 import { allowedTools, type McpTool } from '../../domain/mcps';
 import { dateTime } from '../../domain/time';
-import { useLanguage, useT } from '../../i18n/i18n';
+import { type Translate, useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { settingsHref } from '../../navigation';
 import { ErrorState, LoadingState, SavedStatus } from '../settings/SettingsParts';
 import { McpLogo, McpToolTable } from '../mcps/McpParts';
 import { ConnectBitbucketDialog } from './ConnectBitbucketDialog';
 import { ConnectGitHubDialog } from './ConnectGitHubDialog';
+import { ConnectGmailDialog } from './ConnectGmailDialog';
+import { PickLabelsDialog } from './PickLabelsDialog';
 import { PickRepositoriesDialog } from './PickRepositoriesDialog';
 import { RemoveIntegrationDialog } from './RemoveIntegrationDialog';
 
@@ -24,8 +26,8 @@ type Check = { state: 'idle' } | { state: 'checking' } | { state: 'done'; check:
  * tick saves at once), and what can be done with it: check it now, replace its token, change the repositories
  * (Bitbucket, ADR 0020), remove it.
  */
-export function IntegrationPage({ integrationId, onRemoved }: {
-  integrationId: string; onRemoved: (integration: Integration) => void;
+export function IntegrationPage({ integrationId, workspaceName, onRemoved }: {
+  integrationId: string; workspaceName: string; onRemoved: (integration: Integration) => void;
 }) {
   const t = useT();
   const language = useLanguage();
@@ -85,7 +87,9 @@ export function IntegrationPage({ integrationId, onRemoved }: {
   }
 
   const titleId = `integration-${integration.id}`;
+  const gmail = integration.kind === 'GMAIL';
   const picks = integration.kind === 'BITBUCKET';
+  const allMail = readsAllMail(integration);
   const show = (next: Integration, done: Check) => {
     setDialog(null);
     setCheck(done);
@@ -102,14 +106,18 @@ export function IntegrationPage({ integrationId, onRemoved }: {
         </h2>
       </div>
       <p className="lead mcp-address">
-        {t('integration.page.meta', {
-          account: integration.account, ending: t('integration.tokenEnding', { ending: integration.tokenEnding }),
-          checked: dateTime(integration.checkedAt, language),
-        })}
+        {gmail
+          ? t('integration.page.gmailMeta', { account: integration.account, checked: dateTime(integration.checkedAt, language) })
+          : t('integration.page.meta', {
+            account: integration.account, ending: t('integration.tokenEnding', { ending: integration.tokenEnding }),
+            checked: dateTime(integration.checkedAt, language),
+          })}
       </p>
       {integration.status !== 'WORKS' && (
         <p className={integration.status === 'SIGN_IN_NEEDED' ? 'alert error' : 'alert info'}>
-          <Icon name="alert" /> {t(`integration.state.${integration.status}`, { name: integration.name })}
+          <Icon name="alert" /> {gmail && integration.status === 'SIGN_IN_NEEDED'
+            ? t('integration.state.gmail.SIGN_IN_NEEDED')
+            : t(`integration.state.${integration.status}`, { name: integration.name })}
         </p>
       )}
       <div className="vendor-actions mcp-actions">
@@ -118,25 +126,46 @@ export function IntegrationPage({ integrationId, onRemoved }: {
         </button>
         <button type="button" className={integration.status === 'SIGN_IN_NEEDED' ? 'btn sm primary' : 'btn sm'}
           onClick={() => setDialog('token')}>
-          {t('mcp.page.replaceToken')}
+          {t(gmail ? 'integration.page.signInAgain' : 'mcp.page.replaceToken')}
         </button>
         <button type="button" className="btn sm danger" onClick={() => setDialog('remove')}>{t('mcp.page.remove')}</button>
       </div>
-      <CheckResult check={check} name={integration.name} />
-      <div className="models-head">
-        <h3>{t('integration.page.repositories')}</h3>
-        <span className="muted">{t(integration.repositories.length === 1 ? 'integration.repositories_one' : 'integration.repositories',
-          { count: integration.repositories.length })}</span>
-      </div>
-      <ul className="repo-list">
-        {integration.repositories.map((repository) => <li key={repository} className="mono">{repository}</li>)}
-      </ul>
-      <p className="hint">
-        {t(picks ? 'integration.page.repositoriesPicked' : 'integration.page.repositoriesHelp')}
-        {picks && <> <button type="button" className="link" onClick={() => setDialog('repositories')}>
-          {t('integration.page.changeRepositories')}
-        </button></>}
-      </p>
+      <CheckResult check={check} integration={integration} />
+      {gmail ? (
+        <>
+          <div className="models-head">
+            <h3>{t('integration.page.labels')}</h3>
+            <span className="muted">{reach(integration, t)}</span>
+          </div>
+          {!allMail && (
+            <ul className="repo-list">
+              {integration.repositories.map((label) => <li key={label}>{label}</li>)}
+            </ul>
+          )}
+          <p className="hint">
+            {t(allMail ? 'integration.page.allMail' : 'integration.page.labelsPicked')}{' '}
+            <button type="button" className="link" onClick={() => setDialog('repositories')}>
+              {t('integration.page.changeLabels')}
+            </button>
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="models-head">
+            <h3>{t('integration.page.repositories')}</h3>
+            <span className="muted">{reach(integration, t)}</span>
+          </div>
+          <ul className="repo-list">
+            {integration.repositories.map((repository) => <li key={repository} className="mono">{repository}</li>)}
+          </ul>
+          <p className="hint">
+            {t(picks ? 'integration.page.repositoriesPicked' : 'integration.page.repositoriesHelp')}
+            {picks && <> <button type="button" className="link" onClick={() => setDialog('repositories')}>
+              {t('integration.page.changeRepositories')}
+            </button></>}
+          </p>
+        </>
+      )}
       <div className="models-head">
         <h3>{t('mcp.page.tools')}</h3>
         <span className="muted">{t('mcp.page.toolsCount', { total: integration.tools.length, count: allowed.size })}</span>
@@ -146,15 +175,24 @@ export function IntegrationPage({ integrationId, onRemoved }: {
       <McpToolTable server={integration} tools={integration.tools} allowed={allowed} busy={saving}
         onToggle={(tool) => void toggle(tool)} />
       <p className="note"><Icon name="info" size={14} /> {t('integration.page.readOnly', { name: integration.name })}</p>
-      {dialog === 'token' && !picks && (
+      {gmail && <p className="note"><Icon name="info" size={14} /> {t('integration.page.emailsAreData')}</p>}
+      {dialog === 'token' && integration.kind === 'GITHUB' && (
         <ConnectGitHubDialog integration={integration} onClose={() => setDialog(null)}
+          onDone={(next) => show(next, { state: 'replaced' })} />
+      )}
+      {dialog === 'token' && gmail && (
+        <ConnectGmailDialog integration={integration} workspaceName={workspaceName} onClose={() => setDialog(null)}
           onDone={(next) => show(next, { state: 'replaced' })} />
       )}
       {dialog === 'token' && picks && (
         <ConnectBitbucketDialog integration={integration} onClose={() => setDialog(null)}
           onDone={(next) => show(next, { state: 'replaced' })} />
       )}
-      {dialog === 'repositories' && (
+      {dialog === 'repositories' && gmail && (
+        <PickLabelsDialog integration={integration} onClose={() => setDialog(null)}
+          onDone={(next) => show(next, { state: 'picked' })} />
+      )}
+      {dialog === 'repositories' && !gmail && (
         <PickRepositoriesDialog integration={integration} onClose={() => setDialog(null)}
           onDone={(next) => show(next, { state: 'picked' })} />
       )}
@@ -166,26 +204,44 @@ export function IntegrationPage({ integrationId, onRemoved }: {
   );
 }
 
-/** How Check now went, or that the token or the repositories changed, read out once it arrives. */
-function CheckResult({ check, name }: { check: Check; name: string }) {
+/** How Check now went, or that the token, the sign-in, the repositories or the labels changed, read out once it arrives. */
+function CheckResult({ check, integration }: { check: Check; integration: Integration }) {
   const t = useT();
+  const { name } = integration;
+  const gmail = integration.kind === 'GMAIL';
   let text = '';
   let failed = false;
   if (check.state === 'error') {
     text = t('integration.check.unreachable', { name });
     failed = true;
   } else if (check.state === 'replaced') {
-    text = t('integration.replaced');
+    text = t(gmail ? 'integration.signedInAgain' : 'integration.replaced');
   } else if (check.state === 'picked') {
-    text = t('integration.picked');
+    text = t(gmail ? 'integration.labelsSaved' : 'integration.picked');
   } else if (check.state === 'done' && check.check.works) {
     const count = check.check.integration.repositories.length;
-    text = t(count === 1 ? 'integration.check.works_one' : 'integration.check.works', { count, name });
+    text = gmail
+      ? t(readsAllMail(check.check.integration) ? 'integration.check.gmail-works-all' : 'integration.check.gmail-works')
+      : t(count === 1 ? 'integration.check.works_one' : 'integration.check.works', { count, name });
   } else if (check.state === 'done') {
     const error = check.check.error;
-    text = t(error === 'sign-in-needed' || error === 'refused' || error === 'repositories-lost'
-      ? `integration.check.${error}` : 'integration.check.unreachable', { name });
+    if (gmail && (error === 'sign-in-needed' || error === 'repositories-lost')) {
+      text = t(`integration.check.gmail-${error}`);
+    } else {
+      text = t(error === 'sign-in-needed' || error === 'refused' || error === 'repositories-lost'
+        ? `integration.check.${error}` : 'integration.check.unreachable', { name });
+    }
     failed = true;
   }
   return <p className={failed ? 'status-line failed' : 'status-line'} role="status">{text}</p>;
+}
+
+/** How many repositories, or for Gmail how many labels (or all email), agents may read. */
+export function reach(integration: Integration, t: Translate): string {
+  const count = integration.repositories.length;
+  if (integration.kind !== 'GMAIL') {
+    return t(count === 1 ? 'integration.repositories_one' : 'integration.repositories', { count });
+  }
+  if (readsAllMail(integration)) return t('integration.allMail');
+  return t(count === 1 ? 'integration.labels_one' : 'integration.labels', { count });
 }

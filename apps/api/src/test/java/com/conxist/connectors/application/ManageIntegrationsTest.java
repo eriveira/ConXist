@@ -41,7 +41,7 @@ class ManageIntegrationsTest {
         public List<McpToolUse> mcpToolUses() { return List.copyOf(uses); }
     };
     private final ManageIntegrations manage = new ManageIntegrations(integrations, List.of(api(GITHUB),
-            api(BITBUCKET)), new IntegrationViews(new McpServerViews(agents)), () -> WORKSPACE, CLOCK);
+            api(BITBUCKET), api(Integration.Kind.GMAIL)), new IntegrationViews(new McpServerViews(agents)), () -> WORKSPACE, CLOCK);
 
     private IntegrationApi api(Integration.Kind kind) {
         return new IntegrationApi() {
@@ -197,6 +197,28 @@ class ManageIntegrationsTest {
         UUID id = addGitHub(Set.of()).id();
         failure = new IntegrationApi.Refused("403");
         assertThat(manage.check(id).error()).isEqualTo("refused");
+    }
+
+    @Test
+    void gmail_reads_picked_labels_or_all_mail_and_a_mailbox_without_labels_can_still_be_added() {
+        Integration.Kind gmail = Integration.Kind.GMAIL;
+        assertThatThrownBy(() -> manage.checkToken(gmail, null, "x"))
+                .isInstanceOf(RuleViolation.class).hasMessageContaining("Sign in with Google");
+
+        account = new IntegrationApi.Account("al…@acme.test", List.of());
+        IntegrationViews.IntegrationView added = manage.addSignedIn(gmail, "1//refresh-abcd", List.of("*"),
+                Set.of("search_emails"));
+        assertThat(added.repositories()).containsExactly("*");
+        assertThat(added.tokenEnding()).isEqualTo("abcd");
+        assertThat(manage.check(added.id()).integration().repositories()).containsExactly("*");
+
+        account = new IntegrationApi.Account("al…@acme.test", List.of("Customers", "Personal"));
+        assertThat(manage.pickRepositories(added.id(), List.of("customers")).repositories())
+                .containsExactly("Customers");
+        assertThatThrownBy(() -> manage.pickRepositories(added.id(), List.of("*", "Personal")))
+                .isInstanceOf(RuleViolation.class).hasMessageContaining("not both");
+        assertThatThrownBy(() -> manage.pickRepositories(added.id(), List.of()))
+                .isInstanceOf(RuleViolation.class).hasMessageContaining("at least one label");
     }
 
     @Test
