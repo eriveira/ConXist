@@ -80,10 +80,6 @@ export function SkillSections({ draft, onChange, disabled, context, onRetryConte
           <SkillNeeds draft={draft} tools={context.tools} onChange={onChange} />
         )}
       </Section>
-
-      <Section number={3} title={t('skill.section.files')} lead={t('skill.section.files.lead')}>
-        <p className="muted"><span className="pill soon">{t('skills.soon')}</span> {t('skill.files.soon')}</p>
-      </Section>
     </fieldset>
   );
 }

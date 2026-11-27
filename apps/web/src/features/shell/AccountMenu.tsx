@@ -35,7 +35,7 @@ export function AccountMenu({ theme, onTheme, language, onLanguage }: AccountMen
       </button>
       {popover.open && (
         <div className="menu account-panel" role="group" aria-label={t('account.button')} data-popover>
-          <p className="account-note"><Icon name="lock" size={16} /> {t('account.signInSoon')}</p>
+          <p className="account-note"><Icon name="lock" size={16} /> {t('account.local')}</p>
           <label className="setting">
             <span>{t('app.theme')}</span>
             <select value={theme} onChange={(event) => onTheme(event.target.value as Theme)}>

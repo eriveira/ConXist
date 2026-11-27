@@ -2,16 +2,9 @@
 export const shellEn = {
   'nav.label': 'Main',
   'nav.home': 'Home',
-  'nav.flow': 'Flow',
   'nav.agents': 'Agents',
   'nav.skills': 'Skills',
   'nav.sources': 'Sources',
-  'nav.knowledge': 'Knowledge',
-  'nav.memories': 'Memories',
-  'soon.title': '{page} is coming soon',
-  'soon.flow': 'Follow work from a meeting to requirements to code, step by step.',
-  'soon.knowledge': 'What ConXist learns from your sources: decisions, requirements and context, sorted by your categories.',
-  'soon.memories': 'Memory that lives next to your code, by discipline (mission, branding, design, architecture), so people and coding agents read the same source of truth.',
 
   'workspace.switch': 'Workspace: {name}. Switch workspace',
   'workspace.menu': 'Your workspaces',
@@ -45,27 +38,16 @@ export const shellEn = {
 
   'account.button': 'Account and settings',
   'account.you': 'You',
-  'account.signInSoon': 'Sign-in is coming soon. For now ConXist runs only on this computer.',
+  'account.local': 'ConXist runs only on this computer, without sign-in.',
 
-  'ask.button': 'Ask ConXist',
-  'ask.title': 'Ask ConXist',
-  'ask.soon': 'Coming soon: ask about your meetings, documents and code, and get answers from what ConXist captured.',
-  'ask.close': 'Close',
 };
 
 export const shellEs: Record<keyof typeof shellEn, string> = {
   'nav.label': 'Principal',
   'nav.home': 'Inicio',
-  'nav.flow': 'Flujo',
   'nav.agents': 'Agentes',
   'nav.skills': 'Habilidades',
   'nav.sources': 'Fuentes',
-  'nav.knowledge': 'Conocimiento',
-  'nav.memories': 'Memorias',
-  'soon.title': '{page} llega pronto',
-  'soon.flow': 'Sigue el trabajo de una reunión a los requisitos y al código, paso a paso.',
-  'soon.knowledge': 'Lo que ConXist aprende de tus fuentes: decisiones, requisitos y contexto, ordenados por tus categorías.',
-  'soon.memories': 'Memoria que vive junto a tu código, por disciplina (misión, marca, diseño, arquitectura), para que personas y agentes de código lean la misma fuente de verdad.',
 
   'workspace.switch': 'Espacio de trabajo: {name}. Cambiar de espacio',
   'workspace.menu': 'Tus espacios de trabajo',
@@ -99,10 +81,6 @@ export const shellEs: Record<keyof typeof shellEn, string> = {
 
   'account.button': 'Cuenta y ajustes',
   'account.you': 'Tú',
-  'account.signInSoon': 'El inicio de sesión llega pronto. Por ahora ConXist solo funciona en esta computadora.',
+  'account.local': 'ConXist solo funciona en esta computadora, sin inicio de sesión.',
 
-  'ask.button': 'Pregunta a ConXist',
-  'ask.title': 'Pregunta a ConXist',
-  'ask.soon': 'Próximamente: pregunta sobre tus reuniones, documentos y código, y recibe respuestas de lo que ConXist capturó.',
-  'ask.close': 'Cerrar',
 };

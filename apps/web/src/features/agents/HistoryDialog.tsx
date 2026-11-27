@@ -72,8 +72,8 @@ export function HistoryDialog<V>({
 
   return (
     <Dialog title={t('agent.history.title')} subtitle={t('agent.history.subtitle')} icon={<Icon name="sync" />}
-      closeLabel={t('ask.close')} onClose={onClose} step="history" closable={!busy}
-      footer={<><span className="grow" /><button type="button" className="btn" onClick={onClose} disabled={busy}>{t('ask.close')}</button></>}>
+      closeLabel={t('dialog.close')} onClose={onClose} step="history" closable={!busy}
+      footer={<><span className="grow" /><button type="button" className="btn" onClick={onClose} disabled={busy}>{t('dialog.close')}</button></>}>
       <div className="m-body">
         <h3>{t('agent.history.heading', { name })}</h3>
         {archived && <p className="alert info"><Icon name="info" /> {archivedNote}</p>}

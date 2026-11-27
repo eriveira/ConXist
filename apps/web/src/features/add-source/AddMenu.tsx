@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { Pill } from '../../components/Pill';
-import { canBeAdded, providersIn } from '../../domain/providers';
+import { canBeAdded, isCategoryOpen, providersIn } from '../../domain/providers';
 import { CATEGORIES, type Category, type Provider, type ProviderId } from '../../domain/model';
 import { useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
@@ -18,7 +18,10 @@ interface AddMenuProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-/** Add button with a two-level menu: category first (three choices), then the providers in it. */
+/**
+ * Add button with a two-level menu: category first, then the providers in it. Only what can be added is listed; with
+ * one category open the menu goes straight to its providers.
+ */
 export function AddMenu({ providers, onChoose, open: openFromPage, onOpenChange }: AddMenuProps) {
   const t = useT();
   const [ownOpen, setOwnOpen] = useState(false);
@@ -29,6 +32,8 @@ export function AddMenu({ providers, onChoose, open: openFromPage, onOpenChange 
   };
   const [category, setCategory] = useState<Category | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const openCategories = CATEGORIES.filter((id) => isCategoryOpen(id, providers));
+  const shown = category ?? (openCategories.length === 1 ? openCategories[0] : null);
   const button = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -80,12 +85,12 @@ export function AddMenu({ providers, onChoose, open: openFromPage, onOpenChange 
       </button>
       {open && (
         <div className="menu" role="group" aria-label={t('add.menu.title')}>
-          {category ? (
-            <ProviderList category={category} providers={providers} onBack={() => setCategory(null)} onChoose={choose} />
+          {shown ? (
+            <ProviderList category={shown} providers={providers} onBack={openCategories.length > 1 ? () => setCategory(null) : undefined} onChoose={choose} />
           ) : (
             <>
               <div className="menu-h">{t('add.menu.title')}</div>
-              {CATEGORIES.map((id) => (
+              {openCategories.map((id) => (
                 <button key={id} type="button" className="mitem" onClick={() => setCategory(id)}>
                   <span className="nico"><Icon name={CATEGORY_ICON[id]} /></span>
                   <span className="mtext">
@@ -95,9 +100,9 @@ export function AddMenu({ providers, onChoose, open: openFromPage, onOpenChange 
                   <span className="chev"><Icon name="chevron" size={18} /></span>
                 </button>
               ))}
-              <div className="menu-foot">{t('add.footer')}</div>
             </>
           )}
+          <div className="menu-foot">{t('add.footer')}</div>
         </div>
       )}
     </div>
@@ -107,7 +112,8 @@ export function AddMenu({ providers, onChoose, open: openFromPage, onOpenChange 
 interface ProviderListProps {
   category: Category;
   providers: readonly Provider[];
-  onBack: () => void;
+  /** Left out when this is the only category, so there is nothing to go back to. */
+  onBack?: () => void;
   onChoose: (provider: Provider) => void;
 }
 
@@ -116,22 +122,22 @@ function ProviderList({ category, providers, onBack, onChoose }: ProviderListPro
   return (
     <>
       <div className="menu-h">
-        <button type="button" className="back" onClick={onBack} aria-label={t('add.back')}>
-          <Icon name="back" size={18} />
-        </button>
+        {onBack && (
+          <button type="button" className="back" onClick={onBack} aria-label={t('add.back')}>
+            <Icon name="back" size={18} />
+          </button>
+        )}
         {t(`category.${category}` as MessageKey)}
       </div>
-      {providersIn(category, providers).map((provider) => {
-        const addable = canBeAdded(provider);
+      {providersIn(category, providers).filter(canBeAdded).map((provider) => {
         const description = providerDescription(provider, t);
         return (
-          <button key={provider.provider} type="button" className="mitem" disabled={!addable} onClick={() => onChoose(provider)}>
+          <button key={provider.provider} type="button" className="mitem" onClick={() => onChoose(provider)}>
             <span className="nico"><Icon name={PROVIDER_ICON[provider.provider] ?? CATEGORY_ICON[category]} /></span>
             <span className="mtext">
               <span className="mname">{providerName(provider, t)}</span>
               {description && <span className="mdesc">{description}</span>}
             </span>
-            {!addable && <Pill tone="soon">{t('add.soon')}</Pill>}
             {provider.availability === 'PREVIEW' && <Pill tone="preview">{t('add.preview')}</Pill>}
           </button>
         );

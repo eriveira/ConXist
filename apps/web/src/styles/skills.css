@@ -74,9 +74,6 @@
 .used-by .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .version-note { display: block; margin-top: 2px; font-size: 13px; color: var(--cx-fg-muted); overflow-wrap: anywhere; }
 .plain-list { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
-.soon-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--cx-border); border-radius: var(--cx-radius-sm); }
-.soon-row .grow { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.soon-row small { color: var(--cx-fg-muted); font-size: 13px; }
 
 @media (max-width: 560px) {
   .page-h-actions { grid-column: 1 / -1; justify-content: flex-start; }

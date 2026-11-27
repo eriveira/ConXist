@@ -59,33 +59,6 @@
   background: var(--cx-surface-raised); padding: 0 10px;
 }
 
-/* Ask ConXist */
-/* same right gutter as the page, so it lines up with Add source */
-.ask { position: fixed; right: var(--page-gutter); bottom: 24px; z-index: 30; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-.ask-button {
-  display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 22px 0 18px; border: 1px solid transparent;
-  border-radius: var(--cx-radius-pill); background: var(--cx-ink); color: var(--cx-white); font-size: 16px; font-weight: 700;
-  box-shadow: var(--cx-shadow-pop);
-}
-.ask-button svg { color: var(--cx-glow); }
-.ask-button:hover { box-shadow: var(--cx-shadow-glow); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ask-button { border-color: var(--cx-border); } }
-:root[data-theme="dark"] .ask-button { border-color: var(--cx-border); }
-.ask-panel {
-  width: 320px; max-width: calc(100vw - 32px); padding: 14px 14px 16px; background: var(--cx-surface-raised);
-  border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); box-shadow: var(--cx-shadow-pop); animation: drop .14s ease-out;
-}
-.ask-panel header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.ask-panel h2 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
-.ask-panel p { margin: 0; font-size: 14px; color: var(--cx-fg-muted); }
-.ask-ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--cx-radius-sm); background: var(--cx-accent-soft); color: var(--cx-accent-text); }
-.ask-panel .x {
-  margin-left: auto; min-width: 40px; min-height: 40px; border-radius: 50%; border: 0; background: transparent;
-  color: var(--cx-fg-muted); display: grid; place-items: center;
-}
-.ask-panel .x:hover { background: var(--cx-surface); }
-@media (prefers-reduced-motion: reduce) { .ask-panel { animation: none; } }
-
 /* notice after creating a workspace: stays mounted (empty) so screen readers announce the text when it appears */
 .notice {
   position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 25; margin: 0;
@@ -122,9 +95,6 @@
 .counter.full { color: var(--cx-warn-fg); font-weight: 700; }
 .page-state.full { min-height: 100vh; min-height: 100dvh; }
 .page-state h1 { margin: 0 0 6px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--cx-fg); }
-.soon-page { gap: 8px; }
-.soon-page h1 { margin: 4px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--cx-fg); }
-.soon-page p { margin: 0; }
 
 /* narrower screens (up to 1160px, so a long workspace name still fits): the menu gets its own row under the logo, switcher and account */
 @media (max-width: 1160px) {

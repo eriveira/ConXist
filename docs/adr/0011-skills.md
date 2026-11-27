@@ -52,6 +52,7 @@ section where a skill stays at the version it was added at.
 
 - Reference files and importing from a GitHub repo show as coming soon. Files are useful only once agents run
   (step 3), and storing them needs a decision on size and encryption.
+  2026-11-27 (owner): the app shows only what works, so both rows are gone until they are built.
 - A skill folder (zip) is not imported, only one SKILL.md.
 - The tool picker offers the three agent tools, not tools from GitHub or a team's own MCP server.
 - "New skill" from an agent's Add menu opens a new skill; it is not added to the agent on publish. The person adds it

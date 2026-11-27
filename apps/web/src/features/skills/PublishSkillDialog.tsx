@@ -32,7 +32,7 @@ export function PublishSkillDialog({ skill, context, onPublish, onClose }: Publi
   return (
     <Dialog title={t('skill.publish.title', { version: next })} subtitle={t(skill.publishedVersion
       ? 'skill.publish.subtitle' : 'skill.publish.subtitle.first', { version: skill.publishedVersion })}
-      icon={<Icon name="skill" />} closeLabel={t('ask.close')} onClose={onClose} step="publish" closable={!busy}
+      icon={<Icon name="skill" />} closeLabel={t('dialog.close')} onClose={onClose} step="publish" closable={!busy}
       focusFirst="input"
       footer={(
         <>
