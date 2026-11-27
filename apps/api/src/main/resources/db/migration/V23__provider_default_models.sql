@@ -5,3 +5,5 @@ alter table workspace_model_defaults drop constraint workspace_model_defaults_pk
 alter table workspace_model_defaults add primary key (workspace_id, provider);
 alter table workspace_model_defaults add column new_agents boolean not null default false;
 update workspace_model_defaults set new_agents = true;
+-- At most one provider per workspace is where new agents start.
+create unique index workspace_model_defaults_new_agents on workspace_model_defaults (workspace_id) where new_agents;

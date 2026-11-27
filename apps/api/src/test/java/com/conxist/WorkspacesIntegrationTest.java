@@ -88,6 +88,13 @@ class WorkspacesIntegrationTest {
             org.assertj.core.api.Assertions.assertThat(rows(table, gone)).as(table).isZero();
             org.assertj.core.api.Assertions.assertThat(rows(table, kept)).as(table).isPositive();
         }
+        // Every table that holds a workspace, today's and any added later, keeps nothing of the deleted one.
+        List<String> tables = jdbc.sql("select table_name from information_schema.columns where column_name = 'workspace_id'"
+                        + " and table_schema = current_schema()").query(String.class).list();
+        org.assertj.core.api.Assertions.assertThat(tables).hasSizeGreaterThan(10);
+        for (String table : tables) {
+            org.assertj.core.api.Assertions.assertThat(rows(table, gone)).as(table).isZero();
+        }
         mvc.perform(get("/api/sources").header(HEADER, gone)).andExpect(status().isNotFound());
         org.assertj.core.api.Assertions.assertThat(uploads.resolve(gone)).doesNotExist();
         org.assertj.core.api.Assertions.assertThat(uploads.resolve(kept)).isDirectory();

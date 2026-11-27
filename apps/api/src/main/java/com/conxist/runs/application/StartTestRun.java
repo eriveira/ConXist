@@ -57,6 +57,20 @@ public final class StartTestRun {
         return providers.anyConnected();
     }
 
+    /**
+     * Runs on text when it is given, else on the meeting named by its source and id; with neither, there is nothing
+     * to run on.
+     */
+    public TestRunResult runOn(UUID agentId, UUID sourceId, UUID meetingId, String title, String text) {
+        if (text != null) {
+            return runOnText(agentId, title, text);
+        }
+        if (sourceId == null || meetingId == null) {
+            throw new RuleViolation("run.nothing-to-run-on", "Pick a meeting, or give the text to run on.");
+        }
+        return run(agentId, sourceId, meetingId);
+    }
+
     public TestRunResult run(UUID agentId, UUID sourceId, UUID meetingId) {
         AgentBrief agent = runnable(agentId);
         LlmProviders.Call call = providers.callFor(agent).orElseThrow(StartTestRun::notReady);

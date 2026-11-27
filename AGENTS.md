@@ -48,7 +48,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
-- Capture has file upload (live) and personal Plaud accounts (preview: "Sign in with Plaud" through Plaud's MCP
+- Capture has file upload and personal Plaud accounts (preview: "Sign in with Plaud" through Plaud's MCP
   OAuth sign-in, waiting on Plaud to confirm outside apps may use it; see
   `docs/adr/0005-plaud-sign-in.md`) on the Sources page, which is out of the menu for now (ADR 0022: it still answers
   at `#/sources`, nothing links to it). Connecting Plaud lists the

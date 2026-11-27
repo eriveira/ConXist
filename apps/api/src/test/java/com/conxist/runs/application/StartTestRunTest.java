@@ -149,6 +149,7 @@ class StartTestRunTest {
         assertThat(model.requests.getLast().firstMessage()).contains("<meeting title=\"Pasted text\">");
         assertCode(() -> run.runOnText(AGENT_ID, "", "  "), "run.text-empty");
         assertCode(() -> run.runOnText(AGENT_ID, "", "x".repeat(150_001)), "run.text-too-long");
+        assertCode(() -> run.runOn(AGENT_ID, null, UUID.randomUUID(), null, null), "run.nothing-to-run-on");
     }
 
     @Test

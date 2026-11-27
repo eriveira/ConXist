@@ -286,6 +286,14 @@ class TestRunsIntegrationTest {
                 .andExpect(jsonPath("$.effort").value("LOW"));
         org.assertj.core.api.Assertions.assertThat(claude.requests().getLast().path("model").asString())
                 .isEqualTo("claude-opus-5-5");
+        mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"text\":\"" + "x".repeat(150_001) + "\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("run.text-too-long"));
+        mvc.perform(post("/api/agents/{id}/test-runs", agent).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("run.nothing-to-run-on"));
 
         int before = claude.requests().size();
         mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)

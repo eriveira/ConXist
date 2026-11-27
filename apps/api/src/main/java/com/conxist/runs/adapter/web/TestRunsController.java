@@ -30,17 +30,11 @@ class TestRunsController {
 
     @PostMapping("/api/agents/{agentId}/test-runs")
     TestRunResult run(@PathVariable UUID agentId, @Valid @RequestBody RunRequest request) {
-        if (request.text() != null) {
-            return startTestRun.runOnText(agentId, request.title(), request.text());
-        }
-        if (request.sourceId() == null || request.meetingId() == null) {
-            throw new RuleViolation("run.nothing-to-run-on", "Pick a meeting, or give the text to run on.");
-        }
-        return startTestRun.run(agentId, request.sourceId(), request.meetingId());
+        return startTestRun.runOn(agentId, request.sourceId(), request.meetingId(), request.title(), request.text());
     }
 
     /** A meeting ConXist keeps, by its source and id; or text given for this run only, with an optional title. */
-    record RunRequest(UUID sourceId, UUID meetingId, @Size(max = 200) String title, @Size(max = 150_000) String text) {
+    record RunRequest(UUID sourceId, UUID meetingId, @Size(max = 200) String title, String text) {
 
         @Override
         public String toString() {
