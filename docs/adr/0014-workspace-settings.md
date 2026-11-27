@@ -67,7 +67,7 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   and whether the provider refused it. `POST /{provider}/test` asks the provider now and says how long it took;
   `DELETE /{provider}/key` forgets the workspace's key. Each provider view carries `connection`: its source
   (`WORKSPACE`, `COMPUTER` or `NONE`), the key's ending, added and checked times, and `refused`.
-  `ProviderKeys` picks the key: the workspace's own first, else this computer's `CONXIST_ANTHROPIC_API_KEY` (kept so
+  `ProviderKeys` picks the key: the workspace's own first, else this computer's `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` (kept so
   a local setup still works), else none. `ModelPort` calls take the key; `ClaudeModel` keeps one SDK client per key
   (the SDK sets the key per client). Model lists are kept per key (by a SHA-256 digest, never the key). A listing or
   test that the provider answers records the check (so opening Settings also notices a revoked key); a refused key
@@ -79,7 +79,8 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
 - **Topics** live in the `workspaces` module: table `workspace_topics` (V13) with a name of 1 to 60 characters,
   unique per workspace ignoring case, and a description up to 300. A workspace keeps up to 50, which the app enforces.
   `/api/topics` (GET, POST, PUT and DELETE `/{id}`) acts for the workspace in `X-Workspace-Id`.
-- Not shown for now (owner, 2026-11-25): more providers, the zero data retention rule and a monthly limit per
+- Not shown for now (owner, 2026-11-25; more providers changed by the 2026-11-27 amendment, which adds OpenAI):
+  more providers, the zero data retention rule and a monthly limit per
   provider.
 
 ### OpenAI (amendment, 2026-11-27)
@@ -88,7 +89,7 @@ owner said go. Sources stay in their own menu; Invite members was dropped.
   turn is one Chat Completions call: the run's rules as the developer message, strict function tools, a strict JSON
   schema when the agent gives back a shape, and the agent's effort as `reasoning_effort` for the models that reason
   (GPT-5 and the o-series; GPT-4.1 and GPT-4o refuse the field, so they get none). Earlier turns go back as OpenAI sent
-  them. Chat Completions has no error flag on a tool result, so a failed tool's text starts with "Error:".
+  them. Chat Completions has no error flag on a tool result; a failed tool's text already starts with "Error <code>".
 - OpenAI's Models API lists every model a key can use, with no display name. Settings keeps only the GPT and o-series
   chat models that take tools and structured output (`OpenAiModels.runsAgents`); image, audio, speech, embedding,
   search, Codex and older models are left out, and the screen says so. Names are made from the id ("GPT-5.2 mini").

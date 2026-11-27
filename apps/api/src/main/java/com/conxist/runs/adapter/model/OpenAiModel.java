@@ -35,6 +35,10 @@ import com.openai.models.chat.completions.ChatCompletionMessage;
 import com.openai.models.chat.completions.ChatCompletionMessageToolCall;
 import com.openai.models.chat.completions.ChatCompletionToolMessageParam;
 import com.openai.models.models.Model;
+import com.openai.models.models.ModelListParams;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * OpenAI's GPT models through the official OpenAI Java SDK (ADR 0014). Each turn is one Chat Completions call with the
@@ -47,7 +51,7 @@ public final class OpenAiModel implements ModelPort {
     /** The provider name the API's settings use for OpenAI. */
     public static final String PROVIDER = "openai";
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OpenAiModel.class);
+    private static final Logger log = LoggerFactory.getLogger(OpenAiModel.class);
     private static final String KEY_REFUSED =
             "OpenAI refused the key. Check it in Settings, LLM providers, and what it may use.";
     private static final String BUSY = "OpenAI is busy right now. Try again in a minute.";
@@ -109,7 +113,7 @@ public final class OpenAiModel implements ModelPort {
     public List<ProviderModel> models(ApiKey key, Duration timeout) {
         List<Model> listed;
         try {
-            listed = client(key).models().list(com.openai.models.models.ModelListParams.none(),
+            listed = client(key).models().list(ModelListParams.none(),
                     RequestOptions.builder().timeout(timeout).build()).data();
         } catch (OpenAIException | IllegalArgumentException | IllegalStateException failure) {
             throw failure(failure, "list its models");
@@ -165,8 +169,8 @@ public final class OpenAiModel implements ModelPort {
             params.addMessage((ChatCompletionMessage) Objects.requireNonNull(exchange.turn().providerState()));
             exchange.results().forEach(result -> params.addMessage(ChatCompletionToolMessageParam.builder()
                     .toolCallId(result.callId())
-                    // Chat Completions has no error flag on a tool result, so the text says it.
-                    .content(result.error() ? "Error: " + result.content() : result.content())
+                    // Chat Completions has no error flag on a tool result; a failed tool's text already says so.
+                    .content(result.content())
                     .build()));
         }
         return params.build();
@@ -229,8 +233,9 @@ public final class OpenAiModel implements ModelPort {
         try {
             Map<String, Object> values = ObjectMappers.jsonMapper().readValue(arguments, Map.class);
             return values == null ? Map.of() : values;
-        } catch (com.fasterxml.jackson.core.JsonProcessingException unreadable) {
-            throw new IllegalStateException("unreadable tool arguments");
+        } catch (JsonProcessingException unreadable) {
+            // The arguments are customer data, so only where reading stopped is kept, not the text.
+            throw new IllegalStateException("unreadable tool arguments at " + unreadable.getLocation().offsetDescription());
         }
     }
 

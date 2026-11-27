@@ -1,6 +1,7 @@
 package com.conxist.runs.config;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import com.conxist.runs.adapter.model.ClaudeModel;
@@ -59,7 +60,7 @@ public record RunsProperties(
 
     /** This computer's keys by provider; empty when none is set. */
     Map<String, ApiKey> computerKeys() {
-        Map<String, ApiKey> keys = new java.util.LinkedHashMap<>();
+        Map<String, ApiKey> keys = new LinkedHashMap<>();
         if (anthropicApiKey != null && !anthropicApiKey.isBlank()) {
             keys.put(ClaudeModel.PROVIDER, new ApiKey(anthropicApiKey.strip()));
         }

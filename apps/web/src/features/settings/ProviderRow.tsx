@@ -5,7 +5,7 @@ import type { ConnectionCheck, LlmProvider, LlmProviders } from '../../domain/se
 import { elapsedSince } from '../../domain/time';
 import { providerLabel, type Translate, useLanguage, useT } from '../../i18n/i18n';
 import { ConnectDialog, DisconnectDialog } from './ProviderDialogs';
-import { ProviderMark, providerBrand } from './ProviderMark';
+import { ProviderMark, providerBrand, providerComputerKey } from './ProviderMark';
 
 type Dialogs = 'connect' | 'replace' | 'disconnect' | null;
 type Test = { state: 'idle' } | { state: 'testing' } | { state: 'done'; check: ConnectionCheck } | { state: 'error' };
@@ -94,7 +94,7 @@ export function ProviderRow({ provider, users, onConnected, onDisconnected }: {
 function describe(provider: LlmProvider, brand: string, t: Translate, language: string): string {
   const { connection } = provider;
   if (connection.source === 'NONE') return t('settings.provider.none', { provider: brand });
-  if (connection.source === 'COMPUTER') return t('settings.provider.computer', { variable: `CONXIST_${provider.id.toUpperCase()}_API_KEY` });
+  if (connection.source === 'COMPUTER') return t('settings.provider.computer', { variable: providerComputerKey(provider.id) });
   const ending = connection.keyEnding ?? '';
   const added = connection.addedAt
     ? new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' }).format(new Date(connection.addedAt)) : '';

@@ -12,6 +12,7 @@ import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.ProviderModel;
 import com.conxist.runs.domain.OutputShape;
 import com.conxist.testing.FakeOpenAiServer;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -103,16 +104,64 @@ class OpenAiModelTest {
     void only_models_that_can_run_agents_are_listed_newest_first_with_readable_names() {
         assertThat(openAi.models(KEY, Duration.ofSeconds(10))).extracting(ProviderModel::id, ProviderModel::label)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("gpt-5.2-mini", "GPT-5.2 mini"),
-                        org.assertj.core.groups.Tuple.tuple("gpt-5.2", "GPT-5.2"),
-                        org.assertj.core.groups.Tuple.tuple("gpt-5-nano", "GPT-5 nano"),
-                        org.assertj.core.groups.Tuple.tuple("gpt-4.1", "GPT-4.1"));
+                        Tuple.tuple("gpt-5.2-mini", "GPT-5.2 mini"),
+                        Tuple.tuple("gpt-5.2", "GPT-5.2"),
+                        Tuple.tuple("gpt-5-nano", "GPT-5 nano"),
+                        Tuple.tuple("gpt-4.1", "GPT-4.1"));
 
         assertThat(openAi.models(new ApiKey(FakeOpenAiServer.ANY_KEY_PREFIX + "pasted"), Duration.ofSeconds(10)))
                 .hasSize(4);
         assertThatThrownBy(() -> openAi.models(WRONG, Duration.ofSeconds(10)))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.KEY_REJECTED));
+    }
+
+    @Test
+    void a_busy_provider_a_slow_answer_and_an_unreachable_one_are_told_apart() {
+        server.failWith(429);
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+                .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
+                        assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.BUSY));
+        server.failWith(503);
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+                .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
+                        assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.BUSY));
+        server.failWith(500);
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+                .isInstanceOfSatisfying(ModelPort.Failure.class, failure -> {
+                    assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED);
+                    assertThat(failure.getMessage()).isEqualTo("OpenAI could not run this test (500).");
+                });
+
+        server.failWith(0);
+        server.slow(Duration.ofSeconds(2));
+        ModelPort.Request quick = new ModelPort.Request(GPT, "The rules.", "hello", List.of(), List.of(), null,
+                Duration.ofMillis(300));
+        assertThatThrownBy(() -> openAi.next(KEY, quick)).isInstanceOf(ModelPort.Timeout.class);
+
+        OpenAiModel nowhere = new OpenAiModel("http://127.0.0.1:1/v1");
+        assertThatThrownBy(() -> nowhere.next(KEY, request(GPT, List.of(), null, List.of())))
+                .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
+                        assertThat(failure.getMessage()).isEqualTo("ConXist could not reach OpenAI. Check the connection."));
+    }
+
+    @Test
+    void a_cut_off_answer_a_filtered_one_and_an_unreadable_one_are_told_apart() {
+        server.finishWith("length");
+        assertThat(openAi.next(KEY, request(GPT, List.of(), null, List.of())).stop()).isEqualTo(ModelPort.Stop.CUT_OFF);
+        server.finishWith("content_filter");
+        assertThat(openAi.next(KEY, request(GPT, List.of(), null, List.of())).stop()).isEqualTo(ModelPort.Stop.REFUSED);
+
+        server.badArguments();
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(LIST_SOURCES), null, List.of())))
+                .isInstanceOfSatisfying(ModelPort.Failure.class, failure -> {
+                    assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED);
+                    assertThat(failure.getMessage()).doesNotContain("not json");
+                });
+        server.noChoices();
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+                .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
+                        assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED));
     }
 
     private static ModelPort.Request request(ModelChoice model, List<ModelPort.ToolSpec> tools,

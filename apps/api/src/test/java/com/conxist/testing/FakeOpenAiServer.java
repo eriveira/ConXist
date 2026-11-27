@@ -43,6 +43,11 @@ public final class FakeOpenAiServer implements AutoCloseable {
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<JsonNode> requests = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean declining;
+    private volatile int failStatus;
+    private volatile java.time.Duration wait;
+    private volatile String finishWith;
+    private volatile boolean badArguments;
+    private volatile boolean noChoices;
 
     public FakeOpenAiServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -63,6 +68,31 @@ public final class FakeOpenAiServer implements AutoCloseable {
     /** From now on every answer is a refusal, as when a model declines. */
     public void decline() {
         declining = true;
+    }
+
+    /** From now on every chat answer is this HTTP error, such as 429 or 503. */
+    public void failWith(int status) {
+        failStatus = status;
+    }
+
+    /** From now on every chat answer waits this long first, to try a time limit. */
+    public void slow(java.time.Duration wait) {
+        this.wait = wait;
+    }
+
+    /** From now on every plain answer ends with this finish reason, such as {@code length}. */
+    public void finishWith(String reason) {
+        finishWith = reason;
+    }
+
+    /** From now on a tool call carries arguments that are not JSON. */
+    public void badArguments() {
+        badArguments = true;
+    }
+
+    /** From now on an answer has no choices at all. */
+    public void noChoices() {
+        noChoices = true;
     }
 
     private static boolean accepted(HttpExchange exchange) {
@@ -94,6 +124,23 @@ public final class FakeOpenAiServer implements AutoCloseable {
         JsonNode request = json.readTree(exchange.getRequestBody().readAllBytes());
         requests.add(request);
         String model = request.path("model").asString();
+        if (wait != null) {
+            try {
+                Thread.sleep(wait);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (failStatus != 0) {
+            send(exchange, failStatus, Map.of("error", Map.of("message", "Try later.", "type", "server_error")));
+            return;
+        }
+        if (noChoices) {
+            Map<String, Object> empty = completion(model, message("x", null, List.of()), "stop");
+            empty.put("choices", List.of());
+            send(exchange, 200, empty);
+            return;
+        }
         if (declining) {
             send(exchange, 200, completion(model, message(null, "I can't help with that.", List.of()), "stop"));
             return;
@@ -105,14 +152,14 @@ public final class FakeOpenAiServer implements AutoCloseable {
         boolean firstTurn = request.path("messages").size() == 2; // the developer message and the first one
         if (firstTurn && offersSources) {
             send(exchange, 200, completion(model, message(null, null, List.of(Map.of("id", "call_fake_1",
-                    "type", "function", "function", Map.of("name", "list_sources", "arguments", "{}")))),
+                    "type", "function", "function", Map.of("name", "list_sources", "arguments", badArguments ? "{not json" : "{}")))),
                     "tool_calls"));
             return;
         }
         JsonNode schema = request.path("response_format").path("json_schema").path("schema");
         String text = schema.isMissingNode() ? "A short answer from the fake model."
                 : json.writeValueAsString(example(schema));
-        send(exchange, 200, completion(model, message(text, null, List.of()), "stop"));
+        send(exchange, 200, completion(model, message(text, null, List.of()), finishWith == null ? "stop" : finishWith));
     }
 
     private static Object example(JsonNode schema) {
