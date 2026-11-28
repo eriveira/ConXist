@@ -18,9 +18,8 @@ class AgentTest {
     private static final Instant LATER = NOW.plus(Duration.ofMinutes(5));
 
     private final Agent agent = Agent.create(UUID.randomUUID(), UUID.randomUUID(),
-            new AgentDefinition("Summarizer", "Summarizes a meeting.", "Summarize the meeting.", List.of(), List.of(),
-                    List.of(AgentTool.GET_TRANSCRIPT), MODEL, Style.PRECISE, List.of(InputKind.TRANSCRIPT),
-                    OutputKind.SUMMARY, Limits.DEFAULT), NOW);
+            new AgentDefinition("Summarizer", "Summarizes a meeting.", "Summarize the meeting.", List.of(),
+                    List.of(AgentTool.GET_TRANSCRIPT), MODEL, List.of()), NOW);
 
     @Test
     void a_new_agent_is_an_unpublished_draft() {
@@ -53,11 +52,11 @@ class AgentTest {
     }
 
     @Test
-    void a_draft_without_instructions_or_inputs_cannot_be_published() {
+    void a_draft_without_instructions_or_a_model_cannot_be_published() {
         Agent blank = Agent.create(UUID.randomUUID(), UUID.randomUUID(),
-                new AgentDefinition("Blank", "", " ", List.of(), List.of(), List.of(), null, null, List.of(), null, null), NOW);
+                new AgentDefinition("Blank", "", " ", List.of(), List.of(), null, List.of()), NOW);
 
-        assertThat(blank.draft().problems()).containsExactly("instructions-required", "accepts-required", "model-required");
+        assertThat(blank.draft().problems()).containsExactly("instructions-required", "model-required");
         assertThatThrownBy(() -> blank.publish(NOW)).isInstanceOf(RuleViolation.class)
                 .extracting(e -> ((RuleViolation) e).code()).isEqualTo("agent.not-ready");
     }
@@ -93,35 +92,29 @@ class AgentTest {
 
     @Test
     void the_definition_trims_counts_characters_and_removes_repeats() {
-        AgentDefinition definition = new AgentDefinition("  Résumé 🤖 ", " Purpose ", "Do it.  \n",
-                List.of(), List.of(), List.of(AgentTool.GET_TRANSCRIPT, AgentTool.GET_TRANSCRIPT), null, null,
-                List.of(InputKind.TRANSCRIPT, InputKind.TRANSCRIPT), null, null);
+        AgentDefinition definition = new AgentDefinition("  Résumé 🤖 ", " Purpose ", "Do it.  \n", List.of(),
+                List.of(AgentTool.GET_TRANSCRIPT, AgentTool.GET_TRANSCRIPT), null, List.of());
 
         assertThat(definition.name()).isEqualTo("Résumé 🤖");
         assertThat(definition.purpose()).isEqualTo("Purpose");
         assertThat(definition.instructions()).isEqualTo("Do it.");
         assertThat(definition.tools()).containsExactly(AgentTool.GET_TRANSCRIPT);
-        assertThat(definition.accepts()).containsExactly(InputKind.TRANSCRIPT);
         assertThat(definition.model()).isNull();
         assertThat(definition.problems()).contains("model-required");
-        assertThat(definition.limits()).isEqualTo(Limits.DEFAULT);
-        assertThat(new AgentDefinition("🤖".repeat(60), "", "", null, null, null, null, null, null, null, null).name())
+        assertThat(new AgentDefinition("🤖".repeat(60), "", "", null, null, null, List.of()).name())
                 .hasSize(120);
     }
 
     @Test
-    void the_definition_refuses_what_is_too_long_or_out_of_range() {
-        assertCode(() -> new AgentDefinition(" ", "", "", null, null, null, null, null, null, null, null),
+    void the_definition_refuses_what_is_too_long() {
+        assertCode(() -> new AgentDefinition(" ", "", "", null, null, null, List.of()),
                 "agent.name-required");
-        assertCode(() -> new AgentDefinition("x".repeat(61), "", "", null, null, null, null, null, null, null, null),
+        assertCode(() -> new AgentDefinition("x".repeat(61), "", "", null, null, null, List.of()),
                 "agent.name-too-long");
-        assertCode(() -> new AgentDefinition("A", "x".repeat(201), "", null, null, null, null, null, null, null, null),
+        assertCode(() -> new AgentDefinition("A", "x".repeat(201), "", null, null, null, List.of()),
                 "agent.purpose-too-long");
-        assertCode(() -> new AgentDefinition("A", "", "x".repeat(8_001), null, null, null, null, null, null, null, null),
+        assertCode(() -> new AgentDefinition("A", "", "x".repeat(8_001), null, null, null, List.of()),
                 "agent.instructions-too-long");
-        assertCode(() -> new Limits(0, 120, 10), "agent.limits-steps");
-        assertCode(() -> new Limits(6, 5, 10), "agent.limits-time");
-        assertCode(() -> new Limits(6, 120, 51), "agent.limits-tool-calls");
     }
 
     @Test
@@ -132,8 +125,6 @@ class AgentTest {
         assertThat(empty.instructions()).isEmpty();
         assertThat(empty.tools()).isEmpty();
         assertThat(empty.model()).isEqualTo(MODEL);
-        assertThat(empty.accepts()).containsExactly(InputKind.TRANSCRIPT);
-        assertThat(empty.givesBack()).isEqualTo(OutputKind.FREE_TEXT);
         assertThat(empty.problems()).containsExactly("instructions-required");
     }
 
@@ -151,9 +142,8 @@ class AgentTest {
     }
 
     private static AgentDefinition renamed(AgentDefinition definition, String name) {
-        return new AgentDefinition(name, definition.purpose(), definition.instructions(),
-                definition.knowledgeSources(), definition.skills(), definition.tools(), definition.model(), definition.style(),
-                definition.accepts(), definition.givesBack(), definition.limits());
+        return new AgentDefinition(name, definition.purpose(), definition.instructions(), definition.skills(),
+                definition.tools(), definition.model(), definition.mcpTools());
     }
 
     private static void assertCode(Runnable action, String code) {

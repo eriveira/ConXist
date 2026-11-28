@@ -28,7 +28,6 @@ import com.conxist.agents.application.SkillBook;
 import com.conxist.agents.application.SkillRepository;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.UnitOfWork;
-import com.conxist.sources.SourceCatalog;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -42,9 +41,9 @@ class AgentsConfiguration {
     }
 
     @Bean
-    AgentBook agentBook(AgentRepository agents, CurrentWorkspace workspace, SourceCatalog sources,
-            SkillBook skills, AgentModels models, AgentMcpTools mcpTools, UnitOfWork unitOfWork, Clock clock) {
-        return new AgentBook(agents, workspace, sources, skills, models, mcpTools, unitOfWork, clock);
+    AgentBook agentBook(AgentRepository agents, CurrentWorkspace workspace, SkillBook skills, AgentModels models,
+            AgentMcpTools mcpTools, UnitOfWork unitOfWork, Clock clock) {
+        return new AgentBook(agents, workspace, skills, models, mcpTools, unitOfWork, clock);
     }
 
     @Bean

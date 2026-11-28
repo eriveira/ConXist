@@ -19,11 +19,7 @@ import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.McpToolPick;
 import com.conxist.agents.domain.AgentVersion;
-import com.conxist.agents.domain.InputKind;
-import com.conxist.agents.domain.Limits;
-import com.conxist.agents.domain.OutputKind;
 import com.conxist.agents.domain.SkillPin;
-import com.conxist.agents.domain.Style;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -155,14 +151,9 @@ class AgentsController {
             @Size(max = MAX_LINE_INPUT) String name,
             @Size(max = MAX_LINE_INPUT) String purpose,
             @Size(max = MAX_TEXT_INPUT) String instructions,
-            @Size(max = MAX_LIST_INPUT) List<UUID> knowledgeSources,
             @Size(max = MAX_LIST_INPUT) List<@Valid SkillPinBody> skills,
             @Size(max = MAX_LIST_INPUT) List<AgentTool> tools,
             @Valid ModelBody model,
-            Style style,
-            @Size(max = MAX_LIST_INPUT) List<InputKind> accepts,
-            OutputKind givesBack,
-            @NotNull LimitsBody limits,
             @Size(max = MAX_LIST_INPUT) List<@Valid McpToolBody> mcpTools) {
 
         AgentDefinition toDefinition() {
@@ -170,10 +161,9 @@ class AgentsController {
                     : skills.stream().map(pin -> pin == null ? null : new SkillPin(pin.skillId(), pin.version()))
                             .toList();
             AgentModel picked = model == null ? null : new AgentModel(model.provider(), model.model(), model.effort());
-            return new AgentDefinition(name, purpose, instructions, knowledgeSources, pins, tools, picked, style,
-                    accepts, givesBack, new Limits(limits.maxSteps(), limits.timeoutSeconds(), limits.maxToolCalls()),
-                    mcpTools == null ? null : mcpTools.stream()
-                            .map(tool -> tool == null ? null : new McpToolPick(tool.serverId(), tool.tool())).toList());
+            return new AgentDefinition(name, purpose, instructions, pins, tools, picked, mcpTools == null ? null
+                    : mcpTools.stream().map(tool -> tool == null ? null : new McpToolPick(tool.serverId(), tool.tool()))
+                            .toList());
         }
     }
 
@@ -186,8 +176,5 @@ class AgentsController {
     }
 
     record SkillPinBody(@NotNull UUID skillId, int version) {
-    }
-
-    record LimitsBody(int maxSteps, int timeoutSeconds, int maxToolCalls) {
     }
 }

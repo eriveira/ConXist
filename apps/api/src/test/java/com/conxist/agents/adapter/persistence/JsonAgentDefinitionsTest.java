@@ -39,4 +39,19 @@ class JsonAgentDefinitionsTest {
         assertThat(definition.model()).isEqualTo(new AgentModel("anthropic", "claude-haiku-5-5", AgentModel.Effort.LOW));
         assertThat(definitions.read(definitions.write(definition))).isEqualTo(definition);
     }
+
+    @Test
+    void a_rewritten_agent_drops_the_fields_removed_from_the_agent_page() {
+        String saved = """
+                {"v":1,"name":"Summary","purpose":"","instructions":"Sum it up.","knowledgeSources":["x"],"skills":[],
+                "tools":[],"provider":"anthropic","model":"claude-haiku-5-5","effort":"LOW","style":"CREATIVE",
+                "accepts":["TRANSCRIPT"],"givesBack":"SUMMARY",
+                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}
+                """;
+
+        String written = definitions.write(definitions.read(saved));
+
+        assertThat(written).contains("\"v\":2").doesNotContain("style").doesNotContain("knowledgeSources")
+                .doesNotContain("givesBack").doesNotContain("limits").doesNotContain("accepts");
+    }
 }

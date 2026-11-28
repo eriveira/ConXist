@@ -6,7 +6,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.conxist.agents.AgentBrief;
@@ -16,14 +15,15 @@ import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.WorkspaceVariables;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
-import com.conxist.runs.domain.OutputShape;
+import com.conxist.runs.domain.RunLimits;
 import com.conxist.runs.domain.RunOutcome;
 import com.conxist.runs.domain.RunPrompt;
 
 /**
- * Runs an agent's draft once on a meeting the person picked, or on text they pasted or read from a file (ADR 0012). The loop, not the prompt, keeps the agent's
- * limits: model turns, tool calls and time. The run only reads, unless the draft picked a tool that changes things the
- * workspace allowed (ADR 0022); its answer is returned, never kept.
+ * Runs an agent's draft once on a meeting the person picked, or on text they pasted or read from a file (ADR 0012).
+ * The loop, not the prompt, keeps the workspace's run limits (ADR 0023): model turns, tool calls and time. The run
+ * only reads, unless the draft picked a tool that changes things the workspace allowed (ADR 0022); its answer is
+ * returned, never kept.
  */
 public final class StartTestRun {
 
@@ -35,19 +35,19 @@ public final class StartTestRun {
     private final MeetingLibrary library;
     private final RunTools tools;
     private final LlmProviders providers;
-    private final AnswerReader reader;
+    private final WorkspaceRunLimits limits;
     private final CurrentWorkspace workspace;
     private final WorkspaceVariables variables;
     private final Clock clock;
 
     public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
-            AnswerReader reader, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
+            WorkspaceRunLimits limits, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
         this.variables = variables;
         this.agents = agents;
         this.library = library;
         this.tools = tools;
         this.providers = providers;
-        this.reader = reader;
+        this.limits = limits;
         this.workspace = workspace;
         this.clock = clock;
     }
@@ -130,7 +130,7 @@ public final class StartTestRun {
         private final ModelPort model;
         private final ApiKey key;
         private final ModelChoice choice;
-        private final Optional<OutputShape> shape;
+        private final RunLimits limits;
         private final RunTools.Scope scope;
         private final List<ModelPort.ToolSpec> offered;
         private final String system;
@@ -150,18 +150,17 @@ public final class StartTestRun {
             this.model = call.port();
             this.key = call.key();
             this.choice = call.choice();
-            this.shape = OutputShape.of(agent.givesBack());
-            this.scope = new RunTools.Scope(agent.tools(), agent.knowledgeSources(), meeting.sourceId(), meeting.id(),
-                    tools.mcpTools(agent));
+            this.limits = StartTestRun.this.limits.current();
+            this.scope = new RunTools.Scope(agent.tools(), tools.mcpTools(agent));
             this.offered = tools.specs(scope);
             this.system = RunPrompt.system(agent, tools.descriptions(scope), variables.of(workspace.id()));
             this.started = clock.instant();
-            this.deadline = started.plusSeconds(agent.timeoutSeconds());
+            this.deadline = started.plusSeconds(limits.timeoutSeconds());
         }
 
         TestRunResult run() {
             while (true) {
-                if (turns >= agent.maxSteps()) {
+                if (turns >= limits.maxSteps()) {
                     return end(RunOutcome.STEP_LIMIT, null);
                 }
                 Duration left = Duration.between(clock.instant(), deadline);
@@ -173,7 +172,7 @@ public final class StartTestRun {
                 try {
                     turn = model.next(key, new ModelPort.Request(choice, system,
                             RunPrompt.firstMessage(meeting.title(), meeting.text()), List.copyOf(exchanges), offered,
-                            shape.map(OutputShape::schema).orElse(null), left));
+                            left));
                 } catch (ModelPort.Timeout timeout) {
                     return end(RunOutcome.TIME_LIMIT, null);
                 } catch (ModelPort.Failure failure) {
@@ -197,7 +196,7 @@ public final class StartTestRun {
                     case CUT_OFF:
                         return end(RunOutcome.CUT_OFF, null);
                     case TOOL_USE:
-                        if (toolCalls + turn.toolCalls().size() > agent.maxToolCalls()) {
+                        if (toolCalls + turn.toolCalls().size() > limits.maxToolCalls()) {
                             return end(RunOutcome.TOOL_LIMIT, null);
                         }
                         exchanges.add(new ModelPort.Exchange(turn, turn.toolCalls().stream().map(this::call).toList()));
@@ -228,12 +227,6 @@ public final class StartTestRun {
         }
 
         private TestRunResult end(RunOutcome outcome, String answer) {
-            Object structured = null;
-            Boolean matches = null;
-            if (answer != null && shape.isPresent()) {
-                structured = reader.read(answer, shape.get().required()).orElse(null);
-                matches = structured != null;
-            }
             long millis = since(started);
             // Ids, sizes and counts only: never the meeting, the instructions or the answer (AGENTS.md, Tool calling).
             log.log(System.Logger.Level.INFO,
@@ -241,11 +234,11 @@ public final class StartTestRun {
                             + "{7} tool calls, {8,number,#} input and {9,number,#} output tokens, {10,number,#} ms",
                     agent.id(), workspace.id(), meeting.id(), outcome, choice.id(), RunPrompt.VERSION, turns,
                     toolCalls, inputTokens, outputTokens, millis);
-            return new TestRunResult(agent.id(), outcome, choice.effort().name(), choice.id(), answer, structured, matches,
+            return new TestRunResult(agent.id(), outcome, choice.effort().name(), choice.id(), answer,
                     List.copyOf(steps), toolCalls, inputTokens, outputTokens, millis);
         }
 
-        /** The code at the start of a tool error ("Error source-not-allowed: …"), never the rest of it. */
+        /** The code at the start of a tool error ("Error source-not-found: …"), never the rest of it. */
         private static String errorCode(ModelPort.ToolResult result) {
             String content = result.content();
             int end = content.indexOf(':');

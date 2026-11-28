@@ -10,7 +10,6 @@ import com.conxist.runs.application.ApiKey;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.ProviderModel;
-import com.conxist.runs.domain.OutputShape;
 import com.conxist.testing.FakeOpenAiServer;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.AfterEach;
@@ -35,9 +34,8 @@ class OpenAiModelTest {
     }
 
     @Test
-    void a_run_asks_for_tools_then_answers_in_its_shape_sending_back_each_turn_as_it_came() {
-        ModelPort.Turn asked = openAi.next(KEY, request(GPT, List.of(LIST_SOURCES), OutputShape.REQUIREMENTS.schema(),
-                List.of()));
+    void a_run_asks_for_tools_then_answers_sending_back_each_turn_as_it_came() {
+        ModelPort.Turn asked = openAi.next(KEY, request(GPT, List.of(LIST_SOURCES), List.of()));
 
         assertThat(asked.stop()).isEqualTo(ModelPort.Stop.TOOL_USE);
         assertThat(asked.toolCalls()).singleElement().satisfies(call -> {
@@ -55,21 +53,18 @@ class OpenAiModelTest {
         assertThat(sent.path("store").isBoolean()).isTrue();
         assertThat(sent.path("store").asBoolean()).isFalse();
         assertThat(sent.has("user")).isFalse();
-        JsonNode format = sent.path("response_format");
-        assertThat(format.path("type").asString()).isEqualTo("json_schema");
-        assertThat(format.path("json_schema").path("strict").asBoolean()).isTrue();
-        assertThat(format.path("json_schema").path("schema").path("additionalProperties").asBoolean()).isFalse();
+        assertThat(sent.has("response_format")).isFalse();
         JsonNode tool = sent.path("tools").get(0);
         assertThat(tool.path("type").asString()).isEqualTo("function");
         assertThat(tool.path("function").path("strict").asBoolean()).isTrue();
         assertThat(tool.path("function").path("parameters").path("additionalProperties").asBoolean()).isFalse();
 
         ModelPort.Turn answered = openAi.next(KEY, request(GPT, List.of(LIST_SOURCES),
-                OutputShape.REQUIREMENTS.schema(), List.of(new ModelPort.Exchange(asked, List.of(
+                List.of(new ModelPort.Exchange(asked, List.of(
                         new ModelPort.ToolResult("call_fake_1", "[]", false))))));
 
         assertThat(answered.stop()).isEqualTo(ModelPort.Stop.DONE);
-        assertThat(answered.text()).startsWith("{");
+        assertThat(answered.text()).isEqualTo("A short answer from the fake model.");
         assertThat(answered.inputTokens()).isEqualTo(1100);
         JsonNode second = server.requests().get(1).path("messages");
         assertThat(second).hasSize(4);
@@ -80,8 +75,8 @@ class OpenAiModelTest {
     }
 
     @Test
-    void a_model_that_does_not_reason_gets_no_effort_and_plain_text_gets_no_format() {
-        ModelPort.Turn turn = openAi.next(KEY, request(GPT_41, List.of(), null, List.of()));
+    void a_model_that_does_not_reason_gets_no_effort() {
+        ModelPort.Turn turn = openAi.next(KEY, request(GPT_41, List.of(), List.of()));
 
         assertThat(turn.text()).isEqualTo("A short answer from the fake model.");
         JsonNode sent = server.requests().get(0);
@@ -93,10 +88,10 @@ class OpenAiModelTest {
     @Test
     void a_refusal_and_a_wrong_key_are_told_apart() {
         server.decline();
-        assertThat(openAi.next(KEY, request(GPT, List.of(), null, List.of())).stop())
+        assertThat(openAi.next(KEY, request(GPT, List.of(), List.of())).stop())
                 .isEqualTo(ModelPort.Stop.REFUSED);
 
-        assertThatThrownBy(() -> openAi.next(WRONG, request(GPT, List.of(), null, List.of())))
+        assertThatThrownBy(() -> openAi.next(WRONG, request(GPT, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure -> {
                     assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.KEY_REJECTED);
                     assertThat(failure.getMessage()).startsWith("OpenAI refused the key.");
@@ -122,15 +117,15 @@ class OpenAiModelTest {
     @Test
     void a_busy_provider_a_slow_answer_and_an_unreachable_one_are_told_apart() {
         server.failWith(429);
-        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.BUSY));
         server.failWith(503);
-        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.BUSY));
         server.failWith(500);
-        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure -> {
                     assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED);
                     assertThat(failure.getMessage()).isEqualTo("OpenAI could not run this test (500).");
@@ -138,12 +133,12 @@ class OpenAiModelTest {
 
         server.failWith(0);
         server.slow(Duration.ofSeconds(2));
-        ModelPort.Request quick = new ModelPort.Request(GPT, "The rules.", "hello", List.of(), List.of(), null,
+        ModelPort.Request quick = new ModelPort.Request(GPT, "The rules.", "hello", List.of(), List.of(),
                 Duration.ofMillis(300));
         assertThatThrownBy(() -> openAi.next(KEY, quick)).isInstanceOf(ModelPort.Timeout.class);
 
         OpenAiModel nowhere = new OpenAiModel("http://127.0.0.1:1/v1");
-        assertThatThrownBy(() -> nowhere.next(KEY, request(GPT, List.of(), null, List.of())))
+        assertThatThrownBy(() -> nowhere.next(KEY, request(GPT, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.getMessage()).isEqualTo("ConXist could not reach OpenAI. Check the connection."));
     }
@@ -151,18 +146,18 @@ class OpenAiModelTest {
     @Test
     void a_cut_off_answer_a_filtered_one_and_an_unreadable_one_are_told_apart() {
         server.finishWith("length");
-        assertThat(openAi.next(KEY, request(GPT, List.of(), null, List.of())).stop()).isEqualTo(ModelPort.Stop.CUT_OFF);
+        assertThat(openAi.next(KEY, request(GPT, List.of(), List.of())).stop()).isEqualTo(ModelPort.Stop.CUT_OFF);
         server.finishWith("content_filter");
-        assertThat(openAi.next(KEY, request(GPT, List.of(), null, List.of())).stop()).isEqualTo(ModelPort.Stop.REFUSED);
+        assertThat(openAi.next(KEY, request(GPT, List.of(), List.of())).stop()).isEqualTo(ModelPort.Stop.REFUSED);
 
         server.badArguments();
-        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(LIST_SOURCES), null, List.of())))
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(LIST_SOURCES), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure -> {
                     assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED);
                     assertThat(failure.getMessage()).doesNotContain("not json");
                 });
         server.noChoices();
-        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), null, List.of())))
+        assertThatThrownBy(() -> openAi.next(KEY, request(GPT, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED));
     }
@@ -174,7 +169,7 @@ class OpenAiModelTest {
         ModelPort.ToolSpec odd = new ModelPort.ToolSpec("docs__get_space", "Gets a space.", Map.of("type", "object",
                 "properties", Map.of("id", Map.of("$ref", "#/$defs/Space")), "required", "id",
                 "$defs", Map.of("Space", Map.of("type", "string"))), false);
-        openAi.next(KEY, request(GPT, List.of(bare, odd), null, List.of()));
+        openAi.next(KEY, request(GPT, List.of(bare, odd), List.of()));
 
         JsonNode tools = server.requests().get(0).path("tools");
         JsonNode first = tools.get(0).path("function");
@@ -185,9 +180,9 @@ class OpenAiModelTest {
     }
 
     private static ModelPort.Request request(ModelChoice model, List<ModelPort.ToolSpec> tools,
-            Map<String, Object> schema, List<ModelPort.Exchange> exchanges) {
+            List<ModelPort.Exchange> exchanges) {
         return new ModelPort.Request(model, "The rules.", "<meeting title=\"x\">\nhello\n</meeting>", exchanges, tools,
-                schema, Duration.ofSeconds(30));
+                Duration.ofSeconds(30));
     }
 
     private static FakeOpenAiServer server() {

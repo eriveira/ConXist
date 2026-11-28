@@ -37,6 +37,11 @@ final class CaptureFakes {
         }
 
         @Override
+        public List<SourceSummary> list() {
+            return List.copyOf(byId.values());
+        }
+
+        @Override
         public Optional<SourceSummary> find(UUID sourceId) {
             return Optional.ofNullable(byId.get(sourceId));
         }

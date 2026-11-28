@@ -139,7 +139,6 @@ export function AgentVersionSummary({ version, providers }: { version: AgentVers
   return (
     <dl className="summary version-summary">
       <div><dt>{t('agent.name')}</dt><dd>{definition.name}</dd></div>
-      <div><dt>{t('agent.givesBack')}</dt><dd>{t(`agent.output.${definition.givesBack}`)}</dd></div>
       <div><dt>{t('agent.model')}</dt><dd>{definition.model
         ? t('agent.model.summary', { model: providers
           ? modelLabel(providers, definition.model.provider, definition.model.model) : definition.model.model, effort: t(`settings.effort.${definition.model.effort}`) })

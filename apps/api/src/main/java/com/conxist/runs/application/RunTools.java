@@ -19,7 +19,7 @@ import com.conxist.sources.SourceSummary;
 /**
  * The read tools a run can offer, matched by name against this registry only (ADR 0010, ADR 0012), and the tools of
  * the workspace's MCP servers the agent picked (ADR 0017). Every call reads the current workspace through the owning
- * module, and only the sources the agent may read; the meeting the person picked is always readable. A tool never
+ * module: an agent reads every source of its workspace (ADR 0023), and the meeting the person picked. A tool never
  * changes anything: an MCP tool is offered only while its server marks it read-only and the workspace allows it.
  */
 public final class RunTools {
@@ -39,7 +39,7 @@ public final class RunTools {
         this.library = library;
         this.mcp = mcp;
         register(new Tool("conxist.list_sources", "list_sources",
-                "Lists the sources this agent may read, with each one's id, name and kind. Use it to find a source_id.",
+                "Lists this workspace's sources, with each one's id, name and kind. Use it to find a source_id.",
                 schema(Map.of()), this::listSources));
         register(new Tool("conxist.list_meetings", "list_meetings",
                 "Lists the newest meetings and documents of one source (up to " + MAX_MEETINGS
@@ -114,10 +114,9 @@ public final class RunTools {
     }
 
     private String listSources(Call call) {
-        List<SourceSummary> readable = call.scope().sourceIds().stream().map(sources::find).flatMap(Optional::stream)
-                .toList();
+        List<SourceSummary> readable = sources.list();
         if (readable.isEmpty()) {
-            return "This agent reads no sources: it works only on the meeting it was given.";
+            return "This workspace has no sources: work only on the meeting you were given.";
         }
         StringBuilder text = new StringBuilder();
         readable.forEach(source -> text.append("- id: ").append(source.id()).append(", name: ").append(source.name())
@@ -127,9 +126,7 @@ public final class RunTools {
 
     private String listMeetings(Call call) {
         UUID sourceId = uuid(call, "source_id");
-        if (!call.scope().sourceIds().contains(sourceId)) {
-            throw new ToolError("source-not-allowed", "This agent may not read that source. Use list_sources.");
-        }
+        requireSource(sourceId);
         List<MeetingLibrary.Entry> entries = library.list(sourceId);
         if (entries.isEmpty()) {
             return "This source has no meetings or documents.";
@@ -146,13 +143,17 @@ public final class RunTools {
     private String getTranscript(Call call) {
         UUID sourceId = uuid(call, "source_id");
         UUID meetingId = uuid(call, "meeting_id");
-        boolean handed = sourceId.equals(call.scope().sourceId()) && meetingId.equals(call.scope().meetingId());
-        if (!handed && !call.scope().sourceIds().contains(sourceId)) {
-            throw new ToolError("source-not-allowed", "This agent may not read that source. Use list_sources.");
-        }
+        requireSource(sourceId);
         MeetingLibrary.Text meeting = library.read(sourceId, meetingId).orElseThrow(() ->
                 new ToolError("meeting-not-found", "There is no such meeting in that source. Use list_meetings."));
         return "Title: " + meeting.title() + "\n\n" + RunPrompt.capped(meeting.text());
+    }
+
+    /** A source of this workspace; any other id is refused the same way, whether it exists elsewhere or not. */
+    private void requireSource(UUID sourceId) {
+        if (sources.find(sourceId).isEmpty()) {
+            throw new ToolError("source-not-found", "There is no such source in this workspace. Use list_sources.");
+        }
     }
 
     private static String date(MeetingLibrary.Entry entry) {
@@ -197,23 +198,15 @@ public final class RunTools {
     }
 
     /**
-     * What one run may read.
+     * What one run may use. ConXist's own tools read every source of the workspace (ADR 0023), the handed meeting too.
      *
      * @param toolNames the agent's tools, by full name
-     * @param sourceIds the sources the agent may read
-     * @param sourceId  the source of the meeting the person picked
-     * @param meetingId the meeting the person picked, always readable
      * @param mcpTools  the MCP tools this run offers, by the name the model sees
      */
-    record Scope(List<String> toolNames, List<UUID> sourceIds, UUID sourceId, UUID meetingId,
-            List<McpToolbox.OfferedTool> mcpTools) {
+    record Scope(List<String> toolNames, List<McpToolbox.OfferedTool> mcpTools) {
 
         Scope {
             mcpTools = List.copyOf(mcpTools);
-        }
-
-        Scope(List<String> toolNames, List<UUID> sourceIds, UUID sourceId, UUID meetingId) {
-            this(toolNames, sourceIds, sourceId, meetingId, List.of());
         }
     }
 

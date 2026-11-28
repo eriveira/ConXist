@@ -7,6 +7,7 @@ import type { Workspace } from '../domain/workspaces';
 import type { GmailSignIn, Integration, IntegrationCheck, IntegrationKind, TokenCheck } from '../domain/integrations';
 import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
 import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels } from '../domain/settings';
+import type { RunLimits } from '../domain/runLimits';
 import type { Variable } from '../domain/variables';
 import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
@@ -120,6 +121,8 @@ export const api = {
     request<void>(`/api/workspaces/${encodeURIComponent(workspaceId)}`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
     }),
+  runLimits: () => request<RunLimits>('/api/run-limits'),
+  saveRunLimits: (limits: RunLimits) => putJson<RunLimits>('/api/run-limits', limits),
   variables: () => request<Variable[]>('/api/variables'),
   addVariable: (variable: Omit<Variable, 'id'>) => postJson<Variable>('/api/variables', variable),
   changeVariable: (id: string, variable: Omit<Variable, 'id'>) =>

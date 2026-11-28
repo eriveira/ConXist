@@ -5,8 +5,8 @@ import { settingsHref } from '../../navigation';
 import { FieldError } from './FormParts';
 
 /**
- * The provider, model and effort an agent runs on (ADR 0014). Only connected providers are offered; a pick that can no
- * longer run stays shown, marked, until the person picks another.
+ * The provider, model and effort an agent runs on (ADR 0014); effort is a three-stop slider (ADR 0023). Only connected
+ * providers are offered; a pick that can no longer run stays shown, marked, until the person picks another.
  */
 export function AgentModelPicker({ value, providers, onChange }: {
   value: AgentModel | null;
@@ -56,16 +56,20 @@ export function AgentModelPicker({ value, providers, onChange }: {
         </div>
       </div>
       {connected.length === 0 && <p className="note"><a href={settingsHref('llm')}>{t('agent.model.settings')}</a></p>}
-      <fieldset className="choice segmented">
-        <legend>{t('agent.effort')}</legend>
-        {EFFORTS.map((level) => (
-          <label key={level}>
-            <input type="radio" name="effort" checked={value?.effort === level} disabled={!value}
-              onChange={() => value && onChange({ ...value, effort: level })} />
-            <span><b>{t(`agent.effort.${level}`)}</b><small>{t(`agent.effort.${level}.desc`)}</small></span>
-          </label>
-        ))}
-      </fieldset>
+      <div className="effort">
+        <div className="effort-top">
+          <label htmlFor="agent-effort">{t('agent.effort')}</label>
+          <output htmlFor="agent-effort" aria-hidden="true">{value ? t(`agent.effort.${value.effort}`) : '—'}</output>
+        </div>
+        <input id="agent-effort" type="range" min={0} max={EFFORTS.length - 1} step={1} disabled={!value}
+          value={EFFORTS.indexOf(value?.effort ?? effort)} aria-describedby={value ? 'agent-effort-hint' : undefined}
+          aria-valuetext={t(`agent.effort.${value?.effort ?? effort}`)}
+          onChange={(event) => value && onChange({ ...value, effort: EFFORTS[Number(event.target.value)] })} />
+        <div className="effort-ticks" aria-hidden="true">
+          {EFFORTS.map((level) => <span key={level}>{t(`agent.effort.${level}`)}</span>)}
+        </div>
+        {value && <p id="agent-effort-hint" className="hint">{t(`agent.effort.${value.effort}.desc`)}</p>}
+      </div>
     </>
   );
 }

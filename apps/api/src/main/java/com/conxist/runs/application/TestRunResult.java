@@ -8,10 +8,6 @@ import com.conxist.runs.domain.RunOutcome;
  * What one test run did, for the person who ran it. Nothing of it is kept (ADR 0012).
  *
  * @param answer       the answer as text, or null when the run stopped without one
- * @param structured   the answer read as JSON (maps, lists, text, numbers) when the agent gives back a shape and the
- *                     answer has it; null otherwise
- * @param matchesShape true when the agent gives back a shape and the answer has it; false when it does not; null for
- *                     plain text
  * @param steps        what the run did, in order: each model turn and each tool call
  */
 public record TestRunResult(
@@ -20,8 +16,6 @@ public record TestRunResult(
         String effort,
         String model,
         String answer,
-        Object structured,
-        Boolean matchesShape,
         List<Step> steps,
         int toolCalls,
         long inputTokens,

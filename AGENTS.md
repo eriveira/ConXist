@@ -44,7 +44,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
 - `apps/web/`: the web app (the Sources, Agents, Skills and Settings pages and their dialogs). `domain` and `api` stay
   free of React; screens live in `features`.
 
-## Current state (2026-11-27)
+## Current state (2026-11-28)
 
 - The owner's rule: **mock first**. New screens are designed as HTML mocks
   (shared folder `App/mocks/`) before app code.
@@ -65,7 +65,9 @@ Sources page does not show it for now, owner decision 2026-11-17).
   deletes its rows through the platform port `WorkspaceData`, in one transaction).
 - Agents (ADR 0010, step 1 of 4 the owner set: Agents, Skills, Test run, Schedules): an `agents` module and the
   Agents pages. Create by name (an empty draft; no templates since ADR 0015), edit a draft that saves itself (revision check), publish numbered versions,
-  History and Restore, Archive, Delete.
+  History and Restore, Archive, Delete. The page has five sections (ADR 0023): What it is, Instructions, Skills, Tools
+  (each group folds) and How it thinks (effort as a slider). Style, Takes in / Gives back, Knowledge and the agent's
+  own limits are gone; ConXist's own tools read every source of the workspace.
 - Skills (ADR 0011, step 2): in the `agents` module, with its own menu item. Write or import a SKILL.md (no
   built-in skills since ADR 0015); publish numbered versions with a note. An agent pins a skill version and gets "vN available" when a
   newer one is published.
@@ -73,16 +75,16 @@ Sources page does not show it for now, owner decision 2026-11-17).
   uses it. A skill any agent (archived too) follows in its draft or live version is not deleted; the dialog names
   and links those agents. Nothing uses an agent yet; flows and schedules will plug
   into the `AgentUses` port.
-- Test run (ADR 0012, step 3): a `runs` module and the Test panel on an agent's page. It runs the saved draft once on
+- Test run (ADR 0012, step 3): a `runs` module and the Try it panel on an agent's page. It runs the saved draft once on
   pasted text, a text file (read in the browser, up to 150,000 characters) or a picked meeting (ADR 0022), with the agent's model (Claude through the Anthropic Java SDK, or OpenAI through the OpenAI Java
-  SDK), with the draft's tools, sources and limits, and shows the
-  answer, its shape check and each step. Nothing of a run is kept. It runs on the workspace's key for that provider (below);
+  SDK), with the draft's tools and the workspace's run limits (Settings › General, V25, ADR 0023), and shows the
+  answer as plain text and each step. Nothing of a run is kept. It runs on the workspace's key for that provider (below);
   without one the panel links to Settings, and agents can't be published either, since their provider is not
   connected (ADR 0014). `mvn spring-boot:test-run` also runs a fake Claude that takes any key starting with
   `sk-ant-fake-` and a fake OpenAI that takes any key starting with `sk-fake-` (no computer key for it);
   `CONXIST_FAKE_COMPUTER_KEY=false` starts it with no computer key, to try Settings from scratch.
 - Workspace Settings (ADR 0014, owner 2026-11-24): a Settings button in the workspace menu opens `#/settings` with
-  General (rename, description), LLM providers (Anthropic and OpenAI, owner 2026-11-27: each connects with a pasted API key
+  General (rename, description, run limits), LLM providers (Anthropic and OpenAI, owner 2026-11-27: each connects with a pasted API key
   that ConXist checks and stores encrypted per workspace, Test connection, Replace key, Disconnect; a workspace without
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, a default model and effort per provider,

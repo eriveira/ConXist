@@ -289,10 +289,8 @@ class McpServersIntegrationTest {
         String tools = server == null ? "[]" : "[{\"serverId\":\"" + server + "\",\"tool\":\"" + tool + "\"}]";
         return """
                 {"revision":%d,"draft":{"name":"Researcher","purpose":"","instructions":"Find the spec.",
-                "knowledgeSources":[],"skills":[],"tools":[],"mcpTools":%s,
-                "model":{"provider":"anthropic","model":"claude-sonnet-5-5","effort":"MEDIUM"},
-                "style":"PRECISE","accepts":["TRANSCRIPT"],"givesBack":"FREE_TEXT",
-                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                "skills":[],"tools":[],"mcpTools":%s,
+                "model":{"provider":"anthropic","model":"claude-sonnet-5-5","effort":"MEDIUM"}}}
                 """.formatted(revision, tools);
     }
 

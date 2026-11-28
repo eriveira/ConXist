@@ -75,12 +75,10 @@ public final class ReadAgentBriefs implements AgentBriefs {
                                 pin.skillId(), pin.version(), version.definition().name(), pinned.source().name(),
                                 version.definition().instructions()))))
                 .toList();
-        return new AgentBrief(agent.id(), draft.name(), draft.purpose(), draft.instructions(), draft.knowledgeSources(),
+        return new AgentBrief(agent.id(), draft.name(), draft.purpose(), draft.instructions(),
                 draft.tools().stream().map(AgentTool::toolName).toList(),
                 model.map(AgentModel::provider).orElse(null), model.map(AgentModel::model).orElse(null),
-                model.map(m -> m.effort().name()).orElse(null), draft.style().name(),
-                draft.givesBack().name(), draft.limits().maxSteps(), draft.limits().timeoutSeconds(),
-                draft.limits().maxToolCalls(), followed, book.problems(draft),
+                model.map(m -> m.effort().name()).orElse(null), followed, book.problems(draft),
                 agent.status() == AgentStatus.ARCHIVED,
                 draft.mcpTools().stream().map(pick -> new AgentBrief.McpTool(pick.serverId(), pick.tool())).toList());
     }

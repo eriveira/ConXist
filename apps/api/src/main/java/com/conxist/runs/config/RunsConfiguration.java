@@ -8,11 +8,9 @@ import com.conxist.connectors.McpToolbox;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.WorkspaceVariables;
 import com.conxist.runs.adapter.model.ClaudeModel;
-import com.conxist.runs.adapter.model.JsonAnswerReader;
 import com.conxist.runs.adapter.model.OpenAiModel;
 import com.conxist.runs.application.AllowModel;
 import com.conxist.runs.application.AllowedModelsRepository;
-import com.conxist.runs.application.AnswerReader;
 import com.conxist.runs.application.ConnectProvider;
 import com.conxist.runs.application.ProviderKeys;
 import com.conxist.runs.application.ProviderKeysRepository;
@@ -21,7 +19,9 @@ import com.conxist.runs.application.LlmProviders;
 import com.conxist.runs.application.ModelDefaultsRepository;
 import com.conxist.runs.application.ProviderModelLists;
 import com.conxist.runs.application.RunTools;
+import com.conxist.runs.application.RunLimitsRepository;
 import com.conxist.runs.application.StartTestRun;
+import com.conxist.runs.application.WorkspaceRunLimits;
 import com.conxist.sources.SourceCatalog;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,11 +56,6 @@ class RunsConfiguration {
     }
 
     @Bean
-    AnswerReader answerReader() {
-        return new JsonAnswerReader();
-    }
-
-    @Bean
     ProviderModelLists providerModelLists(RunsProperties properties, Clock clock) {
         return new ProviderModelLists(properties.modelListKeptFor(), properties.modelListMinRefresh(),
                 properties.modelListTimeout(), clock);
@@ -88,7 +83,12 @@ class RunsConfiguration {
 
     @Bean
     StartTestRun startTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
-            AnswerReader reader, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
-        return new StartTestRun(agents, library, tools, providers, reader, workspace, variables, clock);
+            WorkspaceRunLimits limits, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
+        return new StartTestRun(agents, library, tools, providers, limits, workspace, variables, clock);
+    }
+
+    @Bean
+    WorkspaceRunLimits workspaceRunLimits(RunLimitsRepository limits, CurrentWorkspace workspace, Clock clock) {
+        return new WorkspaceRunLimits(limits, workspace, clock);
     }
 }

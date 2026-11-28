@@ -6,7 +6,7 @@ import { modelAvailable, modelLabel, modelUsers, samePick } from './settings';
 const HAIKU_LOW: AgentModel = { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' };
 
 const agent = (name: string, model: AgentModel | null, status: AgentSummary['status'] = 'ACTIVE'): AgentSummary => ({
-  id: name, name, purpose: '', status, publishedVersion: 0, draftPublished: false, givesBack: 'SUMMARY', model, skills: [],
+  id: name, name, purpose: '', status, publishedVersion: 0, draftPublished: false, model, skills: [],
   updatedAt: '2026-11-24T00:00:00Z',
 });
 

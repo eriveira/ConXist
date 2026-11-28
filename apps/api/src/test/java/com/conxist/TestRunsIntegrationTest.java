@@ -112,10 +112,8 @@ class TestRunsIntegrationTest {
         mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"revision":1,"draft":{"name":"Analyst","purpose":"","instructions":"Find the requirements.",
-                                "knowledgeSources":[],"skills":[],"tools":["GET_TRANSCRIPT", "LIST_SOURCES"],
-                                "model":{"provider":"openai","model":"gpt-5.2","effort":"HIGH"},
-                                "style":"PRECISE","accepts":["TRANSCRIPT"],"givesBack":"REQUIREMENTS",
-                                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                                "skills":[],"tools":["GET_TRANSCRIPT", "LIST_SOURCES"],
+                                "model":{"provider":"openai","model":"gpt-5.2","effort":"HIGH"}}}
                                 """))
                 .andExpect(jsonPath("$.problems").isEmpty());
         int claudeBefore = claude.requests().size();
@@ -124,9 +122,8 @@ class TestRunsIntegrationTest {
                         .content("{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.outcome").value("ANSWERED"))
-                .andExpect(jsonPath("$.matchesShape").value(true))
                 .andExpect(jsonPath("$.model").value("gpt-5.2"))
-                .andExpect(jsonPath("$.structured.requirements[0].type").value("BUG"));
+                .andExpect(jsonPath("$.answer").value("A short answer from the fake model."));
         org.assertj.core.api.Assertions.assertThat(openAi.requests().getLast().path("reasoning_effort").asString())
                 .isEqualTo("high");
         org.assertj.core.api.Assertions.assertThat(claude.requests()).hasSize(claudeBefore);
@@ -309,15 +306,13 @@ class TestRunsIntegrationTest {
     private static String summaryDraft(int revision, String model) {
         return """
                 {"revision":%d,"draft":{"name":"Summary","purpose":"","instructions":"Sum it up.",
-                "knowledgeSources":[],"skills":[],"tools":["GET_TRANSCRIPT"],
-                "model":{"provider":"anthropic","model":"%s","effort":"LOW"},"style":"PRECISE",
-                "accepts":["TRANSCRIPT"],"givesBack":"FREE_TEXT",
-                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                "skills":[],"tools":["GET_TRANSCRIPT"],
+                "model":{"provider":"anthropic","model":"%s","effort":"LOW"}}}
                 """.formatted(revision, model);
     }
 
     @Test
-    void an_agents_draft_runs_on_a_meeting_and_answers_in_its_shape() throws Exception {
+    void an_agents_draft_runs_on_a_meeting_and_answers_in_plain_text() throws Exception {
         String workspace = workspace("Runs");
         String source = source(workspace, "Specs");
         String meeting = upload(workspace, source, "# Kickoff\nAna: we need guest checkout.");
@@ -325,10 +320,8 @@ class TestRunsIntegrationTest {
         mvc.perform(put("/api/agents/{id}/draft", agent).header(HEADER, workspace)
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"revision":1,"draft":{"name":"Analyst","purpose":"","instructions":"Find the requirements.",
-                                "knowledgeSources":[],"skills":[],"tools":["GET_TRANSCRIPT"],
-                                "model":{"provider":"anthropic","model":"claude-opus-5-5","effort":"HIGH"},
-                                "style":"PRECISE","accepts":["TRANSCRIPT"],"givesBack":"REQUIREMENTS",
-                                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                                "skills":[],"tools":["GET_TRANSCRIPT"],
+                                "model":{"provider":"anthropic","model":"claude-opus-5-5","effort":"HIGH"}}}
                                 """))
                 .andExpect(jsonPath("$.problems").isEmpty());
 
@@ -338,10 +331,9 @@ class TestRunsIntegrationTest {
                         .content("{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.outcome").value("ANSWERED"))
-                .andExpect(jsonPath("$.matchesShape").value(true))
                 .andExpect(jsonPath("$.model").value("claude-opus-5-5"))
                 .andExpect(jsonPath("$.effort").value("HIGH"))
-                .andExpect(jsonPath("$.structured.requirements[0].type").value("BUG"))
+                .andExpect(jsonPath("$.answer").value("A short answer from the fake model."))
                 .andExpect(jsonPath("$.steps[0].kind").value("MODEL"));
 
         String system = claude.requests().getLast().path("system").asString();
@@ -390,6 +382,45 @@ class TestRunsIntegrationTest {
                         .content("{\"sourceId\":\"" + source + "\",\"meetingId\":\"" + meeting + "\"}"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("run.agent-not-ready"));
+    }
+
+    @Test
+    void each_workspace_keeps_its_own_run_limits_within_bounds() throws Exception {
+        String workspace = workspace("Limits");
+        String other = workspace("Other limits");
+
+        mvc.perform(get("/api/run-limits").header(HEADER, workspace))
+                .andExpect(jsonPath("$.maxSteps").value(6))
+                .andExpect(jsonPath("$.timeoutSeconds").value(120))
+                .andExpect(jsonPath("$.maxToolCalls").value(10));
+        mvc.perform(put("/api/run-limits").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxSteps\":12,\"timeoutSeconds\":300,\"maxToolCalls\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxSteps").value(12));
+        mvc.perform(get("/api/run-limits").header(HEADER, workspace))
+                .andExpect(jsonPath("$.timeoutSeconds").value(300))
+                .andExpect(jsonPath("$.maxToolCalls").value(0));
+        mvc.perform(get("/api/run-limits").header(HEADER, other)).andExpect(jsonPath("$.maxSteps").value(6));
+
+        mvc.perform(put("/api/run-limits").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxSteps\":21,\"timeoutSeconds\":300,\"maxToolCalls\":0}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("run-limits.steps"));
+        mvc.perform(put("/api/run-limits").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxSteps\":5,\"timeoutSeconds\":601,\"maxToolCalls\":0}"))
+                .andExpect(jsonPath("$.code").value("run-limits.time"));
+        mvc.perform(put("/api/run-limits").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxSteps\":5}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/run-limits").header(HEADER, workspace)).andExpect(jsonPath("$.maxSteps").value(12));
+
+        mvc.perform(put("/api/run-limits").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxSteps\":3,\"timeoutSeconds\":60,\"maxToolCalls\":50}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/run-limits").header(HEADER, workspace))
+                .andExpect(jsonPath("$.maxSteps").value(3))
+                .andExpect(jsonPath("$.timeoutSeconds").value(60))
+                .andExpect(jsonPath("$.maxToolCalls").value(50));
     }
 
     private String upload(String workspace, String source, String text) throws Exception {

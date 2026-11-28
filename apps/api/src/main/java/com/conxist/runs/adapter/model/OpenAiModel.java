@@ -27,7 +27,6 @@ import com.openai.errors.UnauthorizedException;
 import com.openai.models.FunctionDefinition;
 import com.openai.models.FunctionParameters;
 import com.openai.models.ReasoningEffort;
-import com.openai.models.ResponseFormatJsonSchema;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionFunctionTool;
@@ -42,9 +41,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * OpenAI's GPT models through the official OpenAI Java SDK (ADR 0014). Each turn is one Chat Completions call with the
- * agent's effort as the reasoning effort (for models that reason), strict function tools, and a strict JSON schema when
- * the agent gives back a shape. Earlier turns go back exactly as OpenAI sent them. Each call names the key to use (the
- * workspace's own or this computer's); keys are never logged.
+ * agent's effort as the reasoning effort (for models that reason) and strict function tools. Earlier turns go back
+ * exactly as OpenAI sent them. Each call names the key to use (the workspace's own or this computer's); keys are never
+ * logged.
  */
 public final class OpenAiModel implements ModelPort {
 
@@ -55,8 +54,6 @@ public final class OpenAiModel implements ModelPort {
     private static final String KEY_REFUSED =
             "OpenAI refused the key. Check it in Settings, LLM providers, and what it may use.";
     private static final String BUSY = "OpenAI is busy right now. Try again in a minute.";
-    /** The name OpenAI asks for with a JSON schema; it is not shown to anyone. */
-    private static final String ANSWER_SCHEMA = "answer";
     /** Clients kept, one per key; a key used less recently is dropped past this. */
     private static final int MAX_CLIENTS = 32;
 
@@ -156,15 +153,6 @@ public final class OpenAiModel implements ModelPort {
                 .addUserMessage(request.firstMessage());
         if (OpenAiModels.reasons(model.id())) {
             params.reasoningEffort(effort(model.effort()));
-        }
-        if (request.outputSchema() != null) {
-            ResponseFormatJsonSchema.JsonSchema.Schema.Builder schema =
-                    ResponseFormatJsonSchema.JsonSchema.Schema.builder();
-            request.outputSchema().forEach((key, value) -> schema.putAdditionalProperty(key, JsonValue.from(value)));
-            params.responseFormat(ResponseFormatJsonSchema.builder()
-                    .jsonSchema(ResponseFormatJsonSchema.JsonSchema.builder()
-                            .name(ANSWER_SCHEMA).strict(true).schema(schema.build()).build())
-                    .build());
         }
         request.tools().forEach(tool -> params.addTool(tool(tool)));
         for (Exchange exchange : request.exchanges()) {

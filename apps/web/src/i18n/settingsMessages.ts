@@ -141,6 +141,17 @@ export const settingsEn = {
   'api.provider.timeout': 'The provider did not answer in time. Try again.',
   'api.provider.unreachable': 'ConXist could not reach the provider. Check the connection and try again.',
   'api.model.unknown-effort': 'Pick low, medium or high effort.',
+  'settings.limits': 'Run limits',
+  'settings.limits.save': 'Save run limits',
+  'settings.limits.lead': 'Every agent run in this workspace stops at the first limit it reaches, so a run that loops cannot keep spending.',
+  'settings.limits.maxSteps': 'Steps',
+  'settings.limits.timeoutSeconds': 'Time (seconds)',
+  'settings.limits.maxToolCalls': 'Tool calls',
+  'settings.limits.range': 'From {min} to {max}',
+  'settings.limits.error': 'The run limits could not load.',
+  'api.run-limits.steps': 'Steps must be between 1 and 20.',
+  'api.run-limits.time': 'Time must be between 10 and 600 seconds.',
+  'api.run-limits.tool-calls': 'Tool calls must be between 0 and 50.',
 };
 
 export const settingsEs: Record<keyof typeof settingsEn, string> = {
@@ -285,4 +296,15 @@ export const settingsEs: Record<keyof typeof settingsEn, string> = {
   'api.provider.timeout': 'El proveedor no respondió a tiempo. Inténtalo de nuevo.',
   'api.provider.unreachable': 'ConXist no pudo conectar con el proveedor. Revisa la conexión e inténtalo de nuevo.',
   'api.model.unknown-effort': 'Elige esfuerzo bajo, medio o alto.',
+  'settings.limits': 'Límites de ejecución',
+  'settings.limits.save': 'Guardar límites',
+  'settings.limits.lead': 'Cada ejecución de un agente en este espacio se detiene en el primer límite que alcanza, así una ejecución que se repite no sigue gastando.',
+  'settings.limits.maxSteps': 'Pasos',
+  'settings.limits.timeoutSeconds': 'Tiempo (segundos)',
+  'settings.limits.maxToolCalls': 'Usos de herramientas',
+  'settings.limits.range': 'De {min} a {max}',
+  'settings.limits.error': 'No se pudieron cargar los límites de ejecución.',
+  'api.run-limits.steps': 'Los pasos deben estar entre 1 y 20.',
+  'api.run-limits.time': 'El tiempo debe estar entre 10 y 600 segundos.',
+  'api.run-limits.tool-calls': 'Los usos de herramientas deben estar entre 0 y 50.',
 };

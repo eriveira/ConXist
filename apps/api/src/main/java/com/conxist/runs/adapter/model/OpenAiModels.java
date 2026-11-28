@@ -8,11 +8,11 @@ import java.util.regex.Pattern;
 /**
  * Which of OpenAI's models can run a ConXist agent, and the name to show for each (ADR 0014). OpenAI's Models API lists
  * every model a key can use, image, audio, speech and embedding models among them, with an id and no display name. An
- * agent needs chat with strict tools and structured output, so the list keeps the GPT and o-series chat models only.
+ * agent needs chat with strict tools, so the list keeps the GPT and o-series chat models only.
  */
 final class OpenAiModels {
 
-    /** The families that take tools and structured output in Chat Completions. */
+    /** The families that take strict tools in Chat Completions. */
     private static final Pattern CHAT = Pattern.compile("^(gpt-4o|gpt-4\\.1|gpt-5|o[1-9])([-.].*)?$");
     /** Words in an id that mark a model agents can't run on, though it belongs to a chat family. */
     private static final List<String> NOT_FOR_AGENTS = List.of("audio", "realtime", "tts", "transcribe", "image",
