@@ -1,6 +1,6 @@
 # 0025. Orders come only from the agent
 
-- Status: Proposed
+- Status: Accepted (owner, 2026-11-28)
 - Date: 2026-11-28
 - Deciders: owner, Claude
 - Changes: ADR 0012 (a test run also reports what the data asked for, and refuses copied changes), ADR 0022 (a ticked
