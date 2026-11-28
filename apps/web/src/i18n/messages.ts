@@ -10,6 +10,7 @@ import { settingsEn, settingsEs } from './settingsMessages';
 import { mcpEn, mcpEs } from './mcpMessages';
 import { integrationEn, integrationEs } from './integrationMessages';
 import { gmailEn, gmailEs } from './gmailMessages';
+import { guardrailsEn, guardrailsEs } from './guardrailsMessages';
 
 const en = {
   ...pickerEn,
@@ -17,7 +18,7 @@ const en = {
   ...editEn,
   ...shellEn,
   ...agentEn,
-  ...skillEn, ...runEn, ...deleteEn, ...settingsEn, ...mcpEn, ...integrationEn, ...gmailEn,
+  ...skillEn, ...runEn, ...deleteEn, ...settingsEn, ...mcpEn, ...integrationEn, ...gmailEn, ...guardrailsEn,
   'app.theme': 'Theme',
   'app.theme.system': 'System',
   'app.theme.light': 'Light', 'app.theme.dark': 'Dark',
@@ -210,7 +211,7 @@ const es: Messages = {
   ...editEs,
   ...shellEs,
   ...agentEs,
-  ...skillEs, ...runEs, ...deleteEs, ...settingsEs, ...mcpEs, ...integrationEs, ...gmailEs,
+  ...skillEs, ...runEs, ...deleteEs, ...settingsEs, ...mcpEs, ...integrationEs, ...gmailEs, ...guardrailsEs,
   'app.theme': 'Tema',
   'app.theme.system': 'Sistema',
   'app.theme.light': 'Claro', 'app.theme.dark': 'Oscuro',

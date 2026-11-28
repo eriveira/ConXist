@@ -15,8 +15,8 @@ import java.util.regex.Pattern;
 /**
  * Keeps a run from copying what it read into a tool that reaches outside ConXist (ADR 0025, layer 3). A hostile
  * source can ask the model to send it, or another meeting, somewhere; the model may obey, so code refuses any outside
- * call whose input repeats {@value #SHINGLE_WORDS} words in a row of something the run read, other than the meeting
- * or text it was handed, which its instructions may quote.
+ * call whose input repeats {@value #SHINGLE_WORDS} words in a row (fewer when the workspace made it stricter) of
+ * something the run read, other than the meeting or text it was handed, which its instructions may quote.
  * <p>
  * All of an input's text counts as one, keys included, so a passage split over fields or list items is still found.
  * Text is folded first (compatibility forms, invisible characters, accents written as separate marks, case), and
@@ -27,25 +27,38 @@ import java.util.regex.Pattern;
  */
 public final class CopyGuard {
 
-    /** How many words in a row count as a copied passage. */
+    /** How many words in a row count as a copied passage, unless the workspace made it stricter. */
     public static final int SHINGLE_WORDS = 12;
 
     private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{M}\\p{N}]+");
     private static final Pattern INVISIBLE = Pattern.compile("\\p{Cf}");
     private static final Pattern NUMBER = Pattern.compile("\\p{N}+");
 
+    private final int words;
     private final Set<Long> handed;
     /** Each passage read, to the name of where it was read. */
     private final Map<Long, String> read = new HashMap<>();
 
     /** @param handedText the meeting or text the run was handed */
     public CopyGuard(String handedText) {
-        this.handed = new HashSet<>(shingles(handedText));
+        this(handedText, SHINGLE_WORDS);
+    }
+
+    /**
+     * @param handedText the meeting or text the run was handed
+     * @param words      how many words in a row count as copying
+     */
+    public CopyGuard(String handedText, int words) {
+        if (words < 1) {
+            throw new IllegalArgumentException("A copied passage has at least one word");
+        }
+        this.words = words;
+        this.handed = new HashSet<>(shingles(handedText, words));
     }
 
     /** Remembers what a tool answered, and where: a meeting's title or a tool's name, shown only to the person. */
     public void read(String text, String from) {
-        for (long shingle : shingles(text)) {
+        for (long shingle : shingles(text, words)) {
             if (!handed.contains(shingle)) {
                 read.putIfAbsent(shingle, from);
             }
@@ -56,7 +69,7 @@ public final class CopyGuard {
     public Optional<String> copiedFrom(Map<String, Object> input) {
         List<String> texts = new ArrayList<>();
         collect(input, texts);
-        for (long shingle : shingles(String.join(" ", texts))) {
+        for (long shingle : shingles(String.join(" ", texts), words)) {
             String from = read.get(shingle);
             if (from != null) {
                 return Optional.of(from);
@@ -80,6 +93,11 @@ public final class CopyGuard {
 
     /** Each run of {@value #SHINGLE_WORDS} words of the folded text, as a 64-bit hash. */
     static List<Long> shingles(String text) {
+        return shingles(text, SHINGLE_WORDS);
+    }
+
+    /** Each run of {@code size} words of the folded text, as a 64-bit hash. */
+    static List<Long> shingles(String text, int size) {
         List<Long> words = new ArrayList<>();
         Matcher matcher = WORD.matcher(folded(text));
         while (matcher.find()) {
@@ -88,9 +106,9 @@ public final class CopyGuard {
             }
         }
         List<Long> shingles = new ArrayList<>();
-        for (int start = 0; start + SHINGLE_WORDS <= words.size(); start++) {
+        for (int start = 0; start + size <= words.size(); start++) {
             long hash = 0xcbf29ce484222325L;
-            for (int i = start; i < start + SHINGLE_WORDS; i++) {
+            for (int i = start; i < start + size; i++) {
                 hash = (hash ^ words.get(i)) * 0x100000001b3L;
             }
             shingles.add(hash);

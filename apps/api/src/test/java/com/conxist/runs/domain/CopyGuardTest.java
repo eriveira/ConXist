@@ -48,6 +48,20 @@ class CopyGuardTest {
     }
 
     @Test
+    void a_stricter_workspace_refuses_shorter_copies() {
+        String board = "The board agreed to cut the marketing budget by forty percent next quarter.";
+        Map<String, Object> tenWords = Map.of("body", "agreed to cut the marketing budget by forty percent next");
+        CopyGuard strict = new CopyGuard("", 8);
+        CopyGuard standard = new CopyGuard("", 12);
+        strict.read(board, "Board");
+        standard.read(board, "Board");
+
+        assertThat(strict.copiedFrom(tenWords)).contains("Board");
+        assertThat(standard.copiedFrom(tenWords)).isEmpty();
+        assertThat(CopyGuard.shingles("a b c d e f g h", 8)).hasSize(1);
+    }
+
+    @Test
     void accents_stay_part_of_their_word() {
         String spanish = "La junta acordó recortar el presupuesto de marketing un cuarenta por ciento el próximo"
                 + " trimestre.";

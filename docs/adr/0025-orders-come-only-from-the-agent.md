@@ -3,6 +3,7 @@
 - Status: Accepted (owner, 2026-11-28)
 - Date: 2026-11-28
 - Deciders: owner, Claude
+- Changed by: ADR 0026 (a workspace may replace ConXist's rule after a warning, and tighten the copy guard)
 - Changes: ADR 0012 (a test run also reports what the data asked for, and refuses copied changes), ADR 0022 (a ticked
   change tool is still checked on every call)
 
