@@ -1,6 +1,6 @@
 # 0020. Bitbucket, the second integration
 
-- Status: Proposed
+- Status: Superseded by ADR 0027 (owner, 2026-11-28)
 - Date: 2026-11-27
 - Deciders: owner, Claude
 - Follows: ADR 0019 (GitHub), the connectors demo v6 the owner approved on 2026-11-27 ("good")

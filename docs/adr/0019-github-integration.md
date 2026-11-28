@@ -1,6 +1,6 @@
 # 0019. GitHub, the first integration
 
-- Status: Proposed
+- Status: Superseded by ADR 0027 (owner, 2026-11-28)
 - Date: 2026-11-27
 - Deciders: owner, Claude
 - Follows: ADR 0017 (MCP servers), the connectors demo v5 the owner approved on 2026-11-27

@@ -115,7 +115,7 @@ class JdbcMcpServerRepository implements McpServerRepository {
                 .param("workspaceId", workspaceId)
                 .param("id", serverId)
                 .param("logo", logo == null ? null : logo.image(), Types.VARCHAR)
-                .param("address", logo == null ? null : logo.address().toString(), Types.VARCHAR)
+                .param("address", logo == null || logo.address() == null ? null : logo.address().toString(), Types.VARCHAR)
                 .param("at", logo == null ? null : Timestamp.from(logo.fetchedAt()), Types.TIMESTAMP)
                 .update() > 0;
     }
@@ -159,7 +159,8 @@ class JdbcMcpServerRepository implements McpServerRepository {
 
     private static McpServer.Logo logo(ResultSet row) throws SQLException {
         String image = row.getString("logo");
-        return image == null ? null : new McpServer.Logo(image, URI.create(row.getString("logo_address")),
+        String address = row.getString("logo_address");
+        return image == null ? null : new McpServer.Logo(image, address == null ? null : URI.create(address),
                 row.getTimestamp("logo_at").toInstant());
     }
 

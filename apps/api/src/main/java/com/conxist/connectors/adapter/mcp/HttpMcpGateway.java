@@ -247,7 +247,8 @@ public final class HttpMcpGateway implements McpGateway {
      * a public favicon service is asked with the host name only (owner, 2026-11-27), unless turned off. Null when none
      * is found.
      */
-    private String siteIcon(URI address) {
+    @Override
+    public String siteIcon(URI address) {
         for (URI home : siteHomes(address)) {
             try {
                 Page page = followed(home, (at, answer) -> page(at, answer));

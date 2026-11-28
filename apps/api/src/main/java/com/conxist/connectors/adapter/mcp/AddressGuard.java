@@ -14,17 +14,17 @@ import com.conxist.connectors.application.McpGateway;
  * names) can't reach this computer or a private network. With {@code allowLoopback}, only for tests and the local
  * fake, plain http on this computer is let through too; other private addresses never are.
  */
-final class AddressGuard {
+public final class AddressGuard {
 
     static final int MAX_ADDRESS_LENGTH = 2_000;
 
     private final boolean allowLoopback;
 
-    AddressGuard(boolean allowLoopback) {
+    public AddressGuard(boolean allowLoopback) {
         this.allowLoopback = allowLoopback;
     }
 
-    URI check(String value) {
+    public URI check(String value) {
         if (value == null || value.isEmpty() || value.length() > MAX_ADDRESS_LENGTH) {
             throw new McpGateway.AddressRefused("address-invalid");
         }
