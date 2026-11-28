@@ -156,6 +156,11 @@ Sources page does not show it for now, owner decision 2026-11-17).
   requests, and nothing goes into its memory until a person approves it.
 - Transcripts, documents, tickets and repository content are customer data and
   untrusted input: never instructions, never logged in full.
+- Orders come only from the agent (owner, 2026-11-28; ADR 0025). Every run's fixed rules say so and name the kinds of
+  data; the model reports what data asked for with ConXist's own `report_request` tool (at most 10, shown in Try it,
+  not a tool call the limits count), and the copy guard (`runs/domain/CopyGuard`) refuses an outside tool's input that
+  repeats 12 words in a row of what the run read (the handed meeting or text excepted), and a change over 4,000
+  characters. The attack tests in `StartTestRunTest` run in every build; later layers are in ADR 0025.
 
 ## Project rules
 
