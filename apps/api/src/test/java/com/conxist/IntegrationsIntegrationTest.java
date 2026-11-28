@@ -151,9 +151,27 @@ class IntegrationsIntegrationTest {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("logo.not-image"));
 
+        // The stored key goes only to the host it was given for: another host needs it again.
+        String elsewhere = api.address().toString().replace("127.0.0.1", "localhost");
+        edit(workspace, integration, elsewhere, "").andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("integration.secret-required"));
+        edit(workspace, integration, api.address().toString(), "").andExpect(status().isOk())
+                .andExpect(jsonPath("$.ending").value("a9F2"));
+        edit(workspace, integration, elsewhere, KEY).andExpect(status().isOk())
+                .andExpect(jsonPath("$.address").value(elsewhere));
+
         mvc.perform(delete("/api/integrations/{id}", integration).header(HEADER, workspace))
                 .andExpect(status().isNoContent());
         assertThat(rows(workspace)).isZero();
+    }
+
+    private ResultActions edit(String workspace, String integration, String address, String key) throws Exception {
+        return mvc.perform(put("/api/integrations/{id}", integration).header(HEADER, workspace)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"Northwind","address":"%s","auth":"API_KEY","keyPlace":"HEADER","keyName":"X-Api-Key",
+                        "secret":"%s","checkPath":"/me"}
+                        """.formatted(address, key)));
     }
 
     @Test

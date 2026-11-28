@@ -1,25 +1,34 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
-import type { Integration } from '../../domain/integrations';
-import type { McpTool } from '../../domain/mcps';
+import type { ApiTool, Integration } from '../../domain/integrations';
 import { stubApi } from '../../testing';
 import { SettingsPage } from '../settings/SettingsPage';
 
 const WORKSPACE = { id: 'w1', name: 'Acme Product', description: '', sourceCount: 0, createdAt: '2026-11-18T12:00:00Z' };
 const ID = '77777777-7777-7777-7777-777777777777';
-const TOKEN = 'github_pat_11ABCDEFG0123456789_9kQ2';
-const tool = (name: string, allowed = false, users: string[] = []): McpTool => ({
-  name, title: name, description: `About ${name}.`, readOnly: true, allowed,
-  usedBy: users.map((agentName) => ({ agentId: agentName, agentName, where: 'DRAFT', archived: false })),
+const KEY = 'nw_live_0123456789a9F2';
+const tool = (name: string, patch: Partial<ApiTool> = {}): ApiTool => ({
+  name, section: 'Contacts', method: 'GET', path: `/${name}`, description: `About ${name}.`, params: [], reads: true,
+  imported: true, allowed: false, usedBy: [], ...patch,
 });
-/** Without a Google OAuth client, the API offers no Gmail. */
-const KINDS = ['GITHUB', 'BITBUCKET'];
-const NAMES = ['search_code', 'get_file', 'list_issues', 'get_issue', 'get_pull_request'];
-const GITHUB: Integration = {
-  id: ID, kind: 'GITHUB', name: 'GitHub', account: 'alex-acme', repositories: ['acme/api', 'acme/web'],
-  tokenEnding: '9kQ2', status: 'WORKS', tools: NAMES.map((name, index) => tool(name, index < 2, index === 0 ? ['Code reader'] : [])),
-  addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
+const TOOLS: ApiTool[] = [
+  tool('get_me', { section: 'Account', path: '/me' }),
+  tool('list_contacts', { path: '/contacts' }),
+  tool('delete_contact', { method: 'DELETE', path: '/contacts/{id}', reads: false,
+    params: [{ name: 'id', in: 'PATH', type: 'string', schema: { type: 'string' }, required: true, description: '' }] }),
+  tool('search_deals', { section: 'Deals', method: 'POST', path: '/deals/search', reads: false }),
+];
+const NORTHWIND: Integration = {
+  id: ID, name: 'Northwind', address: 'https://api.northwind.test/v1',
+  auth: { kind: 'API_KEY', place: 'HEADER', name: 'X-Api-Key' }, account: null, ending: 'a9F2', checkPath: '/me',
+  status: 'WORKS', icon: null, logo: null, description: null, tools: [],
+  addedAt: '2026-11-28T10:00:00Z', checkedAt: '2026-11-28T10:00:00Z',
+};
+const IMPORTED: Integration = {
+  ...NORTHWIND,
+  description: { title: 'Northwind CRM API', version: '1.4.0', address: 'https://api.northwind.test/v1/openapi.json', importedAt: '2026-11-28T10:01:00Z' },
+  tools: TOOLS.map((each) => ({ ...each, allowed: each.reads })),
 };
 
 function open(hash: string) {
@@ -36,209 +45,154 @@ describe('Settings › Integrations', () => {
     window.location.hash = '';
   });
 
-  it('connects GitHub with a fine-grained token, shows what it reaches, and adds the ticked tools', async () => {
+  it('adds any API by its address and key, imports its description, and adds the ticked tools', async () => {
+    let refused = true;
     const calls = stubApi({
-      'GET /api/integrations/kinds': () => ({ body: KINDS }),
       'GET /api/integrations': () => ({ body: [] }),
-      'POST /api/integrations/github/check': () => ({
-        body: { account: 'alex-acme', repositories: ['acme/api', 'acme/web'], tools: NAMES.map((name) => tool(name)) },
+      'POST /api/integrations': () => (refused
+        ? { status: 422, body: { code: 'integration.sign-in-refused', detail: 'The API refused the sign-in (HTTP 401).' } }
+        : { status: 201, body: NORTHWIND }),
+      [`POST /api/integrations/${ID}/import`]: () => ({
+        body: { found: 4, added: TOOLS.map((each) => each.name), kept: [], integration: IMPORTED,
+          leftOut: [{ operation: 'uploadAttachment', reason: 'it sends a file.' }] },
       }),
-      'POST /api/integrations/github': (init) => {
+      [`PUT /api/integrations/${ID}/allowed`]: (init) => {
         const allowed = (JSON.parse(String(init?.body)) as { allowedTools: string[] }).allowedTools;
-        return { status: 201, body: { ...GITHUB, tools: NAMES.map((name) => tool(name, allowed.includes(name))) } };
+        return { body: { ...IMPORTED, tools: IMPORTED.tools.map((each) => ({ ...each, allowed: allowed.includes(each.name) })) } };
       },
     });
     const { container } = open('#/settings/integrations');
 
-    expect(await screen.findByRole('heading', { name: 'No integrations yet' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    const menu = screen.getByRole('dialog', { name: 'Add an integration' });
-    expect(within(menu).getByRole('button', { name: /Bitbucket/ })).toBeEnabled();
-    await userEvent.click(within(menu).getByRole('button', { name: /GitHub/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Connect GitHub' });
-    expect(within(dialog).getByRole('link', { name: 'Open GitHub’s page (new tab)' }))
-      .toHaveAttribute('href', 'https://github.com/settings/personal-access-tokens/new');
-    await userEvent.type(within(dialog).getByLabelText('Token'), 'ghp_classic123');
+    expect(await screen.findByRole('heading', { name: 'No APIs yet' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Add API' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add API' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Use a fine-grained token. It starts with github_pat_.');
-    expect(calls.map((call) => call.key)).not.toContain('POST /api/integrations/github/check');
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Enter the API’s address.');
+    expect(calls.map((call) => call.key)).not.toContain('POST /api/integrations');
 
-    await userEvent.clear(within(dialog).getByLabelText('Token'));
-    await userEvent.type(within(dialog).getByLabelText('Token'), TOKEN);
+    await userEvent.type(within(dialog).getByLabelText('Address'), 'https://api.northwind.test/v1');
+    await userEvent.tab();
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('Northwind');
+    expect(within(dialog).getByRole('radio', { name: /API key/ })).toBeChecked();
+    expect(within(dialog).getByLabelText('Its name')).toHaveValue('X-Api-Key');
+    await userEvent.type(within(dialog).getByLabelText('Key'), 'wrong');
+    await userEvent.type(within(dialog).getByLabelText(/Check the sign-in with/), '/me');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
-    expect(await within(dialog).findByRole('heading', { name: 'GitHub is connected' })).toBeInTheDocument();
-    expect(within(dialog).getByText(/alex-acme’s token reaches 2 repositories: acme\/api, acme\/web\./)).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox', { name: 'Allow get_pull_request' })).toBeChecked();
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('The API refused the sign-in.');
+
+    refused = false;
+    await userEvent.clear(within(dialog).getByLabelText('Key'));
+    await userEvent.type(within(dialog).getByLabelText('Key'), KEY);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
+    expect(await within(dialog).findByRole('heading', { name: 'Which operations should be tools?' })).toBeInTheDocument();
+    expect(bodyOf(calls, 'POST /api/integrations')).toEqual({
+      name: 'Northwind', address: 'https://api.northwind.test/v1', auth: 'API_KEY', keyPlace: 'HEADER',
+      keyName: 'X-Api-Key', username: null, secret: KEY, checkPath: '/me',
+    });
+
+    await userEvent.type(within(dialog).getByLabelText('OpenAPI address'), 'https://api.northwind.test/v1/openapi.json');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
+    expect(await within(dialog).findByText(/Northwind CRM API 1.4.0: 4 operations ConXist can call/)).toBeInTheDocument();
+    expect(within(dialog).getByText('1 operation left out')).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow list_contacts' })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow delete_contact' })).not.toBeChecked();
     expect(await accessibilityViolations(container)).toEqual([]);
 
-    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow get_pull_request' }));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-    expect(await screen.findByText('Connected GitHub.')).toBeInTheDocument();
-    expect(bodyOf(calls, 'POST /api/integrations/github')).toEqual({
-      token: TOKEN, allowedTools: ['search_code', 'get_file', 'list_issues', 'get_issue'],
+    // A tool that changes things asks first; keeping it off leaves it off.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow search_deals' }));
+    expect(within(dialog).getByRole('group', { name: 'Let agents use search_deals?' })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Allow this tool' }));
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow search_deals' })).toBeChecked();
+    // A section's box unticks its tools, and ticks back only the ones that read.
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow the tools of Contacts that only read' }));
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow list_contacts' })).not.toBeChecked();
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Allow the tools of Contacts that only read' }));
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow list_contacts' })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: 'Allow delete_contact' })).not.toBeChecked();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add Northwind with 3 tools' }));
+    expect(await screen.findByText('Added Northwind.')).toBeInTheDocument();
+    expect(bodyOf(calls, `PUT /api/integrations/${ID}/allowed`)).toEqual({
+      allowedTools: ['get_me', 'list_contacts', 'search_deals'],
     });
-    expect(screen.getByText(/alex-acme · 2 repositories · token ending 9kQ2 · 4 of 5 tools allowed/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Manage GitHub' })).toHaveFocus();
-    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    expect(within(screen.getByRole('dialog', { name: 'Add an integration' })).getByRole('button', { name: /GitHub/ }))
-      .toBeDisabled();
-    expect(document.body).not.toHaveTextContent(TOKEN);
+    expect(screen.getByText(/api.northwind.test\/v1 · API key ending a9F2 · 3 of 4 tools allowed · No agents use it yet/))
+      .toBeInTheDocument();
   });
 
-  it('says why GitHub refused a token', async () => {
-    stubApi({
-      'GET /api/integrations/kinds': () => ({ body: KINDS }),
-      'GET /api/integrations': () => ({ body: [] }),
-      'POST /api/integrations/github/check': () => ({ status: 422, body: { code: 'integration.github-token-refused', message: 'x' } }),
-    });
-    open('#/settings/integrations');
-    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
-    await userEvent.click(screen.getByRole('button', { name: /GitHub/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Connect GitHub' });
-    await userEvent.type(within(dialog).getByLabelText('Token'), TOKEN);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('GitHub refused this token.');
-    expect(within(dialog).getByLabelText('Token')).toHaveAttribute('aria-invalid', 'true');
-  });
-
-  it('manages GitHub: ticks save at once, a used tool stays, and Remove names the agents that use it', async () => {
+  it('shows an API’s page, writes a tool by hand, tries it, and keeps a tool agents use', async () => {
+    const used: Integration = {
+      ...IMPORTED,
+      tools: IMPORTED.tools.map((each) => (each.name === 'list_contacts'
+        ? { ...each, usedBy: [{ agentId: 'a1', agentName: 'Deal reader', where: 'DRAFT', archived: false }] } : each)),
+    };
     const calls = stubApi({
-      [`GET /api/integrations/${ID}`]: () => ({ body: GITHUB }),
-      'GET /api/integrations/kinds': () => ({ body: KINDS }),
-      'GET /api/integrations': () => ({ body: [GITHUB] }),
-      [`PUT /api/integrations/${ID}`]: (init) => {
-        const allowed = (JSON.parse(String(init?.body)) as { allowedTools: string[] }).allowedTools;
-        return { body: { ...GITHUB, tools: GITHUB.tools.map((each) => ({ ...each, allowed: allowed.includes(each.name) })) } };
-      },
-      [`POST /api/integrations/${ID}/check`]: () => ({ body: { works: true, error: null, integration: GITHUB } }),
+      'GET /api/integrations': () => ({ body: [used] }),
+      [`GET /api/integrations/${ID}`]: () => ({ body: used }),
+      [`POST /api/integrations/${ID}/try`]: () => ({
+        body: { status: 200, contentType: 'application/json', bytes: 40, millis: 12, request: 'GET /v1/contacts',
+          text: '{"contacts":[{"name":"Dana Globex"}]}' },
+      }),
+      [`POST /api/integrations/${ID}/tools`]: (init) => ({
+        status: 201,
+        body: { ...used, tools: [...used.tools, { ...tool('recent_contacts'), ...JSON.parse(String(init?.body)), params: [], usedBy: [], imported: false }] },
+      }),
+      [`POST /api/integrations/${ID}/check`]: () => ({
+        body: { works: true, error: null, status: 200, millis: 30, request: 'GET /v1/me', integration: used },
+      }),
     });
     const { container } = open(`#/settings/integrations/${ID}`);
 
-    expect(await screen.findByRole('heading', { name: /GitHub/ })).toBeInTheDocument();
-    expect(screen.getByText('acme/web')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Allow search_code' })).toBeDisabled();
-    expect(screen.getByText('Used by Code reader.', { exact: false })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Allow list_issues' }));
-    expect(bodyOf(calls, `PUT /api/integrations/${ID}`)).toEqual({ allowedTools: ['search_code', 'get_file', 'list_issues'] });
-    expect(await screen.findByRole('checkbox', { name: 'Allow list_issues' })).toBeChecked();
+    expect(await screen.findByRole('heading', { name: /Northwind/ })).toBeInTheDocument();
+    expect(screen.getByText('API key in the X-Api-Key header, ending a9F2')).toBeInTheDocument();
+    expect(screen.getByText(/OpenAPI description Northwind CRM API 1.4.0, imported/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Allow list_contacts' })).toBeDisabled();
+    expect(screen.getByText('Used by Deal reader. Turn it off in those agents first.')).toBeInTheDocument();
+    expect(screen.queryByText(KEY)).not.toBeInTheDocument();
+    expect(await accessibilityViolations(container)).toEqual([]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Check now' }));
-    expect(await screen.findByText('GitHub answered. Agents can read 2 repositories.')).toBeInTheDocument();
+    expect(await screen.findByText('Connected. GET /v1/me answered 200 in 30 ms.')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
-    const confirm = screen.getByRole('dialog', { name: 'Remove GitHub?' });
-    expect(confirm).toHaveTextContent('An agent uses its tools: Code reader.');
-    expect(within(confirm).getByRole('button', { name: 'Remove' })).toBeDisabled();
-    expect(await accessibilityViolations(container)).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Add tool' }));
+    const editor = screen.getByRole('dialog', { name: 'New tool for Northwind' });
+    await userEvent.type(within(editor).getByLabelText('Tool name'), 'recent_contacts');
+    await userEvent.clear(within(editor).getByLabelText('Path'));
+    await userEvent.type(within(editor).getByLabelText('Path'), '/contacts');
+    await userEvent.type(within(editor).getByLabelText('What it does, for the agent'), 'The newest contacts.');
+    expect(within(editor).getByRole('checkbox', { name: /It only reads/ })).toBeDisabled();
+    await userEvent.click(within(editor).getByRole('button', { name: 'Add input' }));
+    await userEvent.type(within(editor).getByLabelText('Name of input 1'), 'limit');
+    await userEvent.selectOptions(within(editor).getByLabelText('Type of limit'), 'integer');
+    await userEvent.type(within(editor).getByRole('textbox', { name: /^limit Query/ }), '2');
+    await userEvent.click(within(editor).getByRole('button', { name: 'Send' }));
+    expect(await within(editor).findByText('HTTP 200')).toBeInTheDocument();
+    expect(within(editor).getByText(/Dana Globex/)).toBeInTheDocument();
+    expect(bodyOf(calls, `POST /api/integrations/${ID}/try`)).toMatchObject({
+      tool: { name: 'recent_contacts', method: 'GET', path: '/contacts', reads: true }, inputs: { limit: 2 },
+    });
+
+    await userEvent.click(within(editor).getByRole('button', { name: 'Save tool' }));
+    expect(await screen.findByText('Added recent_contacts.')).toBeInTheDocument();
+    expect(bodyOf(calls, `POST /api/integrations/${ID}/tools`)).toMatchObject({
+      name: 'recent_contacts', section: null, allowed: true,
+      inputs: [{ name: 'limit', in: 'QUERY', type: 'integer', required: false }],
+    });
   });
 
-  it('connects Bitbucket with an email and API token, and agents read only the repositories picked', async () => {
-    const BB_TOOLS = ['search_code', 'get_file', 'list_pull_requests', 'get_pull_request', 'list_commits'];
-    const BITBUCKET: Integration = {
-      id: '88888888-8888-8888-8888-888888888888', kind: 'BITBUCKET', name: 'Bitbucket', account: 'alex@acme.test', repositories: ['acme/web'],
-      tokenEnding: 'Q7f1', status: 'WORKS', tools: BB_TOOLS.map((name) => tool(name, true)),
-      addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
-    };
-    const calls = stubApi({
-      'GET /api/integrations/kinds': () => ({ body: KINDS }),
-      'GET /api/integrations': () => ({ body: [GITHUB] }),
-      'POST /api/integrations/bitbucket/check': () => ({
-        body: { account: 'alex@acme.test', repositories: ['acme/api', 'acme/mobile', 'acme/web'],
-          tools: BB_TOOLS.map((name) => tool(name)) },
-      }),
-      'POST /api/integrations/bitbucket': () => ({ status: 201, body: BITBUCKET }),
-    });
-    const { container } = open('#/settings/integrations');
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
-    await userEvent.click(screen.getByRole('button', { name: /Bitbucket/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Connect Bitbucket' });
-    await userEvent.type(within(dialog).getByLabelText('Atlassian email'), 'alex@acme.test');
-    await userEvent.type(within(dialog).getByLabelText('API token'), 'app-password');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('It starts with ATATT.');
-    expect(within(dialog).getByLabelText('API token')).toHaveAttribute('aria-invalid', 'true');
-
-    await userEvent.clear(within(dialog).getByLabelText('API token'));
-    await userEvent.type(within(dialog).getByLabelText('API token'), 'ATATT3xFfGF0Q7f1');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Connect' }));
-    expect(await within(dialog).findByRole('heading', { name: 'Bitbucket accepted the token' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Next' })).toBeDisabled();
-    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'acme/web' }));
-    expect(within(dialog).getByText(/1 of 3 picked/)).toBeInTheDocument();
-    expect(await accessibilityViolations(container)).toEqual([]);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
-    expect(within(dialog).getByRole('heading', { name: 'Choose Bitbucket’s tools' })).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-
-    expect(await screen.findByText('Connected Bitbucket.')).toBeInTheDocument();
-    expect(bodyOf(calls, 'POST /api/integrations/bitbucket')).toEqual({
-      email: 'alex@acme.test', token: 'ATATT3xFfGF0Q7f1', repositories: ['acme/web'], allowedTools: BB_TOOLS,
-    });
-    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
-    expect(document.body).not.toHaveTextContent('ATATT3xFfGF0Q7f1');
-  });
-
-  it('changes which Bitbucket repositories agents may read', async () => {
-    const BITBUCKET: Integration = {
-      ...GITHUB, id: '88888888-8888-8888-8888-888888888888', kind: 'BITBUCKET', name: 'Bitbucket', account: 'alex@acme.test', repositories: ['acme/web'],
-    };
-    const calls = stubApi({
-      'GET /api/integrations/88888888-8888-8888-8888-888888888888': () => ({ body: BITBUCKET }),
-      'GET /api/integrations/kinds': () => ({ body: KINDS }),
-      'GET /api/integrations': () => ({ body: [BITBUCKET] }),
-      'POST /api/integrations/88888888-8888-8888-8888-888888888888/reachable': () => ({
-        body: { account: 'alex@acme.test', repositories: ['acme/api', 'acme/web'], tools: [] },
-      }),
-      'PUT /api/integrations/88888888-8888-8888-8888-888888888888/repositories': () => ({ body: { ...BITBUCKET, repositories: ['acme/api', 'acme/web'] } }),
-    });
-    open('#/settings/integrations/88888888-8888-8888-8888-888888888888');
-
-    expect(await screen.findByText(/The ones you picked for agents to read/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Change repositories' }));
-    const dialog = screen.getByRole('dialog', { name: 'Change repositories' });
-    expect(await within(dialog).findByRole('checkbox', { name: 'acme/web' })).toBeChecked();
-    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'acme/api' }));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-
-    expect(await screen.findByText('Repositories saved.')).toBeInTheDocument();
-    expect(bodyOf(calls, 'PUT /api/integrations/88888888-8888-8888-8888-888888888888/repositories')).toEqual({ repositories: ['acme/web', 'acme/api'] });
-    expect(screen.getByText('acme/api')).toBeInTheDocument();
-  });
-
-  it('says which picked repositories the token lost, and can ask again after a failure', async () => {
-    const BITBUCKET: Integration = {
-      ...GITHUB, id: '88888888-8888-8888-8888-888888888888', kind: 'BITBUCKET', name: 'Bitbucket', account: 'Alex Acme',
-      repositories: ['acme/old', 'acme/web'],
-    };
-    let asked = 0;
+  it('refuses a tool name the API has, and a path change adds its path input', async () => {
     stubApi({
-      'GET /api/integrations/88888888-8888-8888-8888-888888888888': () => ({ body: BITBUCKET }),
-      'GET /api/integrations/kinds': () => ({ body: KINDS }),
-      'GET /api/integrations': () => ({ body: [BITBUCKET] }),
-      'POST /api/integrations/88888888-8888-8888-8888-888888888888/reachable': () => (++asked === 1
-        ? { status: 422, body: { code: 'integration.bitbucket-unreachable', message: 'x' } }
-        : { body: { account: 'Alex Acme', repositories: ['acme/api', 'acme/web'], tools: [] } }),
+      'GET /api/integrations': () => ({ body: [IMPORTED] }),
+      [`GET /api/integrations/${ID}`]: () => ({ body: IMPORTED }),
     });
-    open('#/settings/integrations/88888888-8888-8888-8888-888888888888');
+    open(`#/settings/integrations/${ID}`);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Change repositories' }));
-    const dialog = screen.getByRole('dialog', { name: 'Change repositories' });
-    await userEvent.click(await within(dialog).findByRole('button', { name: 'Try again' }));
-
-    expect(await within(dialog).findByText(/acme\/old is no longer reachable with this token/)).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox', { name: 'acme/web' })).toBeChecked();
-  });
-
-  it('goes back from Connect Bitbucket to the list of what can be added', async () => {
-    stubApi({ 'GET /api/integrations/kinds': () => ({ body: KINDS }), 'GET /api/integrations': () => ({ body: [] }) });
-    open('#/settings/integrations');
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
-    await userEvent.click(screen.getByRole('button', { name: /Bitbucket/ }));
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'Connect Bitbucket' })).getByRole('button', { name: 'Back' }));
-
-    expect(screen.getByRole('dialog', { name: 'Add an integration' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Add tool' }));
+    const editor = screen.getByRole('dialog', { name: 'New tool for Northwind' });
+    await userEvent.type(within(editor).getByLabelText('Tool name'), 'list_contacts');
+    await userEvent.type(within(editor).getByLabelText('Path'), 'contacts/{{id}');
+    expect(within(editor).getByLabelText('Name of input 1')).toHaveValue('id');
+    await userEvent.type(within(editor).getByLabelText('What it does, for the agent'), 'One contact.');
+    await userEvent.click(within(editor).getByRole('button', { name: 'Save tool' }));
+    expect(within(editor).getByRole('alert')).toHaveTextContent('This API already has a tool with that name.');
   });
 });

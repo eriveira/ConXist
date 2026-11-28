@@ -375,28 +375,32 @@ describe('AgentPage', () => {
     expect(screen.getByRole('checkbox', { name: /search_docs/ })).not.toBeChecked();
   });
 
-  it('offers GitHub’s allowed tools as their own group, marked API', async () => {
+  it('offers a custom API’s allowed tools as their own group, marked API', async () => {
     const integrationId = '77777777-7777-7777-7777-777777777777';
-    const read = (name: string, allowed: boolean) => ({ name, title: name, description: `About ${name}.`, readOnly: true, allowed, usedBy: [] });
+    const tool = (name: string, allowed: boolean) => ({
+      name, section: 'Deals', method: 'GET', path: `/${name}`, description: `About ${name}.`, params: [], reads: true,
+      imported: true, allowed, usedBy: [],
+    });
     const calls = api(AGENT, {
       'GET /api/integrations': () => ({ body: [{
-        id: integrationId, kind: 'GITHUB', name: 'GitHub', account: 'alex-acme', repositories: ['acme/api'], tokenEnding: '9kQ2',
-        status: 'WORKS', tools: [read('search_code', true), read('get_file', false)],
-        addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
+        id: integrationId, name: 'Northwind', address: 'https://api.northwind.test/v1',
+        auth: { kind: 'API_KEY', place: 'HEADER', name: 'X-Api-Key' }, account: null, ending: 'a9F2', checkPath: '/me',
+        status: 'WORKS', icon: null, logo: null, description: null, tools: [tool('search_deals', true), tool('get_deal', false)],
+        addedAt: '2026-11-28T10:00:00Z', checkedAt: '2026-11-28T10:00:00Z',
       }] }),
       [`PUT /api/agents/${ID}/draft`]: (init) => ({ body: { ...AGENT, revision: 2, draft: JSON.parse(String(init?.body)).draft } }),
     });
     render(<AgentPage agentId={ID} />);
 
-    const fold = await screen.findByRole('button', { name: /GitHub/ });
+    const fold = await screen.findByRole('button', { name: /Northwind/ });
     expect(fold).toHaveTextContent('API');
     await userEvent.click(fold);
-    const group = screen.getByRole('group', { name: /GitHub/ });
-    expect(within(group).queryByRole('checkbox', { name: /get_file/ })).not.toBeInTheDocument();
+    const group = screen.getByRole('group', { name: /Northwind/ });
+    expect(within(group).queryByRole('checkbox', { name: /get_deal/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings › Integrations' })).toHaveAttribute('href', '#/settings/integrations');
-    await userEvent.click(within(group).getByRole('checkbox', { name: /search_code/ }));
+    await userEvent.click(within(group).getByRole('checkbox', { name: /search_deals/ }));
     await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
-    expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.mcpTools).toEqual([{ serverId: integrationId, tool: 'search_code' }]);
+    expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.mcpTools).toEqual([{ serverId: integrationId, tool: 'search_deals' }]);
   });
 
   it('keeps the agent editable when the MCP servers can’t load', async () => {

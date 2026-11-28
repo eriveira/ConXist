@@ -4,7 +4,9 @@ import type {
 import type { MeetingChanges } from '../domain/meetingEdits';
 import type { RecordingList } from '../domain/recordings';
 import type { Workspace } from '../domain/workspaces';
-import type { GmailSignIn, Integration, IntegrationCheck, IntegrationKind, TokenCheck } from '../domain/integrations';
+import type {
+  ApiConnection, ApiImport, ApiToolDraft, ApiTry, Integration, IntegrationCheck,
+} from '../domain/integrations';
 import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
 import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels } from '../domain/settings';
 import type { RunLimits } from '../domain/runLimits';
@@ -144,6 +146,8 @@ export const api = {
   checkMcp: (serverId: string) => postJson<McpCheck>(`${mcpPath(serverId)}/check`, {}),
   /** Fetches the image at this address once and shows it as the server's logo. */
   useMcpLogo: (serverId: string, address: string) => putJson<McpServer>(`${mcpPath(serverId)}/logo`, { address }),
+  /** Keeps an uploaded file (a data: address) as the server's logo. */
+  uploadMcpLogo: (serverId: string, image: string) => putJson<McpServer>(`${mcpPath(serverId)}/logo`, { image }),
   /** Goes back to the logo ConXist found. */
   dropMcpLogo: (serverId: string) => request<McpServer>(`${mcpPath(serverId)}/logo`, { method: 'DELETE' }),
   mcpSignedIn: (serverId: string, connectionId: string) =>
@@ -151,29 +155,28 @@ export const api = {
   removeMcp: (serverId: string) => request<void>(mcpPath(serverId), { method: 'DELETE' }),
   integrations: () => request<Integration[]>('/api/integrations'),
   integration: (id: string) => request<Integration>(integrationPath(id)),
-  checkGitHubToken: (token: string) => postJson<TokenCheck>('/api/integrations/github/check', { token }),
-  addGitHub: (token: string, allowedTools: string[]) =>
-    postJson<Integration>('/api/integrations/github', { token, allowedTools }),
-  updateIntegration: (id: string, allowedTools: string[]) => putJson<Integration>(integrationPath(id), { allowedTools }),
+  /** Checks the sign-in with the API, then saves it with no tools yet. */
+  addIntegration: (connection: ApiConnection) => postJson<Integration>('/api/integrations', connection),
+  /** A new connection; an empty secret keeps the stored one. */
+  editIntegration: (id: string, connection: ApiConnection) => putJson<Integration>(integrationPath(id), connection),
   checkIntegration: (id: string) => postJson<IntegrationCheck>(`${integrationPath(id)}/check`, {}),
-  checkBitbucketToken: (email: string, token: string) =>
-    postJson<TokenCheck>('/api/integrations/bitbucket/check', { email, token }),
-  addBitbucket: (email: string, token: string, repositories: string[], allowedTools: string[]) =>
-    postJson<Integration>('/api/integrations/bitbucket', { email, token, repositories, allowedTools }),
-  reachableRepositories: (id: string) => postJson<TokenCheck>(`${integrationPath(id)}/reachable`, {}),
-  pickRepositories: (id: string, repositories: string[]) =>
-    putJson<Integration>(`${integrationPath(id)}/repositories`, { repositories }),
-  replaceIntegrationToken: (id: string, token: string, email?: string) =>
-    putJson<Integration>(`${integrationPath(id)}/token`, email === undefined ? { token } : { email, token }),
-  integrationKinds: () => request<IntegrationKind[]>('/api/integrations/kinds'),
-  startGmailSignIn: (integrationId?: string) =>
-    postJson<GmailSignIn>('/api/integrations/gmail/sign-in', integrationId ? { integrationId } : {}),
-  gmailSignIn: (id: string) => request<GmailSignIn>(`/api/integrations/gmail/sign-in/${encodeURIComponent(id)}`),
-  relistGmailLabels: (id: string) =>
-    postJson<GmailSignIn>(`/api/integrations/gmail/sign-in/${encodeURIComponent(id)}/labels`, {}),
-  addGmail: (signInId: string, labels: string[], allowedTools: string[]) =>
-    postJson<Integration>('/api/integrations/gmail', { signInId, labels, allowedTools }),
-  replaceGoogleSignIn: (id: string, signInId: string) => putJson<Integration>(`${integrationPath(id)}/google`, { signInId }),
+  /** Imports an OpenAPI description by its address, or the text of a file the person picked. */
+  importDescription: (id: string, from: { address: string } | { text: string }) =>
+    postJson<ApiImport>(`${integrationPath(id)}/import`, from),
+  allowIntegrationTools: (id: string, allowedTools: string[]) =>
+    putJson<Integration>(`${integrationPath(id)}/allowed`, { allowedTools }),
+  addIntegrationTool: (id: string, tool: ApiToolDraft) => postJson<Integration>(`${integrationPath(id)}/tools`, tool),
+  updateIntegrationTool: (id: string, name: string, tool: ApiToolDraft) =>
+    putJson<Integration>(`${integrationPath(id)}/tools/${encodeURIComponent(name)}`, tool),
+  removeIntegrationTool: (id: string, name: string) =>
+    request<Integration>(`${integrationPath(id)}/tools/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  /** Sends one real call of a tool, saved or not; nothing is kept. */
+  tryIntegrationTool: (id: string, tool: ApiToolDraft, inputs: Record<string, unknown>) =>
+    postJson<ApiTry>(`${integrationPath(id)}/try`, { tool, inputs }),
+  /** Fetches the image at this address once, or keeps an uploaded file (a data: address), as the API's logo. */
+  setIntegrationLogo: (id: string, logo: { address: string } | { image: string }) =>
+    putJson<Integration>(`${integrationPath(id)}/logo`, logo),
+  dropIntegrationLogo: (id: string) => request<Integration>(`${integrationPath(id)}/logo`, { method: 'DELETE' }),
   removeIntegration: (id: string) => request<void>(integrationPath(id), { method: 'DELETE' }),
   llmProviders: () => request<LlmProviders>('/api/llm-providers'),
   /** The provider's default model, where agents that switch to it start; agents already made keep their own pick. */

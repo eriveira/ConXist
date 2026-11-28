@@ -8,7 +8,7 @@ import { problemMessage } from '../../i18n/problems';
 import { settingsHref } from '../../navigation';
 import { ErrorState, LoadingState, SavedStatus } from '../settings/SettingsParts';
 import { AddMcpDialog } from './AddMcpDialog';
-import { McpLogoBox } from './McpLogoBox';
+import { LogoBox } from './McpLogoBox';
 import { McpLogo, McpStatusPill, McpToolTable } from './McpParts';
 import { RemoveMcpDialog } from './RemoveMcpDialog';
 
@@ -104,7 +104,10 @@ export function McpServerPage({ serverId, onRemoved }: { serverId: string; onRem
         <button type="button" className="btn sm danger" onClick={() => setDialog('remove')}>{t('mcp.page.remove')}</button>
       </div>
       <CheckResult check={check} />
-      <McpLogoBox key={server.logo?.address ?? ''} server={server} onChanged={(next) => setState({ status: 'ready', server: next })} />
+      <LogoBox key={server.logo?.fetchedAt ?? ''} target={server}
+        onAddress={async (address) => setState({ status: 'ready', server: await api.useMcpLogo(server.id, address) })}
+        onUpload={async (image) => setState({ status: 'ready', server: await api.uploadMcpLogo(server.id, image) })}
+        onDrop={async () => setState({ status: 'ready', server: await api.dropMcpLogo(server.id) })} />
       <div className="models-head">
         <h3>{t('mcp.page.tools')}</h3>
         <span className="muted">{t('mcp.page.toolsCount', { total: server.tools.length, count: allowed.size })}</span>

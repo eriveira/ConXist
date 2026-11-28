@@ -96,7 +96,11 @@ public final class ManageIntegrations {
     public IntegrationViews.IntegrationView edit(UUID integrationId, Connection connection) {
         Integration integration = load(integrationId);
         URI address = address(connection.address());
-        String kept = connection.auth().kind() == integration.auth().kind()
+        // The stored secret goes only to the host it was given for: a new host, or a new kind of sign-in, needs it again.
+        boolean sameHost = address.getHost().equalsIgnoreCase(integration.address().getHost())
+                && address.getPort() == integration.address().getPort()
+                && address.getScheme().equals(integration.address().getScheme());
+        String kept = sameHost && connection.auth().kind() == integration.auth().kind()
                 ? integrations.secret(integration.workspaceId(), integrationId).orElse(null) : null;
         String secret = secret(connection, kept);
         Integration changed = integration.connected(connection.name(), address, connection.auth(),
@@ -104,8 +108,8 @@ public final class ManageIntegrations {
                 address.getHost().equals(integration.address().getHost()) ? integration.icon() : icon(address),
                 clock.instant());
         refuseIfFails(check(changed, secret));
-        boolean newSecret = connection.secret() != null && !connection.secret().isEmpty();
-        if (!integrations.updateConnection(changed, newSecret || !changed.auth().hasSecret() ? secret : null)) {
+        // The secret is saved whole each time: for Basic it holds the username too.
+        if (!integrations.updateConnection(changed, secret)) {
             throw taken(changed.name());
         }
         log.info("Workspace {} changed the connection of API {}", integration.workspaceId(), integrationId);

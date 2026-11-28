@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
-import { type Integration, integrationUsers, kindIcon } from '../../domain/integrations';
+import { type Integration, integrationUsers } from '../../domain/integrations';
 import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { McpLogo } from '../mcps/McpParts';
 
-/** Asks before removing an integration. While agents use its tools it names them, and Remove stays off. */
+/** Asks before removing an API. While agents use its tools it names them, and Remove stays off. */
 export function RemoveIntegrationDialog({ integration, onClose, onRemoved }: {
   integration: Integration; onClose: () => void; onRemoved: () => void;
 }) {
@@ -30,9 +30,9 @@ export function RemoveIntegrationDialog({ integration, onClose, onRemoved }: {
 
   return (
     <Dialog
-      title={t('github.remove.title', { name: integration.name })}
-      subtitle={t('github.remove.subtitle')}
-      icon={<McpLogo name={integration.name} icon={kindIcon(integration.kind)} size="sm" />}
+      title={t('api.remove.title', { name: integration.name })}
+      subtitle={t('api.remove.subtitle')}
+      icon={<McpLogo name={integration.name} icon={integration.icon} size="sm" />}
       closeLabel={t('dialog.close')}
       onClose={onClose}
       step="remove-integration"
@@ -42,7 +42,7 @@ export function RemoveIntegrationDialog({ integration, onClose, onRemoved }: {
           <span className="grow" />
           <button type="button" className="btn" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</button>
           <button type="button" className="btn danger" onClick={() => void remove()} disabled={busy || users.length > 0}>
-            {busy ? t('github.remove.busy') : t('github.remove.go')}
+            {busy ? t('api.remove.busy') : t('api.remove.go')}
           </button>
         </>
       )}
@@ -50,8 +50,8 @@ export function RemoveIntegrationDialog({ integration, onClose, onRemoved }: {
       <div className="m-body">
         {error && <p className="alert error" role="alert"><Icon name="alert" /> {error}</p>}
         {users.length > 0
-          ? <p className="alert info"><Icon name="alert" /> {t(users.length === 1 ? 'github.remove.used_one' : 'github.remove.used', { names: users.join(', ') })}</p>
-          : <p>{t('github.remove.unused')}</p>}
+          ? <p className="alert info"><Icon name="alert" /> {t(users.length === 1 ? 'api.remove.used_one' : 'api.remove.used', { names: users.join(', ') })}</p>
+          : <p>{t('api.remove.unused')}</p>}
       </div>
     </Dialog>
   );

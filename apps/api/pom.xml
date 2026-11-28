@@ -62,6 +62,11 @@
       <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>
     <dependency>
+      <!-- Reads OpenAPI descriptions written in YAML, safely (ADR 0027); the version comes from Spring Boot -->
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
+    <dependency>
       <!-- Every model call goes through Spring AI's chat models (ADR 0024); only the runs module's model adapters use them -->
       <groupId>org.springframework.ai</groupId>
       <artifactId>spring-ai-anthropic</artifactId>
