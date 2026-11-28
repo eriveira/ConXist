@@ -5,7 +5,7 @@
 
 create table workspace_guardrails (
     workspace_id         uuid        primary key,
-    rules                text        not null check (char_length(rules) <= 2000) -- PostgreSQL counts characters, as the app does,
+    rules                text        not null check (char_length(rules) <= 2000), -- characters, as the app counts them
     max_input_characters integer     not null check (max_input_characters between 200 and 4000),
     updated_at           timestamptz not null
 );

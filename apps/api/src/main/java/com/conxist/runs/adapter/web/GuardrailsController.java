@@ -38,12 +38,16 @@ class GuardrailsController {
     record GuardrailsRequest(@NotNull String rules, @NotNull Integer maxInputCharacters) {
     }
 
-    /** @param baseRule the exact rule every agent gets first, which no workspace can change */
+    /**
+     * @param baseRule the exact rule every agent gets first, which no workspace can change; its lines are joined so the
+     *                 app can wrap it to the screen, one paragraph per rule
+     */
     record GuardrailsView(String baseRule, String rules, int maxInputCharacters, int maxRules,
             int minInputCharacters, int maxInputCharactersAllowed) {
 
         static GuardrailsView of(Guardrails guardrails) {
-            return new GuardrailsView(RunPrompt.RULES, guardrails.rules(), guardrails.maxInputCharacters(),
+            return new GuardrailsView(RunPrompt.RULES.replaceAll("\\n(?!- )\\s*", " "), guardrails.rules(),
+                    guardrails.maxInputCharacters(),
                     Guardrails.MAX_RULES, Guardrails.MIN_INPUT_CHARACTERS, Guardrails.MAX_INPUT_CHARACTERS);
         }
     }
