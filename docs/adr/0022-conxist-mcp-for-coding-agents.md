@@ -32,7 +32,7 @@ Codex, any MCP client) can't reach any of it. ConXist has no sign-in yet and lis
 - **Only signed-in people, only their workspaces** (owner, 2026-11-28: "The ConXist MCP needs to be able to allow
   only authorized user to interact with authorized Workspaces"). ConXist has no sign-in yet, so this needs people and
   workspace members first (ADR 0002 "Open": auth provider). Proposed:
-  - *People and members* come first, in their own record and pull request: a person signs in to ConXist; each
+  - *People and members* come first (ADR 0023, its own pull request): a person signs in to ConXist; each
     workspace has members with a role (Owner, Member). Settings › Coding agents and its switches are for Owners.
   - *The MCP signs people in with MCP's own OAuth flow.* ConXist is the authorization server; a client like
     Claude Code finds it from `/.well-known/oauth-protected-resource` (RFC 9728), registers (RFC 7591), and opens
