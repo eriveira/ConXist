@@ -58,6 +58,18 @@ public record ApiAuth(Kind kind, Place place, String name) {
         return kind != Kind.NONE;
     }
 
+    /**
+     * Whether ConXist sets this input itself with the sign-in: the key's header or query parameter, or Authorization.
+     * A tool never takes such an input, so the model can't send a key of its own in place of the workspace's.
+     */
+    public boolean sets(ApiParam param) {
+        return switch (param.in()) {
+            case HEADER -> param.name().equalsIgnoreCase(header() == null ? "" : header());
+            case QUERY -> kind == Kind.API_KEY && place == Place.QUERY && param.name().equalsIgnoreCase(name);
+            case PATH, BODY -> false;
+        };
+    }
+
     /** The header this sign-in sets, lower case, or null: a tool's input can't set it. */
     public String header() {
         return switch (kind) {

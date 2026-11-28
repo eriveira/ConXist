@@ -27,15 +27,21 @@ be set by hand, by address or by uploading a file, for MCP servers too.
    sign-in is none, an API key in a header or the query (its name given), a bearer token, or Basic (username and
    password). The secret is sealed with `SecretBox` (ADR 0004), bound to the workspace and the row, and only its last 4
    characters show. Adding an API checks the sign-in with one GET of its check path (or its address): a refused key is
-   not saved. OAuth 2.0 is a later step.
+   not saved. Editing the connection keeps the stored secret only for the same scheme, host, port and path and the
+   same kind of sign-in; anything else asks for it again. No tool takes an input where the sign-in goes (the key's
+   header or query name, or Authorization): ConXist drops it from imported tools and refuses it in a tool written by
+   hand, so the model can't send a key it read in place of the workspace's. OAuth 2.0 is a later step.
 3. **Tools from a description, or by hand.** ConXist reads OpenAPI 3 and Swagger 2, JSON or YAML (YAML read safely),
    fetched from an address through the same address guard, or uploaded, up to 2 MB. Each operation under the API's
    address becomes a tool: its name from the operation id in snake_case, its section from its first tag, its inputs
    from path, query and header parameters and the properties of a JSON body. Local `$ref`s are followed and schemas
-   are kept small. What ConXist can't call (files, forms, cookies, another host, a path outside the address, past 200)
+   are kept small: each schema, and the whole read, has a budget of nodes, so refs that fan out can't build a huge
+   tree. A tool path (and the check path) holds no `.` or `..` part, plain or encoded (`%2e`, `%2f`, `%5c`). What ConXist can't call (files, forms, cookies, another host, a path outside the address, past 200)
    is listed as left out, with why. A person can also write a tool: method, path, section, description and inputs.
    Importing again replaces the imported tools and keeps the ticks, the tools written by hand, and any tool an agent
-   uses.
+   uses; room for the tools that stay is kept first, so an import never pushes them out. A tick follows a tool that
+   changes things only while it makes the same call (method, path and inputs); one that now calls something else
+   starts unticked, and while agents use it the earlier version stays.
 4. **Reads and changes.** A GET always only reads and a DELETE never does; a POST, PUT or PATCH changes things unless
    a person says it only reads (a search, say). On the first import the tools that only read come ticked; tools that
    change things start unticked and warn before they are ticked (ADR 0022). Re-imported tools that are new start off.
@@ -44,7 +50,8 @@ be set by hand, by address or by uploading a file, for MCP servers too.
    allowed; an unknown input, a missing one, a path value of `.` or `..`, or a header value that is not one short line
    is refused before anything is sent. Path values are encoded, so they can't climb out of the path. The run's copy
    guard and size cap (ADR 0025) apply as to every outside call. The answer is the API's data, untrusted, cut at
-   20,000 characters (2,000 for an error); a 401 marks the API so a person replaces the secret; files are not read.
+   20,000 characters (2,000 for an error), with the secret taken out (as typed, URL-encoded and as Basic sends it) in
+   case the API echoes the request; a 401 marks the API so a person replaces the secret; files are not read.
 6. **Try it.** A person can send one real call of a tool, saved or not, from the tool editor. Nothing of it is kept,
    and the address shown never includes the query, so a key in the query never shows.
 7. **In use stays.** A tool an agent uses can't be unticked, removed, renamed or turned into one that changes things;

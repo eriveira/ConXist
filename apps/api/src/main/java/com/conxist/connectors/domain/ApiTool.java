@@ -48,7 +48,7 @@ public record ApiTool(String name, String section, Method method, String path, S
         if (path.length() > MAX_PATH_LENGTH || !PATH.matcher(path).matches()) {
             throw new InvalidIntegration("tool-path-invalid", "A path starts with / and holds no spaces, ? or #.");
         }
-        if (List.of(path.split("/")).stream().anyMatch(part -> part.equals("..") || part.equals("."))) {
+        if (climbs(path)) {
             throw new InvalidIntegration("tool-path-invalid", "A path can't hold . or .. parts.");
         }
         description = Texts.cut(description, MAX_DESCRIPTION_LENGTH);
@@ -78,6 +78,16 @@ public record ApiTool(String name, String section, Method method, String path, S
         reads = method == Method.GET || (method != Method.DELETE && reads);
     }
 
+    /**
+     * Whether a path could leave the address it is under: a . or .. part, or an encoded dot, slash or backslash that a
+     * server might decode into one.
+     */
+    public static boolean climbs(String path) {
+        String lower = path.toLowerCase(Locale.ROOT);
+        return lower.contains("%2e") || lower.contains("%2f") || lower.contains("%5c") || lower.contains("\\")
+                || List.of(path.split("/")).stream().anyMatch(part -> part.equals("..") || part.equals("."));
+    }
+
     /** The {name} parts of a path, in order. */
     public static Set<String> placeholders(String path) {
         Set<String> found = new LinkedHashSet<>();
@@ -97,6 +107,26 @@ public record ApiTool(String name, String section, Method method, String path, S
             }
         }
         return "Other";
+    }
+
+    /** Whether it makes the same call as {@code other}: the same method, path and inputs, so a tick still fits it. */
+    public boolean sameCall(ApiTool other) {
+        return method == other.method && path.equals(other.path) && callShape().equals(other.callShape());
+    }
+
+    private Set<String> callShape() {
+        Set<String> shape = new HashSet<>();
+        params.forEach(param -> shape.add(param.in() + ":" + param.name()));
+        return shape;
+    }
+
+    /** The tool without the inputs the sign-in sets (see {@link ApiAuth#sets}). */
+    public ApiTool withoutSignIn(ApiAuth auth) {
+        if (params.stream().noneMatch(auth::sets)) {
+            return this;
+        }
+        return new ApiTool(name, section, method, path, description,
+                params.stream().filter(param -> !auth.sets(param)).toList(), reads, imported, allowed);
     }
 
     public ApiTool withAllowed(boolean value) {

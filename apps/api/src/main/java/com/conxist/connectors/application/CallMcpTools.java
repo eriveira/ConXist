@@ -154,7 +154,7 @@ public final class CallMcpTools implements McpToolbox {
         }
         try {
             ApiGateway.Answer answer = api.send(request);
-            return answered(integration, toolName, answer);
+            return answered(integration, toolName, answer, secret);
         } catch (ApiGateway.AddressRefused | ApiGateway.Unreachable unreachable) {
             log.info("Workspace {}: API {} could not be reached for a tool call", integration.workspaceId(),
                     integration.id());
@@ -167,7 +167,7 @@ public final class CallMcpTools implements McpToolbox {
         }
     }
 
-    private Result answered(Integration integration, String toolName, ApiGateway.Answer answer) {
+    private Result answered(Integration integration, String toolName, ApiGateway.Answer answer, String secret) {
         String name = integration.name();
         int status = answer.status();
         if (status == 401) {
@@ -181,7 +181,7 @@ public final class CallMcpTools implements McpToolbox {
         String body = answer.text() == null
                 ? name + " answered with " + (answer.contentType().isEmpty() ? "something" : answer.contentType())
                         + " (" + answer.bytes() + " bytes), which ConXist doesn't read."
-                : answer.text();
+                : ApiRequests.redacted(answer.text(), secret);
         if (answer.ok()) {
             return new Result(capped("HTTP " + status + "\n" + body, MAX_API_ANSWER_CHARACTERS), false);
         }

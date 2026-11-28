@@ -77,9 +77,39 @@ class ApiRequestsTest {
         assertThat(check.url().toString()).isEqualTo("https://api.northwind.test/v1/me");
     }
 
-    private static Integration api(ApiAuth auth) {
+    @Test
+    void an_input_named_like_the_sign_in_is_never_sent_so_the_model_cant_swap_in_its_own_key() {
+        ApiTool withKeyInput = new ApiTool("create_note", "Notes", ApiTool.Method.POST, "/notes", "Adds a note",
+                List.of(ApiParam.simple("x-api-key", ApiParam.In.HEADER, "string", false, ""),
+                        ApiParam.simple("api_key", ApiParam.In.QUERY, "string", false, ""),
+                        ApiParam.simple("text", ApiParam.In.BODY, "string", false, "")), false, true, true);
+
+        // Stored on the API, the inputs the sign-in sets are dropped: the model never sees them.
+        Integration header = api(ApiAuth.apiKey(ApiAuth.Place.HEADER, "X-Api-Key"), withKeyInput);
+        assertThat(header.tool("create_note").orElseThrow().params()).extracting(ApiParam::name)
+                .containsExactly("api_key", "text");
+        Integration query = api(ApiAuth.apiKey(ApiAuth.Place.QUERY, "API_KEY"), withKeyInput);
+        assertThat(query.tool("create_note").orElseThrow().params()).extracting(ApiParam::name)
+                .containsExactly("x-api-key", "text");
+
+        // A tool that still has one (Try it on an unsaved tool) is refused before anything is sent.
+        assertThatThrownBy(() -> ApiRequests.build(header, "k3y", withKeyInput,
+                Map.of("x-api-key", "attacker-key", "text", "notes")))
+                .isInstanceOf(ApiRequests.Problem.class).hasMessageContaining("set by ConXist");
+    }
+
+    @Test
+    void the_secret_is_taken_out_of_an_answer_that_echoes_the_request() {
+        assertThat(ApiRequests.redacted("GET /v1/x?api_key=k3y%2B%2F1 failed, key k3y+/1", "k3y+/1"))
+                .isEqualTo("GET /v1/x?api_key=*** failed, key ***");
+        assertThat(ApiRequests.redacted("Authorization: Basic YWxleDpwOnNz (p:ss)", "alex\np:ss"))
+                .isEqualTo("Authorization: Basic *** (***)");
+        assertThat(ApiRequests.redacted("{\"ok\":true}", null)).isEqualTo("{\"ok\":true}");
+    }
+
+    private static Integration api(ApiAuth auth, ApiTool... tools) {
         return new Integration(UUID.randomUUID(), UUID.randomUUID(), "Northwind",
                 URI.create("https://api.northwind.test/v1"), auth, null, null, "/me", null, null, null, null,
-                List.of(GET_CONTACT, SEARCH), Instant.EPOCH, Instant.EPOCH);
+                tools.length == 0 ? List.of(GET_CONTACT, SEARCH) : List.of(tools), Instant.EPOCH, Instant.EPOCH);
     }
 }

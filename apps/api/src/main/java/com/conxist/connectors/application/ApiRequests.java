@@ -6,8 +6,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import com.conxist.connectors.domain.ApiAuth;
 import com.conxist.connectors.domain.ApiParam;
 import com.conxist.connectors.domain.ApiTool;
@@ -37,7 +39,11 @@ public final class ApiRequests {
         List<String> query = new ArrayList<>();
         List<Map.Entry<String, String>> headers = new ArrayList<>();
         Map<String, Object> body = new LinkedHashMap<>();
+        ApiAuth auth = api.auth();
         for (ApiParam param : tool.params()) {
+            if (auth.sets(param)) {
+                throw new Problem(param.name() + " is set by ConXist. Leave it out.");
+            }
             Object value = given.get(param.name());
             if (value == null) {
                 if (param.required()) {
@@ -52,7 +58,6 @@ public final class ApiRequests {
                 case BODY -> body.put(param.name(), value);
             }
         }
-        ApiAuth auth = api.auth();
         if (auth.kind() == ApiAuth.Kind.API_KEY && auth.place() == ApiAuth.Place.QUERY) {
             query.add(encode(auth.name()) + "=" + encode(secret));
         }
@@ -78,6 +83,33 @@ public final class ApiRequests {
     /** The address a person sees for a request: no query, so a key in the address never shows. */
     public static String shown(ApiGateway.Request request) {
         return request.method() + " " + request.url().getRawPath();
+    }
+
+    /**
+     * An API's answer with the secret taken out, as typed, as it travels in an address and as Basic sends it: many APIs
+     * echo the request in their errors, and the answer goes to the model, the run's steps and Try it.
+     */
+    public static String redacted(String text, String secret) {
+        if (text == null || secret == null || secret.isEmpty()) {
+            return text;
+        }
+        Set<String> forms = new LinkedHashSet<>();
+        int at = secret.indexOf('\n');
+        if (at >= 0) {
+            forms.add(Base64.getEncoder().encodeToString(basic(secret).getBytes(StandardCharsets.UTF_8)));
+            forms.add(secret.substring(at + 1));
+        } else {
+            forms.add(secret);
+            forms.add(encode(secret));
+            forms.add(encode(secret).replace("+", "%20"));
+        }
+        String clean = text;
+        for (String form : forms) {
+            if (form.length() >= 4) {
+                clean = clean.replace(form, "***");
+            }
+        }
+        return clean;
     }
 
     private static List<Map.Entry<String, String>> signIn(ApiAuth auth, String secret) {

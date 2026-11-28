@@ -130,6 +130,35 @@ class OpenApiReaderTest {
                 .isEqualTo("delete_contacts_by_id");
     }
 
+    @Test
+    void schemas_whose_refs_fan_out_are_cut_down_quickly_instead_of_built_whole() {
+        StringBuilder schemas = new StringBuilder();
+        for (char level = 'A'; level <= 'F'; level++) {
+            schemas.append(level == 'A' ? "" : ",").append('"').append(level).append("\":{\"type\":\"object\",\"properties\":{");
+            for (int field = 0; field < 200; field++) {
+                schemas.append(field == 0 ? "" : ",").append("\"f").append(field).append("\":")
+                        .append(level == 'F' ? "{\"type\":\"string\"}" : "{\"$ref\":\"#/components/schemas/"
+                                + (char) (level + 1) + "\"}");
+            }
+            schemas.append("}}");
+        }
+        StringBuilder paths = new StringBuilder();
+        for (int op = 0; op < 50; op++) {
+            paths.append(op == 0 ? "" : ",").append("\"/v1/q").append(op).append("\":{\"get\":{\"parameters\":[")
+                    .append("{\"name\":\"filter\",\"in\":\"query\",\"schema\":{\"$ref\":\"#/components/schemas/A\"}}]}}");
+        }
+        String description = "{\"openapi\":\"3.0.0\",\"info\":{\"title\":\"Bomb\"},\"servers\":[{\"url\":"
+                + "\"https://api.northwind.test\"}],\"paths\":{" + paths + "},\"components\":{\"schemas\":{" + schemas
+                + "}}}";
+
+        long started = System.nanoTime();
+        ApiDescriptions.Read read = reader.read(description, ADDRESS, null, 200);
+
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - started)).isLessThan(java.time.Duration.ofSeconds(5));
+        assertThat(read.tools()).hasSize(50).allSatisfy(each ->
+                assertThat(each.params().getFirst().schema()).isEqualTo(Map.of("type", "object")));
+    }
+
     private static ApiTool tool(ApiDescriptions.Read read, String name) {
         return read.tools().stream().filter(tool -> tool.name().equals(name)).findFirst().orElseThrow();
     }

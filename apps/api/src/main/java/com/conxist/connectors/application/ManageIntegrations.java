@@ -34,10 +34,10 @@ public final class ManageIntegrations {
     private static final Logger log = LoggerFactory.getLogger(ManageIntegrations.class);
     /** What Try it shows of an answer. */
     static final int MAX_TRY_CHARACTERS = 20_000;
-    static final int MAX_SECRET_LENGTH = 4_000;
 
     private final IntegrationRepository integrations;
     private final ApiGateway gateway;
+    private final ApiConnections connections;
     private final ApiDescriptions descriptions;
     private final IntegrationViews views;
     private final CurrentWorkspace workspace;
@@ -47,6 +47,7 @@ public final class ManageIntegrations {
             IntegrationViews views, CurrentWorkspace workspace, Clock clock) {
         this.integrations = integrations;
         this.gateway = gateway;
+        this.connections = new ApiConnections(gateway);
         this.descriptions = descriptions;
         this.views = views;
         this.workspace = workspace;
@@ -76,15 +77,15 @@ public final class ManageIntegrations {
     /** Checks the sign-in with the API, then saves it with no tools yet. */
     public IntegrationViews.IntegrationView add(Connection connection) {
         UUID workspaceId = workspace.id();
-        URI address = address(connection.address());
-        String secret = secret(connection, null);
+        URI address = connections.guarded(connection.address(), "address");
+        String secret = ApiConnections.secret(connection, null);
         Instant now = clock.instant();
         Integration draft = new Integration(UUID.randomUUID(), workspaceId, connection.name(), address,
-                connection.auth(), account(connection), ending(connection.auth(), secret), connection.checkPath(),
-                Integration.Status.WORKS, null, null, null, List.of(), now, now);
-        refuseIfFails(check(draft, secret));
+                connection.auth(), ApiConnections.account(connection), ApiConnections.ending(connection.auth(), secret),
+                connection.checkPath(), Integration.Status.WORKS, null, null, null, List.of(), now, now);
+        connections.refuseIfFails(draft, secret);
         Integration integration = draft.connected(draft.name(), address, draft.auth(), draft.account(), draft.ending(),
-                draft.checkPath(), icon(address), now);
+                draft.checkPath(), connections.icon(address), now);
         if (!integrations.insert(integration, secret)) {
             throw taken(integration.name());
         }
@@ -95,19 +96,17 @@ public final class ManageIntegrations {
     /** Checks a changed connection with the API, then saves it; its tools stay. */
     public IntegrationViews.IntegrationView edit(UUID integrationId, Connection connection) {
         Integration integration = load(integrationId);
-        URI address = address(connection.address());
-        // The stored secret goes only to the host it was given for: a new host, or a new kind of sign-in, needs it again.
-        boolean sameHost = address.getHost().equalsIgnoreCase(integration.address().getHost())
-                && address.getPort() == integration.address().getPort()
-                && address.getScheme().equals(integration.address().getScheme());
-        String kept = sameHost && connection.auth().kind() == integration.auth().kind()
+        URI address = connections.guarded(connection.address(), "address");
+        // The stored secret goes only to the address it was given for: another one, or a new kind of sign-in, needs it
+        // typed again.
+        String kept = ApiConnections.keepsSecret(integration, address, connection.auth())
                 ? integrations.secret(integration.workspaceId(), integrationId).orElse(null) : null;
-        String secret = secret(connection, kept);
+        String secret = ApiConnections.secret(connection, kept);
         Integration changed = integration.connected(connection.name(), address, connection.auth(),
-                account(connection), ending(connection.auth(), secret), connection.checkPath(),
-                address.getHost().equals(integration.address().getHost()) ? integration.icon() : icon(address),
-                clock.instant());
-        refuseIfFails(check(changed, secret));
+                ApiConnections.account(connection), ApiConnections.ending(connection.auth(), secret),
+                connection.checkPath(), address.getHost().equalsIgnoreCase(integration.address().getHost())
+                        ? integration.icon() : connections.icon(address), clock.instant());
+        connections.refuseIfFails(changed, secret);
         // The secret is saved whole each time: for Basic it holds the username too.
         if (!integrations.updateConnection(changed, secret)) {
             throw taken(changed.name());
@@ -119,7 +118,7 @@ public final class ManageIntegrations {
     /** Calls the check path now with the stored sign-in, and saves whether it works. */
     public IntegrationViews.CheckView check(UUID integrationId) {
         Integration integration = load(integrationId);
-        Outcome outcome = check(integration, secretOf(integration));
+        ApiConnections.Outcome outcome = connections.check(integration, secretOf(integration));
         Integration.Status status = outcome.works() ? Integration.Status.WORKS
                 : "sign-in-refused".equals(outcome.error()) ? Integration.Status.SIGN_IN_NEEDED
                         : Integration.Status.UNREACHABLE;
@@ -141,7 +140,7 @@ public final class ManageIntegrations {
         URI from = null;
         String source = text;
         if (address != null && !address.isBlank()) {
-            from = guarded(address, "description");
+            from = connections.guarded(address, "description");
             try {
                 source = gateway.description(from);
             } catch (ApiGateway.Unreachable unreachable) {
@@ -152,7 +151,7 @@ public final class ManageIntegrations {
         if (source == null || source.isBlank()) {
             throw new InvalidIntegration("description-required", "Give the description's address or its file.");
         }
-        if (source.length() > ApiGateway.MAX_DESCRIPTION_BYTES) {
+        if (source.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > ApiGateway.MAX_DESCRIPTION_BYTES) {
             throw new InvalidIntegration("description-too-big", "That description is over 2 MB.");
         }
         ApiDescriptions.Read read;
@@ -163,50 +162,24 @@ public final class ManageIntegrations {
                     + " description: " + unreadable.getMessage());
         }
         boolean first = integration.description() == null && integration.tools().stream().noneMatch(ApiTool::imported);
-        Map<String, ApiTool> before = new LinkedHashMap<>();
-        integration.tools().forEach(tool -> before.put(tool.name(), tool));
         Set<String> used = views.usesOf(integrationId).stream().map(AgentBriefs.McpToolUse::tool)
                 .collect(Collectors.toSet());
-        List<ApiTool> merged = new ArrayList<>();
-        List<String> added = new ArrayList<>();
-        Set<String> names = new LinkedHashSet<>();
-        for (ApiTool tool : read.tools()) {
-            ApiTool earlier = before.get(tool.name());
-            if (earlier != null && !earlier.imported()) {
-                continue;
-            }
-            boolean allowed = earlier != null ? earlier.allowed() && (tool.reads() || !earlier.reads())
-                    : first && tool.reads();
-            if (earlier == null) {
-                added.add(tool.name());
-            }
-            merged.add(tool.withAllowed(allowed));
-            names.add(tool.name());
-        }
-        List<String> kept = new ArrayList<>();
-        for (ApiTool tool : integration.tools()) {
-            boolean stays = !tool.imported() || used.contains(tool.name());
-            if (stays && !names.contains(tool.name())) {
-                merged.add(tool);
-                if (tool.imported()) {
-                    kept.add(tool.name());
-                }
-            }
-        }
-        if (merged.size() > Integration.MAX_TOOLS) {
-            merged = new ArrayList<>(merged.subList(0, Integration.MAX_TOOLS));
-        }
-        Integration changed = integration.withTools(merged, new Integration.Description(read.title(), read.version(),
+        ToolMerge.Merged merged = ToolMerge.merge(integration.tools(), read.tools(), used, first);
+        List<ApiDescriptions.LeftOut> leftOut = new ArrayList<>(read.leftOut());
+        merged.overflow().forEach(name -> leftOut.add(new ApiDescriptions.LeftOut(name, ToolMerge.FULL)));
+        Integration changed = integration.withTools(merged.tools(), new Integration.Description(read.title(), read.version(),
                 from, clock.instant()));
         integrations.update(changed);
         log.info("Workspace {} imported a description into API {} ({} tools, {} left out)", integration.workspaceId(),
-                integrationId, read.tools().size(), read.leftOut().size());
-        return new IntegrationViews.ImportView(read.tools().size(), added, kept, read.leftOut(), views.view(changed));
+                integrationId, read.tools().size(), leftOut.size());
+        return new IntegrationViews.ImportView(read.tools().size(), merged.added(), merged.kept(), leftOut,
+                views.view(changed));
     }
 
     /** Adds a tool a person wrote. One that changes things starts off. */
     public IntegrationViews.IntegrationView addTool(UUID integrationId, ApiTool tool) {
         Integration integration = load(integrationId);
+        refuseSignInInputs(integration, tool);
         List<ApiTool> tools = new ArrayList<>(integration.tools());
         tools.add(new ApiTool(tool.name(), tool.section(), tool.method(), tool.path(), tool.description(),
                 tool.params(), tool.reads(), false, false).withAllowed(tool.allowed() && tool.reads()));
@@ -223,15 +196,16 @@ public final class ManageIntegrations {
     public IntegrationViews.IntegrationView updateTool(UUID integrationId, String toolName, ApiTool tool) {
         Integration integration = load(integrationId);
         ApiTool earlier = integration.tool(toolName).orElseThrow(() -> toolGone(toolName));
+        refuseSignInInputs(integration, tool);
         List<AgentBriefs.McpToolUse> uses = views.usesOf(integrationId).stream()
                 .filter(use -> use.tool().equals(toolName)).toList();
         ApiTool changed = new ApiTool(tool.name(), tool.section(), tool.method(), tool.path(), tool.description(),
                 tool.params(), tool.reads(), false, false);
-        if (!uses.isEmpty() && (!changed.name().equals(toolName) || (earlier.reads() && !changed.reads()))) {
+        boolean allowed = ToolMerge.keepsTick(earlier, changed);
+        if (!uses.isEmpty() && (!changed.name().equals(toolName) || (earlier.allowed() && !allowed))) {
             throw new Conflict("integration.tool-in-use", agentNames(uses) + " use " + toolName + ". Remove it"
-                    + " from them first to rename it or let it change things.");
+                    + " from them first to rename it, let it change things or change what it calls.");
         }
-        boolean allowed = earlier.allowed() && (changed.reads() || !earlier.reads());
         List<ApiTool> tools = integration.tools().stream()
                 .map(each -> each.name().equals(toolName) ? changed.withAllowed(allowed) : each).toList();
         Integration saved = integration.withTools(tools);
@@ -263,9 +237,10 @@ public final class ManageIntegrations {
      */
     public IntegrationViews.TryView tryTool(UUID integrationId, ApiTool tool, Map<String, Object> inputs) {
         Integration integration = load(integrationId);
+        String secret = secretOf(integration);
         ApiGateway.Request request;
         try {
-            request = ApiRequests.build(integration, secretOf(integration), tool, inputs);
+            request = ApiRequests.build(integration, secret, tool, inputs);
         } catch (ApiRequests.Problem problem) {
             throw new InvalidIntegration("try-input", problem.getMessage());
         }
@@ -281,7 +256,7 @@ public final class ManageIntegrations {
                 integrationId, answer.status());
         return new IntegrationViews.TryView(answer.status(), answer.contentType(), answer.bytes(),
                 answer.took().toMillis(), ApiRequests.shown(request), answer.text() == null ? null
-                        : cut(answer.text(), MAX_TRY_CHARACTERS));
+                        : cut(ApiRequests.redacted(answer.text(), secret), MAX_TRY_CHARACTERS));
     }
 
     /** Allows exactly the ticked tools. A tool agents use can't be unticked. */
@@ -305,7 +280,7 @@ public final class ManageIntegrations {
     /** Shows the image at this address as the API's logo; ConXist fetches it once, without the secret. */
     public IntegrationViews.IntegrationView useLogo(UUID integrationId, String address) {
         Integration integration = load(integrationId);
-        URI at = guarded(address, "logo");
+        URI at = connections.guarded(address, "logo");
         String image;
         try {
             image = gateway.image(at);
@@ -358,128 +333,19 @@ public final class ManageIntegrations {
         return views.view(changed);
     }
 
-    /** How a check went, for the person: the request shown has no query, so a key in the address never shows. */
-    private record Outcome(boolean works, String error, int status, long millis, String request) {
-    }
-
-    /**
-     * Calls the check path, or the address, with the sign-in. With a check path only a 2xx answer works; without one,
-     * any answer but a refusal of the sign-in or a server error shows the address answers.
-     */
-    private Outcome check(Integration integration, String secret) {
-        ApiGateway.Request request = ApiRequests.check(integration, secret);
-        String shown = ApiRequests.shown(request);
-        try {
-            ApiGateway.Answer answer = gateway.send(request);
-            int status = answer.status();
-            long millis = answer.took().toMillis();
-            if (status == 401 || status == 403) {
-                return new Outcome(false, "sign-in-refused", status, millis, shown);
-            }
-            boolean works = integration.checkPath() != null ? answer.ok() : status < 500;
-            return new Outcome(works, works ? null : "http-" + status, status, millis, shown);
-        } catch (ApiGateway.AddressRefused refused) {
-            return new Outcome(false, refused.code(), 0, 0, shown);
-        } catch (ApiGateway.Unreachable unreachable) {
-            return new Outcome(false, "unreachable", 0, 0, shown);
-        }
-    }
-
-    private static void refuseIfFails(Outcome outcome) {
-        if (outcome.works()) {
-            return;
-        }
-        throw switch (outcome.error()) {
-            case "sign-in-refused" -> new InvalidIntegration("sign-in-refused", "The API refused the sign-in (HTTP "
-                    + outcome.status() + "). Check the secret, and where it goes.");
-            case "unreachable" -> new InvalidIntegration("unreachable", "The API did not answer. Check the address,"
-                    + " then try again.");
-            case "address-private" -> new InvalidIntegration("address-private", "This address is on a private"
-                    + " network. ConXist only calls APIs on the internet.");
-            case "address-not-https", "address-invalid" -> new InvalidIntegration("address-invalid",
-                    "Use an https address on the internet.");
-            default -> new InvalidIntegration("check-failed", outcome.request() + " answered HTTP " + outcome.status()
-                    + ". Check the path, or leave it empty.");
-        };
-    }
-
-    private URI address(String value) {
-        return guarded(value, "address");
-    }
-
-    /** An https address on the internet; the code names what it is for: address, logo or description. */
-    private URI guarded(String value, String what) {
-        try {
-            return gateway.checked(value == null ? "" : value.strip());
-        } catch (ApiGateway.AddressRefused refused) {
-            throw switch (refused.code()) {
-                case "address-not-https" -> new InvalidIntegration(what + "-not-https",
-                        "Use an address that starts with https://.");
-                case "address-private" -> new InvalidIntegration(what + "-private",
-                        "This address is on a private network. ConXist only calls the internet.");
-                default -> new InvalidIntegration(what + "-invalid", "This doesn't look like a web address.");
-            };
-        } catch (ApiGateway.Unreachable unknown) {
-            throw new InvalidIntegration(what + "-unknown-host", "ConXist can't find this address's host.");
-        }
-    }
-
-    /** The secret to seal: the key or token, or {@code username\npassword}; {@code kept} when none was typed. */
-    private static String secret(Connection connection, String kept) {
-        ApiAuth auth = connection.auth();
-        if (!auth.hasSecret()) {
-            return null;
-        }
-        String typed = connection.secret() == null ? "" : connection.secret();
-        if (auth.kind() == ApiAuth.Kind.BASIC) {
-            String username = connection.username() == null ? "" : connection.username().strip();
-            if (username.isEmpty() || username.contains("\n") || username.contains(":")) {
-                throw new InvalidIntegration("username-invalid", "Enter the username, without : or line breaks.");
-            }
-            String password = typed.isEmpty() && kept != null ? kept.substring(kept.indexOf('\n') + 1) : typed;
-            return username + "\n" + required(password);
-        }
-        String value = typed.strip().isEmpty() ? kept : typed.strip();
-        return required(value);
-    }
-
-    private static String required(String secret) {
-        if (secret == null || secret.isEmpty()) {
-            throw new InvalidIntegration("secret-required", "Paste the secret first.");
-        }
-        if (secret.length() > MAX_SECRET_LENGTH || secret.chars().anyMatch(c -> c == '\r' || c == '\n' || c == 0)) {
-            throw new InvalidIntegration("secret-invalid", "That doesn't look like a key or a token. Copy it again.");
-        }
-        return secret;
-    }
-
-    private static String account(Connection connection) {
-        return connection.auth().kind() == ApiAuth.Kind.BASIC && connection.username() != null
-                ? connection.username().strip() : null;
-    }
-
-    private static String ending(ApiAuth auth, String secret) {
-        if (secret == null) {
-            return null;
-        }
-        String part = auth.kind() == ApiAuth.Kind.BASIC ? secret.substring(secret.indexOf('\n') + 1) : secret;
-        return Integration.endingOf(part);
-    }
-
-    private String icon(URI address) {
-        try {
-            return gateway.siteIcon(address);
-        } catch (RuntimeException unusable) {
-            log.debug("No site icon for an API: {}", unusable.getClass().getSimpleName());
-            return null;
-        }
-    }
-
     private String secretOf(Integration integration) {
         if (!integration.auth().hasSecret()) {
             return null;
         }
         return integrations.secret(integration.workspaceId(), integration.id()).orElseThrow(ManageIntegrations::gone);
+    }
+
+    /** ConXist sets the sign-in's key itself: a tool written by hand can't take it as an input. */
+    private static void refuseSignInInputs(Integration integration, ApiTool tool) {
+        tool.params().stream().filter(integration.auth()::sets).findFirst().ifPresent(param -> {
+            throw new InvalidIntegration("tool-input-sign-in", param.name() + " is where ConXist puts "
+                    + integration.name() + "'s sign-in. Remove that input: ConXist sends it on every call.");
+        });
     }
 
     private Integration load(UUID integrationId) {

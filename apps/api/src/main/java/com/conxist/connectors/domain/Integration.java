@@ -64,10 +64,12 @@ public record Integration(UUID id, UUID workspaceId, String name, URI address, A
         Objects.requireNonNull(auth, "auth");
         checkPath = checkPath == null || checkPath.isBlank() ? null : checkPath.strip();
         if (checkPath != null && (!checkPath.startsWith("/") || checkPath.length() > MAX_CHECK_PATH_LENGTH
-                || checkPath.contains("#") || checkPath.contains(" ") || checkPath.contains(".."))) {
+                || checkPath.contains("#") || checkPath.contains(" ") || ApiTool.climbs(checkPath))) {
             throw new InvalidIntegration("check-path-invalid", "The check path starts with / and holds no spaces.");
         }
-        tools = List.copyOf(Objects.requireNonNullElse(tools, List.of()));
+        // The sign-in's own key is never an input: ConXist sets it, so the model can't swap in a key it read.
+        tools = Objects.requireNonNullElse(tools, List.<ApiTool>of()).stream().map(tool -> tool.withoutSignIn(auth))
+                .toList();
         if (tools.size() > MAX_TOOLS) {
             throw new InvalidIntegration("too-many-tools", "An API keeps at most " + MAX_TOOLS + " tools.");
         }
