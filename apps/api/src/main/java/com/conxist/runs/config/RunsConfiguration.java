@@ -22,6 +22,8 @@ import com.conxist.runs.application.RunTools;
 import com.conxist.runs.application.RunLimitsRepository;
 import com.conxist.runs.application.StartTestRun;
 import com.conxist.runs.application.WorkspaceRunLimits;
+import com.conxist.runs.application.GuardrailsRepository;
+import com.conxist.runs.application.WorkspaceGuardrails;
 import com.conxist.sources.SourceCatalog;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -83,8 +85,14 @@ class RunsConfiguration {
 
     @Bean
     StartTestRun startTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
-            WorkspaceRunLimits limits, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
-        return new StartTestRun(agents, library, tools, providers, limits, workspace, variables, clock);
+            WorkspaceRunLimits limits, WorkspaceGuardrails guardrails, CurrentWorkspace workspace,
+            WorkspaceVariables variables, Clock clock) {
+        return new StartTestRun(agents, library, tools, providers, limits, guardrails, workspace, variables, clock);
+    }
+
+    @Bean
+    WorkspaceGuardrails workspaceGuardrails(GuardrailsRepository guardrails, CurrentWorkspace workspace, Clock clock) {
+        return new WorkspaceGuardrails(guardrails, workspace, clock);
     }
 
     @Bean

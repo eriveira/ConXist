@@ -12,12 +12,12 @@ import java.util.stream.Collectors;
 import com.conxist.agents.AgentBrief;
 import com.conxist.agents.AgentBriefs;
 import com.conxist.capture.MeetingLibrary;
-import com.conxist.connectors.McpToolbox;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.WorkspaceVariables;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
 import com.conxist.runs.domain.CopyGuard;
+import com.conxist.runs.domain.Guardrails;
 import com.conxist.runs.domain.RunLimits;
 import com.conxist.runs.domain.RunOutcome;
 import com.conxist.runs.domain.RunPrompt;
@@ -40,12 +40,15 @@ public final class StartTestRun {
     private final RunTools tools;
     private final LlmProviders providers;
     private final WorkspaceRunLimits limits;
+    private final WorkspaceGuardrails guardrails;
     private final CurrentWorkspace workspace;
     private final WorkspaceVariables variables;
     private final Clock clock;
 
     public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
-            WorkspaceRunLimits limits, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
+            WorkspaceRunLimits limits, WorkspaceGuardrails guardrails, CurrentWorkspace workspace,
+            WorkspaceVariables variables, Clock clock) {
+        this.guardrails = guardrails;
         this.variables = variables;
         this.agents = agents;
         this.library = library;
@@ -135,6 +138,7 @@ public final class StartTestRun {
         private final ApiKey key;
         private final ModelChoice choice;
         private final RunLimits limits;
+        private final Guardrails rules;
         private final RunTools.Scope scope;
         private final List<ModelPort.ToolSpec> offered;
         private final String system;
@@ -158,13 +162,14 @@ public final class StartTestRun {
             this.key = call.key();
             this.choice = call.choice();
             this.limits = StartTestRun.this.limits.current();
+            this.rules = guardrails.current();
             this.scope = new RunTools.Scope(agent.tools(), tools.mcpTools(agent));
             List<ModelPort.ToolSpec> specs = new ArrayList<>(tools.specs(scope));
             specs.add(FoundRequests.SPEC);
             this.offered = List.copyOf(specs);
             List<RunPrompt.ToolDescription> described = new ArrayList<>(tools.descriptions(scope));
             described.add(FoundRequests.DESCRIPTION);
-            this.system = RunPrompt.system(agent, described, variables.of(workspace.id()));
+            this.system = RunPrompt.system(agent, described, variables.of(workspace.id()), rules);
             this.guard = new CopyGuard(RunPrompt.capped(meeting.text()));
             this.started = clock.instant();
             this.deadline = started.plusSeconds(limits.timeoutSeconds());
@@ -229,10 +234,11 @@ public final class StartTestRun {
             }
             if (tools.isOutside(call.name(), scope)) {
                 Map<String, Object> input = call.input() == null ? Map.of() : call.input();
-                if (String.valueOf(input).length() > McpToolbox.MAX_ARGUMENT_CHARACTERS) {
-                    return refuse(call, "input-too-long", "ConXist did not send this: one call may hold up to "
-                            + RunPrompt.inputLimitText() + " characters. Write it shorter.", "Refused by ConXist: it"
-                            + " holds more than " + RunPrompt.inputLimitText() + " characters.", at);
+                if (String.valueOf(input).length() > rules.maxInputCharacters()) {
+                    String limit = RunPrompt.characters(rules.maxInputCharacters());
+                    return refuse(call, "input-too-long", "ConXist did not send this: one call may hold up to " + limit
+                            + " characters. Write it shorter.", "Refused by ConXist: it holds more than " + limit
+                            + " characters.", at);
                 }
                 Optional<String> copied = guard.copiedFrom(input);
                 if (copied.isPresent()) {
