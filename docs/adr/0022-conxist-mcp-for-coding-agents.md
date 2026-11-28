@@ -37,8 +37,10 @@ Codex, any MCP client) can't reach any of it. ConXist has no sign-in yet and lis
   - *The MCP signs people in with MCP's own OAuth flow.* ConXist is the authorization server; a client like
     Claude Code finds it from `/.well-known/oauth-protected-resource` (RFC 9728), registers (RFC 7591), and opens
     ConXist's sign-in in the browser (PKCE S256, resource indicator RFC 8707 for `/mcp`). The person then picks
-    which of *their* workspaces this client may use. The token names the person and those workspaces, lives one
-    hour, and refreshes.
+    one of *their* workspaces. The token names the person and that one workspace, lives one hour, and refreshes.
+  - *One connection, one workspace* (owner, 2026-11-28: "every workspace brings its own tools"). A connection
+    sees only its workspace's shared tools, agents, skills and bundle, never a mix. Using a second workspace means
+    adding a second connection (for example `conxist-acme` and `conxist-personal`), each with its own sign-in.
   - *Every request checks again*: the person is still a member of that workspace, and the item is still shared.
     Leaving a workspace, or losing access, cuts it off on the next call; open sessions for it are closed.
   - *Access keys* stay for machines with no browser (CI, a build box): a key belongs to one person and one
