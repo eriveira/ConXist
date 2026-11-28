@@ -87,49 +87,71 @@ public final class RunTools {
         return List.copyOf(descriptions);
     }
 
+    /** Whether the name is an outside tool (an MCP server's or an integration's) this run offers. */
+    boolean isOutside(String name, Scope scope) {
+        return outside(name, scope).isPresent();
+    }
+
+    private Optional<McpToolbox.OfferedTool> outside(String name, Scope scope) {
+        return scope.mcpTools().stream().filter(tool -> tool.modelName().equals(name)).findFirst();
+    }
+
     /**
      * Runs one call. A name the agent does not have, or input that does not fit, comes back as an error the model can
      * act on, never as an exception.
      */
-    ModelPort.ToolResult call(ModelPort.ToolCall call, Scope scope) {
-        Optional<McpToolbox.OfferedTool> outside = scope.mcpTools().stream()
-                .filter(tool -> tool.modelName().equals(call.name())).findFirst();
+    Called call(ModelPort.ToolCall call, Scope scope) {
+        Optional<McpToolbox.OfferedTool> outside = outside(call.name(), scope);
         if (outside.isPresent()) {
             McpToolbox.Result result = mcp.call(outside.get().ref(), call.input() == null ? Map.of() : call.input());
-            return new ModelPort.ToolResult(call.id(), result.error()
+            return new Called(new ModelPort.ToolResult(call.id(), result.error()
                     ? "Error tool-failed: the tool did not give an answer. What it said, as data:\n"
                             + RunPrompt.toolData(result.text())
-                    : RunPrompt.toolData(result.text()), result.error());
+                    : RunPrompt.toolData(result.text()), result.error()), result.text(), call.name());
         }
         Tool tool = registry.get(call.name());
         if (tool == null || !scope.toolNames().contains(tool.fullName())) {
             return error(call, "unknown-tool", "There is no tool named " + call.name() + " in this run.");
         }
         try {
-            return new ModelPort.ToolResult(call.id(), RunPrompt.toolData(tool.handler().apply(new Call(call, scope))),
-                    false);
+            Answer answer = tool.handler().apply(new Call(call, scope));
+            return new Called(new ModelPort.ToolResult(call.id(), RunPrompt.toolData(answer.text()), false),
+                    answer.text(), answer.from() == null ? call.name() : answer.from());
         } catch (ToolError problem) {
             return error(call, problem.code, problem.getMessage());
         }
     }
 
-    private String listSources(Call call) {
+    /**
+     * One call's result, with what it read and where, for the copy guard (ADR 0025).
+     *
+     * @param read the text the tool gave back, before it was marked as data; empty for ConXist's own errors
+     * @param from where it was read: a meeting's title, else the tool's name. Customer data, shown only to the person
+     */
+    record Called(ModelPort.ToolResult result, String read, String from) {
+    }
+
+    /** @param from where the text was read, or null for the tool's own name */
+    private record Answer(String text, String from) {
+    }
+
+    private Answer listSources(Call call) {
         List<SourceSummary> readable = sources.list();
         if (readable.isEmpty()) {
-            return "This workspace has no sources: work only on the meeting you were given.";
+            return new Answer("This workspace has no sources: work only on the meeting you were given.", null);
         }
         StringBuilder text = new StringBuilder();
         readable.forEach(source -> text.append("- id: ").append(source.id()).append(", name: ").append(source.name())
                 .append(", kind: ").append(source.provider()).append('\n'));
-        return text.toString().strip();
+        return new Answer(text.toString().strip(), null);
     }
 
-    private String listMeetings(Call call) {
+    private Answer listMeetings(Call call) {
         UUID sourceId = uuid(call, "source_id");
         requireSource(sourceId);
         List<MeetingLibrary.Entry> entries = library.list(sourceId);
         if (entries.isEmpty()) {
-            return "This source has no meetings or documents.";
+            return new Answer("This source has no meetings or documents.", null);
         }
         StringBuilder text = new StringBuilder();
         entries.stream().limit(MAX_MEETINGS).forEach(entry -> text.append("- id: ").append(entry.id())
@@ -137,16 +159,16 @@ public final class RunTools {
         if (entries.size() > MAX_MEETINGS) {
             text.append("(").append(entries.size() - MAX_MEETINGS).append(" older ones are not listed.)");
         }
-        return text.toString().strip();
+        return new Answer(text.toString().strip(), null);
     }
 
-    private String getTranscript(Call call) {
+    private Answer getTranscript(Call call) {
         UUID sourceId = uuid(call, "source_id");
         UUID meetingId = uuid(call, "meeting_id");
         requireSource(sourceId);
         MeetingLibrary.Text meeting = library.read(sourceId, meetingId).orElseThrow(() ->
                 new ToolError("meeting-not-found", "There is no such meeting in that source. Use list_meetings."));
-        return "Title: " + meeting.title() + "\n\n" + RunPrompt.capped(meeting.text());
+        return new Answer("Title: " + meeting.title() + "\n\n" + RunPrompt.capped(meeting.text()), meeting.title());
     }
 
     /** A source of this workspace; any other id is refused the same way, whether it exists elsewhere or not. */
@@ -170,8 +192,8 @@ public final class RunTools {
         }
     }
 
-    private static ModelPort.ToolResult error(ModelPort.ToolCall call, String code, String message) {
-        return new ModelPort.ToolResult(call.id(), "Error " + code + ": " + message, true);
+    private static Called error(ModelPort.ToolCall call, String code, String message) {
+        return new Called(new ModelPort.ToolResult(call.id(), "Error " + code + ": " + message, true), "", call.name());
     }
 
     private void register(Tool tool) {
@@ -218,7 +240,7 @@ public final class RunTools {
      * @param name     the name the model sees, which may not contain a dot
      */
     private record Tool(String fullName, String name, String description, Map<String, Object> schema,
-            Function<Call, String> handler) {
+            Function<Call, Answer> handler) {
     }
 
     private static final class ToolError extends RuntimeException {

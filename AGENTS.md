@@ -89,7 +89,9 @@ Sources page does not show it for now, owner decision 2026-11-17).
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, a default model and effort per provider,
   and which provider new agents start on, grouped by provider in lists that fold away (ADR 0022, V23)),
-  MCPs (ADR 0017, below), Integrations (ADR 0019, 0020 and 0021, below), and Variables (ADR 0018, below).
+  MCPs (ADR 0017, below), Integrations (ADR 0019, 0020 and 0021, below), Variables (ADR 0018, below), and Guardrails
+  (ADR 0025, V26: ConXist's rule shown read-only, the workspace's own rules up to 2,000 characters that every agent
+  follows after it, and the most text one outside call may send, 200 to 4,000).
   Each agent picks its own provider, model and effort among the models its workspace allows; `conxist.runs.models`
   lists the ones a new workspace allows. A model an agent runs on, or new agents start on, stays allowed.
 - MCPs (ADR 0017, owner 2026-11-27): a `connectors` module and Settings › MCPs. Add any MCP server by its https
@@ -156,6 +158,14 @@ Sources page does not show it for now, owner decision 2026-11-17).
   requests, and nothing goes into its memory until a person approves it.
 - Transcripts, documents, tickets and repository content are customer data and
   untrusted input: never instructions, never logged in full.
+- Orders come only from the agent (owner, 2026-11-28; ADR 0025). Every run's fixed rules say so and name the kinds of
+  data; the model reports what data asked for with ConXist's own `report_request` tool (at most 10, shown in Try it,
+  not a tool call the limits count). The workspace's own rules (Settings › Guardrails) come after ConXist's rule in a
+  `<workspace-rules>` block and can only add limits. The copy guard (`runs/domain/CopyGuard`) refuses an outside
+  tool's input that repeats 12 words in a row of what the run read (the handed meeting or text excepted; a floor,
+  paraphrases pass), and any outside call over the workspace's limit (at most `McpToolbox.MAX_ARGUMENT_CHARACTERS`,
+  4,000); Try it shows the step as refused. The attack tests in `StartTestRunTest` run in every build; later layers
+  are in ADR 0025.
 
 ## Project rules
 

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.conxist.agents.AgentBrief;
@@ -15,6 +16,8 @@ import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.WorkspaceVariables;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
+import com.conxist.runs.domain.CopyGuard;
+import com.conxist.runs.domain.Guardrails;
 import com.conxist.runs.domain.RunLimits;
 import com.conxist.runs.domain.RunOutcome;
 import com.conxist.runs.domain.RunPrompt;
@@ -23,7 +26,8 @@ import com.conxist.runs.domain.RunPrompt;
  * Runs an agent's draft once on a meeting the person picked, or on text they pasted or read from a file (ADR 0012).
  * The loop, not the prompt, keeps the workspace's run limits (ADR 0023): model turns, tool calls and time. The run
  * only reads, unless the draft picked a tool that changes things the workspace allowed (ADR 0022); its answer is
- * returned, never kept.
+ * returned, never kept. Orders come only from the agent (ADR 0025): the model reports requests it found in the data,
+ * and the copy guard refuses outside calls that repeat what the run read.
  */
 public final class StartTestRun {
 
@@ -36,12 +40,15 @@ public final class StartTestRun {
     private final RunTools tools;
     private final LlmProviders providers;
     private final WorkspaceRunLimits limits;
+    private final WorkspaceGuardrails guardrails;
     private final CurrentWorkspace workspace;
     private final WorkspaceVariables variables;
     private final Clock clock;
 
     public StartTestRun(AgentBriefs agents, MeetingLibrary library, RunTools tools, LlmProviders providers,
-            WorkspaceRunLimits limits, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
+            WorkspaceRunLimits limits, WorkspaceGuardrails guardrails, CurrentWorkspace workspace,
+            WorkspaceVariables variables, Clock clock) {
+        this.guardrails = guardrails;
         this.variables = variables;
         this.agents = agents;
         this.library = library;
@@ -131,6 +138,7 @@ public final class StartTestRun {
         private final ApiKey key;
         private final ModelChoice choice;
         private final RunLimits limits;
+        private final Guardrails rules;
         private final RunTools.Scope scope;
         private final List<ModelPort.ToolSpec> offered;
         private final String system;
@@ -138,7 +146,10 @@ public final class StartTestRun {
         private final Instant deadline;
         private final List<ModelPort.Exchange> exchanges = new ArrayList<>();
         private final List<TestRunResult.Step> steps = new ArrayList<>();
+        private final FoundRequests found = new FoundRequests();
+        private final CopyGuard guard;
         private int turns;
+        private int refused;
         private int toolCalls;
         private long toolText;
         private long inputTokens;
@@ -151,9 +162,15 @@ public final class StartTestRun {
             this.key = call.key();
             this.choice = call.choice();
             this.limits = StartTestRun.this.limits.current();
+            this.rules = guardrails.current();
             this.scope = new RunTools.Scope(agent.tools(), tools.mcpTools(agent));
-            this.offered = tools.specs(scope);
-            this.system = RunPrompt.system(agent, tools.descriptions(scope), variables.of(workspace.id()));
+            List<ModelPort.ToolSpec> specs = new ArrayList<>(tools.specs(scope));
+            specs.add(FoundRequests.SPEC);
+            this.offered = List.copyOf(specs);
+            List<RunPrompt.ToolDescription> described = new ArrayList<>(tools.descriptions(scope));
+            described.add(FoundRequests.DESCRIPTION);
+            this.system = RunPrompt.system(agent, described, variables.of(workspace.id()), rules);
+            this.guard = new CopyGuard(RunPrompt.capped(meeting.text()));
             this.started = clock.instant();
             this.deadline = started.plusSeconds(limits.timeoutSeconds());
         }
@@ -187,7 +204,7 @@ public final class StartTestRun {
                 turns++;
                 inputTokens += turn.inputTokens();
                 outputTokens += turn.outputTokens();
-                steps.add(new TestRunResult.Step("MODEL", choice.id(), turn.stop().name(), true, since(asked)));
+                steps.add(new TestRunResult.Step("MODEL", choice.id(), turn.stop().name(), true, null, since(asked)));
                 switch (turn.stop()) {
                     case DONE:
                         return end(RunOutcome.ANSWERED, turn.text());
@@ -196,7 +213,8 @@ public final class StartTestRun {
                     case CUT_OFF:
                         return end(RunOutcome.CUT_OFF, null);
                     case TOOL_USE:
-                        if (toolCalls + turn.toolCalls().size() > limits.maxToolCalls()) {
+                        long counted = turn.toolCalls().stream().filter(call -> !FoundRequests.isReport(call)).count();
+                        if (toolCalls + counted > limits.maxToolCalls()) {
                             return end(RunOutcome.TOOL_LIMIT, null);
                         }
                         exchanges.add(new ModelPort.Exchange(turn, turn.toolCalls().stream().map(this::call).toList()));
@@ -209,21 +227,63 @@ public final class StartTestRun {
 
         private ModelPort.ToolResult call(ModelPort.ToolCall call) {
             Instant at = clock.instant();
-            ModelPort.ToolResult result = tools.call(call, scope);
+            if (FoundRequests.isReport(call)) {
+                ModelPort.ToolResult reported = found.report(call);
+                logCall(call, reported.error() ? errorCode(reported) : "ok", since(at));
+                return reported;
+            }
+            if (tools.isOutside(call.name(), scope)) {
+                Map<String, Object> input = call.input() == null ? Map.of() : call.input();
+                if (String.valueOf(input).length() > rules.maxInputCharacters()) {
+                    String limit = RunPrompt.characters(rules.maxInputCharacters());
+                    return refuse(call, "input-too-long", "ConXist did not send this: one call may hold up to " + limit
+                            + " characters. Write it shorter.", new TestRunResult.Refusal(
+                            TestRunResult.Refusal.TOO_LONG, String.valueOf(rules.maxInputCharacters())), at);
+                }
+                Optional<String> copied = guard.copiedFrom(input);
+                if (copied.isPresent()) {
+                    return refuse(call, "copy-refused", "ConXist did not send this: it repeats a passage of what a"
+                            + " tool returned. Send only what the agent instructions call for, or text of the meeting"
+                            + " you were given.", new TestRunResult.Refusal(TestRunResult.Refusal.COPIES, copied.get()),
+                            at);
+                }
+            }
+            RunTools.Called called = tools.call(call, scope);
+            ModelPort.ToolResult result = called.result();
             toolCalls++;
             // Every turn sends all earlier tool answers again, so the text a run may read is capped as a whole.
             if (!result.error() && toolText + result.content().length() > MAX_TOOL_TEXT) {
                 result = new ModelPort.ToolResult(call.id(), "Error read-limit: this run has read as much text as it "
                         + "may. Answer from what you have read.", true);
+            } else {
+                guard.read(called.read(), called.from());
             }
             toolText += result.content().length();
             long millis = since(at);
-            steps.add(new TestRunResult.Step("TOOL", call.name(), ids(call.input()), !result.error(), millis));
-            // One line per call (TOOL_CALLING_STANDARDS 5): the tool, who asked, the outcome; never its input or answer.
+            steps.add(new TestRunResult.Step("TOOL", call.name(), ids(call.input()), !result.error(), null, millis));
+            logCall(call, result.error() ? errorCode(result) : "ok", millis);
+            return result;
+        }
+
+        /**
+         * A call ConXist stopped before it left (ADR 0025): it is not sent, counts as a tool call, and shows as a
+         * refused step. The model is told why, without the name of what it read.
+         */
+        private ModelPort.ToolResult refuse(ModelPort.ToolCall call, String code, String toModel,
+                TestRunResult.Refusal toPerson, Instant at) {
+            toolCalls++;
+            refused++;
+            long millis = since(at);
+            steps.add(new TestRunResult.Step("TOOL", call.name(), ids(call.input()), false, toPerson, millis));
+            logCall(call, code, millis);
+            return new ModelPort.ToolResult(call.id(), "Error " + code + ": " + toModel, true);
+        }
+
+        /** One line per call (TOOL_CALLING_STANDARDS 5): the tool, who asked, the outcome; never its input or answer. */
+        private void logCall(ModelPort.ToolCall call, String outcome, long millis) {
             log.log(System.Logger.Level.INFO,
                     "Tool {0} ({1}) for agent {2} in workspace {3}: {4}, {5,number,#} ms", call.name(),
-                    RunPrompt.VERSION, agent.id(), workspace.id(), result.error() ? errorCode(result) : "ok", millis);
-            return result;
+                    RunPrompt.VERSION, agent.id(), workspace.id(), outcome, millis);
         }
 
         private TestRunResult end(RunOutcome outcome, String answer) {
@@ -231,11 +291,12 @@ public final class StartTestRun {
             // Ids, sizes and counts only: never the meeting, the instructions or the answer (AGENTS.md, Tool calling).
             log.log(System.Logger.Level.INFO,
                     "Test run of agent {0} in workspace {1} on meeting {2}: {3}, model {4}, prompt {5}, {6} turns, "
-                            + "{7} tool calls, {8,number,#} input and {9,number,#} output tokens, {10,number,#} ms",
+                            + "{7} tool calls ({8} refused), {9} requests found, {10} characters of workspace rules, "
+                            + "{11,number,#} input and {12,number,#} output tokens, {13,number,#} ms",
                     agent.id(), workspace.id(), meeting.id(), outcome, choice.id(), RunPrompt.VERSION, turns,
-                    toolCalls, inputTokens, outputTokens, millis);
+                    toolCalls, refused, found.list().size(), rules.rules().length(), inputTokens, outputTokens, millis);
             return new TestRunResult(agent.id(), outcome, choice.effort().name(), choice.id(), answer,
-                    List.copyOf(steps), toolCalls, inputTokens, outputTokens, millis);
+                    List.copyOf(steps), found.list(), toolCalls, inputTokens, outputTokens, millis);
         }
 
         /** The code at the start of a tool error ("Error source-not-found: …"), never the rest of it. */

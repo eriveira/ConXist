@@ -11,6 +11,12 @@ import java.util.UUID;
 public interface McpToolbox {
 
     /**
+     * The most characters of input, as {@code String.valueOf(arguments)} measures them, that one call may send. A lookup
+     * needs a few words; a limit keeps meeting text or earlier answers from leaving ConXist in a tool's arguments.
+     */
+    int MAX_ARGUMENT_CHARACTERS = 4_000;
+
+    /**
      * The picked tools the workspace still allows, in the order picked, each with the name the model sees: letters,
      * digits, {@code _} and {@code -}, at most 64 characters, unique in the list. Picks it no longer allows are left out.
      */

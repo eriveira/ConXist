@@ -6,12 +6,12 @@ import com.conxist.platform.WorkspaceData;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
-/** A deleted workspace's sealed provider keys, allowed models, defaults and run limits. */
+/** A deleted workspace's sealed provider keys, allowed models, defaults, run limits and guardrails. */
 @Repository
 class JdbcRunsWorkspaceData implements WorkspaceData {
 
     private static final List<String> TABLES = List.of("workspace_provider_keys", "workspace_allowed_models",
-            "workspace_model_defaults", "workspace_run_limits");
+            "workspace_model_defaults", "workspace_run_limits", "workspace_guardrails");
 
     private final JdbcClient jdbc;
 

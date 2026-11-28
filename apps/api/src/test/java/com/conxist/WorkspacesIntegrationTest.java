@@ -73,6 +73,9 @@ class WorkspacesIntegrationTest {
             mvc.perform(put("/api/run-limits").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
                             .content("{\"maxSteps\":8,\"timeoutSeconds\":90,\"maxToolCalls\":12}"))
                     .andExpect(status().isOk());
+            mvc.perform(put("/api/guardrails").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"rules\":\"Answer in Spanish.\",\"maxInputCharacters\":2000}"))
+                    .andExpect(status().isOk());
         }
         await().atMost(Duration.ofSeconds(10)).until(() -> rows("hub_items", gone) == 2 && rows("hub_items", kept) == 2);
 
@@ -88,7 +91,7 @@ class WorkspacesIntegrationTest {
                 .andExpect(jsonPath("$[?(@.id=='" + gone + "')]").isEmpty())
                 .andExpect(jsonPath("$[?(@.id=='" + kept + "')]").isNotEmpty());
         for (String table : List.of("sources", "captured_documents", "hub_items", "agents", "workspace_variables",
-                "workspace_sources", "workspace_run_limits")) {
+                "workspace_sources", "workspace_run_limits", "workspace_guardrails")) {
             org.assertj.core.api.Assertions.assertThat(rows(table, gone)).as(table).isZero();
             org.assertj.core.api.Assertions.assertThat(rows(table, kept)).as(table).isPositive();
         }
