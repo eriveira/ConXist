@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
+import { useNotice } from '../../components/useNotice';
 import { Pill } from '../../components/Pill';
 import type { AgentSummary, AgentToolInfo } from '../../domain/agents';
 import { localSkillProblems, type SkillVersion } from '../../domain/skills';
@@ -37,7 +38,7 @@ export function SkillPage({ skillId }: { skillId: string }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useNotice();
   const [actionProblem, setActionProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
