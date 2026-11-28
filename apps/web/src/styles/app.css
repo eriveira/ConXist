@@ -191,7 +191,7 @@ a.btn.ghost { color: var(--cx-accent-text); }
 }
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
 .field label { font-size: 13px; font-weight: 700; }
-.field input[type=text], .field input[type=password] {
+.field input[type=text], .field input[type=password], .field input[type=number] {
   height: 44px; border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); padding: 0 12px;
   background: var(--cx-surface); color: var(--cx-fg); width: 100%;
 }

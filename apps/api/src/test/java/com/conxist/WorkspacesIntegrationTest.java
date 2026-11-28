@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,6 +70,9 @@ class WorkspacesIntegrationTest {
             mvc.perform(post("/api/variables").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
                             .content("{\"name\":\"company\",\"value\":\"Acme\"}"))
                     .andExpect(status().isCreated());
+            mvc.perform(put("/api/run-limits").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"maxSteps\":8,\"timeoutSeconds\":90,\"maxToolCalls\":12}"))
+                    .andExpect(status().isOk());
         }
         await().atMost(Duration.ofSeconds(10)).until(() -> rows("hub_items", gone) == 2 && rows("hub_items", kept) == 2);
 
@@ -84,7 +88,7 @@ class WorkspacesIntegrationTest {
                 .andExpect(jsonPath("$[?(@.id=='" + gone + "')]").isEmpty())
                 .andExpect(jsonPath("$[?(@.id=='" + kept + "')]").isNotEmpty());
         for (String table : List.of("sources", "captured_documents", "hub_items", "agents", "workspace_variables",
-                "workspace_sources")) {
+                "workspace_sources", "workspace_run_limits")) {
             org.assertj.core.api.Assertions.assertThat(rows(table, gone)).as(table).isZero();
             org.assertj.core.api.Assertions.assertThat(rows(table, kept)).as(table).isPositive();
         }

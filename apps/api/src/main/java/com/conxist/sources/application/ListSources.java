@@ -19,6 +19,7 @@ public final class ListSources implements SourceCatalog {
         this.workspace = workspace;
     }
 
+    @Override
     public List<SourceSummary> list() {
         return sources.findAll(workspace.id()).stream().map(Source::toSummary).toList();
     }

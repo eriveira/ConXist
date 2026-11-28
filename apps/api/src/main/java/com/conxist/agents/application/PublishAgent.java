@@ -18,10 +18,6 @@ public final class PublishAgent {
         return book.inTransaction(() -> {
             Agent agent = book.load(agentId, expectedRevision);
             List<String> problems = book.problems(agent.draft());
-            if (problems.contains(AgentBook.SOURCE_MISSING)) {
-                throw new InvalidAgent(AgentBook.SOURCE_MISSING,
-                        "A source this agent reads was removed. Remove it from Knowledge, then publish.");
-            }
             if (problems.contains(AgentBook.MODEL_UNAVAILABLE)) {
                 throw new InvalidAgent(AgentBook.MODEL_UNAVAILABLE,
                         "This agent's model can't run here now. Pick another in How it thinks, then publish.");

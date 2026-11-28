@@ -10,7 +10,6 @@ import com.conxist.runs.application.ApiKey;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.ProviderModel;
-import com.conxist.runs.domain.OutputShape;
 import com.conxist.testing.FakeClaudeServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -34,8 +33,8 @@ class ClaudeModelTest {
     }
 
     @Test
-    void a_run_asks_for_tools_then_answers_in_its_shape_sending_back_each_turn_as_it_came() {
-        ModelPort.Request first = request(SONNET, List.of(LIST_SOURCES), OutputShape.REQUIREMENTS.schema(), List.of());
+    void a_run_asks_for_tools_then_answers_sending_back_each_turn_as_it_came() {
+        ModelPort.Request first = request(SONNET, List.of(LIST_SOURCES), List.of());
         ModelPort.Turn asked = claude.next(KEY, first);
 
         assertThat(asked.stop()).isEqualTo(ModelPort.Stop.TOOL_USE);
@@ -45,19 +44,17 @@ class ClaudeModelTest {
         });
         assertThat(asked.inputTokens()).isEqualTo(1200);
 
-        ModelPort.Turn answered = claude.next(KEY, request(SONNET, List.of(LIST_SOURCES), OutputShape.REQUIREMENTS.schema(),
-                List.of(new ModelPort.Exchange(asked, List.of(new ModelPort.ToolResult(
+        ModelPort.Turn answered = claude.next(KEY, request(SONNET, List.of(LIST_SOURCES), List.of(new ModelPort.Exchange(asked, List.of(new ModelPort.ToolResult(
                         asked.toolCalls().get(0).id(), "<data>\nnone\n</data>", false))))));
 
         assertThat(answered.stop()).isEqualTo(ModelPort.Stop.DONE);
-        assertThat(answered.text()).startsWith("{\"requirements\":[{\"title\":");
+        assertThat(answered.text()).isEqualTo("A short answer from the fake model.");
 
         JsonNode sent = server.requests().get(0);
         assertThat(sent.path("model").asString()).isEqualTo("claude-sonnet-5-5");
         assertThat(sent.path("system").asString()).isEqualTo("The rules.");
         assertThat(sent.path("output_config").path("effort").asString()).isEqualTo("medium");
-        assertThat(sent.path("output_config").path("format").path("schema").path("additionalProperties").asBoolean())
-                .isFalse();
+        assertThat(sent.path("output_config").has("format")).isFalse();
         assertThat(sent.path("fallbacks").asString()).isEqualTo("default");
         assertThat(sent.has("thinking")).isFalse();
         assertThat(sent.has("temperature")).isFalse();
@@ -75,8 +72,8 @@ class ClaudeModelTest {
     }
 
     @Test
-    void a_model_without_fallbacks_and_a_plain_text_answer_send_neither() {
-        ModelPort.Turn turn = claude.next(KEY, request(HAIKU, List.of(), null, List.of()));
+    void a_model_without_fallbacks_sends_none() {
+        ModelPort.Turn turn = claude.next(KEY, request(HAIKU, List.of(), List.of()));
 
         assertThat(turn.text()).isEqualTo("A short answer from the fake model.");
         JsonNode sent = server.requests().get(0);
@@ -88,13 +85,13 @@ class ClaudeModelTest {
     @Test
     void a_refusal_a_wrong_key_and_a_missing_key_are_told_apart() {
         server.decline();
-        assertThat(claude.next(KEY, request(SONNET, List.of(), null, List.of())).stop()).isEqualTo(ModelPort.Stop.REFUSED);
+        assertThat(claude.next(KEY, request(SONNET, List.of(), List.of())).stop()).isEqualTo(ModelPort.Stop.REFUSED);
 
-        assertThatThrownBy(() -> claude.next(WRONG, request(SONNET, List.of(), null, List.of())))
+        assertThatThrownBy(() -> claude.next(WRONG, request(SONNET, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure ->
                         assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.KEY_REJECTED));
         // The same adapter goes on calling with the right key: each key has its own client.
-        assertThat(claude.next(KEY, request(SONNET, List.of(), null, List.of())).stop())
+        assertThat(claude.next(KEY, request(SONNET, List.of(), List.of())).stop())
                 .isEqualTo(ModelPort.Stop.REFUSED);
     }
 
@@ -116,12 +113,12 @@ class ClaudeModelTest {
     void a_slow_answer_is_a_timeout_and_an_unreadable_one_a_failure_that_quotes_nothing() {
         server.slow(Duration.ofSeconds(2));
         ModelPort.Request quick = new ModelPort.Request(HAIKU, "The rules.", "<meeting>\nhello\n</meeting>", List.of(),
-                List.of(), null, Duration.ofMillis(300));
+                List.of(), Duration.ofMillis(300));
         assertThatThrownBy(() -> claude.next(KEY, quick)).isInstanceOf(ModelPort.Timeout.class);
 
         server.slow(Duration.ZERO);
         server.garble();
-        assertThatThrownBy(() -> claude.next(KEY, request(HAIKU, List.of(), null, List.of())))
+        assertThatThrownBy(() -> claude.next(KEY, request(HAIKU, List.of(), List.of())))
                 .isInstanceOfSatisfying(ModelPort.Failure.class, failure -> {
                     assertThat(failure.reason()).isEqualTo(ModelPort.Failure.Reason.FAILED);
                     assertThat(failure.getMessage()).doesNotContain("customer words");
@@ -135,7 +132,7 @@ class ClaudeModelTest {
         ModelPort.ToolSpec odd = new ModelPort.ToolSpec("docs__get_space", "Gets a space.", Map.of("type", "object",
                 "properties", Map.of("id", Map.of("$ref", "#/$defs/Space")), "required", "id",
                 "$defs", Map.of("Space", Map.of("type", "string"))), false);
-        claude.next(KEY, request(HAIKU, List.of(bare, odd), null, List.of()));
+        claude.next(KEY, request(HAIKU, List.of(bare, odd), List.of()));
 
         JsonNode tools = server.requests().get(0).path("tools");
         assertThat(tools.get(0).path("strict").asBoolean()).isFalse();
@@ -147,9 +144,9 @@ class ClaudeModelTest {
     }
 
     private static ModelPort.Request request(ModelChoice model, List<ModelPort.ToolSpec> tools,
-            Map<String, Object> schema, List<ModelPort.Exchange> exchanges) {
+            List<ModelPort.Exchange> exchanges) {
         return new ModelPort.Request(model, "The rules.", "<meeting title=\"x\">\nhello\n</meeting>", exchanges, tools,
-                schema, Duration.ofSeconds(30));
+                Duration.ofSeconds(30));
     }
 
     private static FakeClaudeServer server() {

@@ -15,7 +15,7 @@ public final class ListAgents {
         return book.agents().findAll(book.workspaceId()).stream()
                 .map(agent -> new AgentSummary(agent.id(), agent.draft().name(), agent.draft().purpose(),
                         agent.status(), agent.publishedVersion(), agent.draftPublished(),
-                        agent.draft().givesBack(), agent.draft().model(), agent.draft().skills(), agent.updatedAt()))
+                        agent.draft().model(), agent.draft().skills(), agent.updatedAt()))
                 .toList();
     }
 }

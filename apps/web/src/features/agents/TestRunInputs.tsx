@@ -36,7 +36,7 @@ export function MeetingPicker({ id, meetings, picked, onPick, disabled, onRetry 
       <label htmlFor={id}>{t('run.meeting')}</label>
       <select id={id} value={picked} onChange={(event) => onPick(event.target.value)} disabled={disabled}>
         {meetings.groups.map((group) => (
-          <optgroup key={group.sourceId} label={group.read ? t('run.group.reads', { name: group.sourceName }) : group.sourceName}>
+          <optgroup key={group.sourceId} label={group.sourceName}>
             {group.choices.map((choice) => (
               <option key={key(choice)} value={key(choice)}>{choice.title} · {date.format(new Date(choice.when))}</option>
             ))}

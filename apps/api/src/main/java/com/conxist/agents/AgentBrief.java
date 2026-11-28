@@ -4,11 +4,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * An agent as a run reads it: its job, the skills it follows with their text at the pinned version, and its limits.
- * Choices are the names of the agent's own settings ({@code provider} and {@code model} as the API's settings list
- * them, {@code effort} LOW, MEDIUM or HIGH, or all three null when no model is picked; {@code style} PRECISE
- * or CREATIVE; {@code givesBack} an output kind such as REQUIREMENTS), so a reader does not depend on this module's
- * inner types.
+ * An agent as a run reads it: its job and the skills it follows with their text at the pinned version. Choices are the
+ * names of the agent's own settings ({@code provider} and {@code model} as the API's settings list them, {@code effort}
+ * LOW, MEDIUM or HIGH, or all three null when no model is picked), so a reader does not depend on this module's inner
+ * types. Where a run stops is the workspace's run limits, not the agent's (ADR 0023).
  *
  * @param tools    the tool names the agent may use, such as {@code conxist.get_transcript}
  * @param skills   the skills the agent follows that this workspace can use, in the agent's order
@@ -22,16 +21,10 @@ public record AgentBrief(
         String name,
         String purpose,
         String instructions,
-        List<UUID> knowledgeSources,
         List<String> tools,
         String provider,
         String model,
         String effort,
-        String style,
-        String givesBack,
-        int maxSteps,
-        int timeoutSeconds,
-        int maxToolCalls,
         List<Skill> skills,
         List<String> problems,
         boolean archived,
@@ -39,19 +32,15 @@ public record AgentBrief(
 
     public AgentBrief {
         mcpTools = List.copyOf(mcpTools);
-        knowledgeSources = List.copyOf(knowledgeSources);
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         problems = List.copyOf(problems);
     }
 
     /** A brief without MCP tools. */
-    public AgentBrief(UUID id, String name, String purpose, String instructions, List<UUID> knowledgeSources,
-            List<String> tools, String provider, String model, String effort, String style, String givesBack,
-            int maxSteps, int timeoutSeconds, int maxToolCalls, List<Skill> skills, List<String> problems,
-            boolean archived) {
-        this(id, name, purpose, instructions, knowledgeSources, tools, provider, model, effort, style, givesBack,
-                maxSteps, timeoutSeconds, maxToolCalls, skills, problems, archived, List.of());
+    public AgentBrief(UUID id, String name, String purpose, String instructions, List<String> tools, String provider,
+            String model, String effort, List<Skill> skills, List<String> problems, boolean archived) {
+        this(id, name, purpose, instructions, tools, provider, model, effort, skills, problems, archived, List.of());
     }
 
     /** A tool of an MCP server: the server's id and the tool's name as the server lists it. */

@@ -8,7 +8,7 @@ import { SettingsPage } from './SettingsPage';
 
 const WORKSPACE = { id: 'w1', name: 'Acme Product', description: 'Checkout', sourceCount: 2, createdAt: '2026-11-18T12:00:00Z' };
 const agent = (name: string, model: AgentSummary['model']): AgentSummary => ({
-  id: name, name, purpose: '', status: 'ACTIVE', publishedVersion: 0, draftPublished: false, givesBack: 'TOPICS', model,
+  id: name, name, purpose: '', status: 'ACTIVE', publishedVersion: 0, draftPublished: false, model,
   skills: [], updatedAt: '2026-11-24T00:00:00Z',
 });
 const OFFERED: OfferedModels = {
@@ -274,6 +274,40 @@ describe('SettingsPage', () => {
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
     expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['General', 'LLM providers', 'MCPs', 'Integrations', 'Variables']);
     expect(within(nav).getByRole('link', { name: 'General' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('keeps run limits for the whole workspace in General, in range, and says when one is refused', async () => {
+    let refuse = false;
+    const calls = stubApi({
+      'GET /api/run-limits': () => ({ body: { maxSteps: 6, timeoutSeconds: 120, maxToolCalls: 10 } }),
+      'PUT /api/run-limits': (init) => (refuse ? { status: 422, body: { code: 'run-limits.time' } }
+        : { body: JSON.parse(String(init?.body)) }),
+    });
+    const { container } = open('#/settings/general');
+
+    const limits = await screen.findByRole('region', { name: 'Run limits' });
+    const steps = await within(limits).findByRole('spinbutton', { name: 'Steps' });
+    const save = within(limits).getByRole('button', { name: 'Save run limits' });
+    expect(steps).toHaveValue(6);
+    expect(save).toBeDisabled();
+    expect(await accessibilityViolations(container)).toEqual([]);
+
+    await userEvent.clear(steps);
+    await userEvent.type(steps, '21');
+    expect(steps).toHaveAttribute('aria-invalid', 'true');
+    expect(save).toBeDisabled();
+    await userEvent.clear(steps);
+    await userEvent.type(steps, '12');
+    await userEvent.click(save);
+    expect(await within(limits).findByText('Saved')).toBeInTheDocument();
+    expect(JSON.parse(String(calls.find((call) => call.key === 'PUT /api/run-limits')?.init?.body)))
+      .toEqual({ maxSteps: 12, timeoutSeconds: 120, maxToolCalls: 10 });
+
+    refuse = true;
+    await userEvent.clear(steps);
+    await userEvent.type(steps, '8');
+    await userEvent.click(save);
+    expect(await within(limits).findByRole('alert')).toHaveTextContent('Time must be between 10 and 600 seconds.');
   });
 
   it('starts with no variables, adds one in place, and refuses a name that is taken or not made for braces', async () => {

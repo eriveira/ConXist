@@ -102,10 +102,6 @@ class AgentsIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":1}"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("agent.not-ready"));
-        mvc.perform(put("/api/agents/{id}/draft", id).header(HEADER, workspace)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(draft(1, "Mine").replace("\"maxSteps\":6", "\"maxSteps\":99")))
-                .andExpect(jsonPath("$.code").value("agent.limits-steps"));
         mvc.perform(post("/api/agents").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"MINE\"}"))
                 .andExpect(jsonPath("$.code").value("agent.name-taken"));
@@ -151,25 +147,19 @@ class AgentsIntegrationTest {
     }
 
     @Test
-    void an_agent_cannot_publish_reading_another_workspaces_source() throws Exception {
-        String owner = workspace("Reader");
-        String other = workspace("Holder of the source");
-        String source = JsonPath.read(mvc.perform(post("/api/sources").header(HEADER, other)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"UPLOAD\",\"name\":\"Theirs\"}"))
-                .andReturn().getResponse().getContentAsString(), "$.id");
-        String id = JsonPath.read(mvc.perform(post("/api/agents").header(HEADER, owner)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Reader\"}"))
+    void a_draft_from_an_older_page_saves_without_the_fields_the_agent_no_longer_has() throws Exception {
+        String workspace = workspace("Older page");
+        String id = JsonPath.read(mvc.perform(post("/api/agents").header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Old\"}"))
                 .andReturn().getResponse().getContentAsString(), "$.id");
 
-        mvc.perform(put("/api/agents/{id}/draft", id).header(HEADER, owner).contentType(MediaType.APPLICATION_JSON)
-                        .content(draft(1, "Reader").replace("\"knowledgeSources\":[]",
-                                "\"knowledgeSources\":[\"" + source + "\"]")))
-                .andExpect(jsonPath("$.problems[0]").value("source-missing"));
-        mvc.perform(post("/api/agents/{id}/publish", id).header(HEADER, owner)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"revision\":2}"))
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.code").value("agent.source-missing"));
+        mvc.perform(put("/api/agents/{id}/draft", id).header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content(draft(1, "Old").replace("\"tools\"", "\"style\":\"CREATIVE\",\"knowledgeSources\":[],"
+                                + "\"limits\":{\"maxSteps\":6},\"tools\"")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draft.style").doesNotExist())
+                .andExpect(jsonPath("$.draft.knowledgeSources").doesNotExist())
+                .andExpect(jsonPath("$.problems").isEmpty());
     }
 
     /** A new agent with instructions and a tool, saved once, so it is ready to publish at revision 2. */
@@ -186,9 +176,7 @@ class AgentsIntegrationTest {
     private static String draft(int revision, String name) {
         return """
                 {"revision":%d,"draft":{"name":"%s","purpose":"Finds requirements","instructions":"Find them.",
-                "knowledgeSources":[],"tools":["GET_TRANSCRIPT"],"model":{"provider":"anthropic","model":"claude-haiku-5-5","effort":"LOW"},"style":"PRECISE",
-                "accepts":["TRANSCRIPT"],"givesBack":"REQUIREMENTS",
-                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                "tools":["GET_TRANSCRIPT"],"model":{"provider":"anthropic","model":"claude-haiku-5-5","effort":"LOW"}}}
                 """.formatted(revision, name);
     }
 

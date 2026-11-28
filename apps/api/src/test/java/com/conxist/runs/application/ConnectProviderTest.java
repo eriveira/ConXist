@@ -164,8 +164,8 @@ class ConnectProviderTest {
     }
 
     private static AgentBrief brief() {
-        return new AgentBrief(UUID.randomUUID(), "Analyst", "", "Find them.", List.of(), List.of(), "anthropic",
-                TestModels.SONNET, "LOW", "PRECISE", "REQUIREMENTS", 6, 120, 10, List.of(), List.of(), false);
+        return new AgentBrief(UUID.randomUUID(), "Analyst", "", "Find them.", List.of(), "anthropic",
+                TestModels.SONNET, "LOW", List.of(), List.of(), false);
     }
 
     private static void assertCode(Runnable action, String code) {

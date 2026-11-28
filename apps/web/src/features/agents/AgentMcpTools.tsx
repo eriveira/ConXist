@@ -7,14 +7,16 @@ import {
 import { useT } from '../../i18n/i18n';
 import { settingsHref } from '../../navigation';
 import { McpLogo } from '../mcps/McpParts';
+import { AgentToolGroup } from './AgentToolGroup';
 
 /**
  * The tools of the workspace's MCP servers and integrations that agents may use, one group per server (ADR 0017,
- * ADR 0019). Tools that change things carry a label: the workspace allowed them after a warning. A pick the workspace
- * no longer allows shows as a problem with a way to remove it. Descriptions come from the server: shown as text.
+ * ADR 0019), each folding (ADR 0023). Tools that change things carry a label: the workspace allowed them after a warning.
+ * A pick the workspace no longer allows shows as a problem with a way to remove it. Descriptions come from the server:
+ * shown as text. A locked page (an archived agent) shows every group open.
  */
-export function AgentMcpTools({ draft, servers, onChange }: {
-  draft: AgentDefinition; servers: McpServer[]; onChange: (change: Partial<AgentDefinition>) => void;
+export function AgentMcpTools({ draft, servers, onChange, locked }: {
+  draft: AgentDefinition; servers: McpServer[]; onChange: (change: Partial<AgentDefinition>) => void; locked: boolean;
 }) {
   const t = useT();
   const usable = servers.filter((server) => allowedTools(server).length > 0);
@@ -27,13 +29,16 @@ export function AgentMcpTools({ draft, servers, onChange }: {
 
   return (
     <>
-      {usable.map((server) => (
-        <fieldset key={server.id} className="choice mcp-group">
-          <legend>
-            <McpLogo name={server.name} icon={server.icon} size="sm" /> {server.name}{' '}
-            <Pill tone="info">{t('kind' in server && server.kind === 'api' ? 'integration.kind' : 'agent.tools.mcp')}</Pill>
-          </legend>
-          {allowedTools(server).map((tool) => {
+      {usable.map((server) => {
+        const tools = allowedTools(server);
+        const picks = tools.filter((tool) => has({ serverId: server.id, tool: tool.name }));
+        return (
+        <AgentToolGroup key={server.id} mark={<McpLogo name={server.name} icon={server.icon} size="sm" />}
+          title={<>{server.name}{' '}
+            <Pill tone="info">{t('kind' in server && server.kind === 'api' ? 'integration.kind' : 'agent.tools.mcp')}</Pill></>}
+          picked={picks.length} total={tools.length} changing={picks.filter((tool) => !tool.readOnly).length}
+          startOpen={picks.length > 0} locked={locked}>
+          {tools.map((tool) => {
             const pick = { serverId: server.id, tool: tool.name };
             const on = has(pick);
             return (
@@ -49,12 +54,13 @@ export function AgentMcpTools({ draft, servers, onChange }: {
               </label>
             );
           })}
-        </fieldset>
-      ))}
+        </AgentToolGroup>
+        );
+      })}
       {gone.map((pick) => (
         <p key={`${pick.serverId}/${pick.tool}`} className="alert error">
           <Icon name="alert" /> <span className="grow">{t('agent.tools.mcpGone', { tool: pick.tool })}</span>
-          <button type="button" className="link" onClick={() => toggle(pick)}>{t('agent.knowledge.remove')}</button>
+          <button type="button" className="link" onClick={() => toggle(pick)}>{t('agent.tools.remove')}</button>
         </p>
       ))}
       {full && <p className="hint">{t('agent.tools.mcpFull', { max: MAX_MCP_TOOLS_PER_AGENT })}</p>}

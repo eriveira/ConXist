@@ -7,9 +7,10 @@ import { useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { useWorkspaceForm } from '../workspaces/useWorkspaceForm';
 import { WorkspaceFields } from '../workspaces/WorkspaceFields';
+import { RunLimitsForm } from './RunLimitsForm';
 import { SavedStatus, SettingsCard } from './SettingsParts';
 
-/** The workspace's name and description, saved once something changed; then Delete workspace. */
+/** The workspace's name and description, saved once something changed; its run limits (ADR 0023); then Delete workspace. */
 export function GeneralSection({ workspace, onSaved, canDelete, onDeleted }: {
   workspace: Workspace; onSaved: (workspace: Workspace) => void; canDelete: boolean;
   onDeleted: (workspace: Workspace) => void;
@@ -35,6 +36,7 @@ export function GeneralSection({ workspace, onSaved, canDelete, onDeleted }: {
           </button>
         </div>
       </form>
+      <RunLimitsForm workspaceId={workspace.id} />
       <section className="danger-zone" aria-labelledby="delete-workspace">
         <h3 id="delete-workspace">{t('workspace.delete.title')}</h3>
         <p>{t(canDelete ? 'workspace.delete.lead' : 'workspace.delete.only', { name: workspace.name })}</p>

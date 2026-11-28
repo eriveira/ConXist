@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { accessibilityViolations } from '../../a11y';
 import type { Agent, AgentDefinition } from '../../domain/agents';
@@ -21,9 +21,8 @@ const SKILLS: SkillSummary[] = [
     publishedVersion: 3, draftPublished: true, needs: [], updatedAt: '2026-11-21T00:00:00Z' },
 ];
 const DRAFT: AgentDefinition = {
-  name: 'Summarizer', purpose: 'Summarizes meetings.', instructions: 'Summarize the meeting.', knowledgeSources: [], skills: [],
-  tools: ['GET_TRANSCRIPT'], mcpTools: [], model: { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' }, style: 'PRECISE', accepts: ['TRANSCRIPT'], givesBack: 'SUMMARY',
-  limits: { maxSteps: 6, timeoutSeconds: 120, maxToolCalls: 10 },
+  name: 'Summarizer', purpose: 'Summarizes meetings.', instructions: 'Summarize the meeting.', skills: [],
+  tools: ['GET_TRANSCRIPT'], mcpTools: [], model: { provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'LOW' },
 };
 const AGENT: Agent = {
   id: ID, status: 'ACTIVE', revision: 1, draft: DRAFT, publishedVersion: 0, draftPublished: false, problems: [], skills: [],
@@ -60,13 +59,20 @@ describe('AgentPage', () => {
     // The page moves focus once it has loaded; under a busy test run that can land a moment after the heading shows.
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText('Draft, not published')).toBeInTheDocument();
-    for (const section of ['What it is', 'Instructions', 'Takes in and gives back', 'Knowledge', 'Skills', 'Tools', 'How it thinks', 'Limits']) {
+    for (const section of ['What it is', 'Instructions', 'Skills', 'Tools', 'How it thinks']) {
       expect(screen.getByRole('region', { name: new RegExp(section) })).toBeInTheDocument();
     }
     expect(screen.getByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
-    expect(await screen.findByRole('checkbox', { name: /Specs/ })).not.toBeChecked();
+    for (const gone of ['Takes in and gives back', 'Knowledge', 'Limits']) {
+      expect(screen.queryByRole('region', { name: new RegExp(gone) })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText('Style')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Try it' })).toBeInTheDocument();
     expect(await screen.findByRole('combobox', { name: 'Model' })).toHaveDisplayValue('Claude Haiku 5.5');
-    expect(screen.getByRole('radio', { name: /Low/ })).toBeChecked();
+    const effort = screen.getByRole('slider', { name: 'Effort' });
+    expect(effort).toHaveValue('0');
+    expect(effort).toHaveAttribute('aria-valuetext', 'Low');
+    expect(screen.getByText('Quick and low cost, for simple jobs.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'History' })).toBeDisabled();
     expect(await accessibilityViolations(container)).toEqual([]);
   });
@@ -82,14 +88,14 @@ describe('AgentPage', () => {
     await screen.findByRole('heading', { name: 'Summarizer', level: 1 });
 
     await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Model' }), 'claude-opus-5-5');
-    await userEvent.click(screen.getByRole('radio', { name: /High/ }));
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Specs/ }));
+    fireEvent.change(screen.getByRole('slider', { name: 'Effort' }), { target: { value: '2' } });
+    expect(screen.getByRole('slider', { name: 'Effort' })).toHaveAttribute('aria-valuetext', 'High');
 
     await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
     const sent = bodyOf(calls, `PUT /api/agents/${ID}/draft`);
     expect(sent.revision).toBe(1);
     expect(sent.draft.model).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5', effort: 'HIGH' });
-    expect(sent.draft.knowledgeSources).toEqual([SOURCE.id]);
+    expect(sent.draft).not.toHaveProperty('knowledgeSources');
     expect(calls.filter((call) => call.key === `PUT /api/agents/${ID}/draft`)).toHaveLength(1);
   });
 
@@ -211,17 +217,16 @@ describe('AgentPage', () => {
 
   it('says when sources cannot load instead of calling them removed, and retries', async () => {
     let fail = true;
-    api({ ...AGENT, draft: { ...DRAFT, knowledgeSources: [SOURCE.id] } }, {
+    api(AGENT, {
       'GET /api/sources': () => (fail ? { status: 500, body: {} } : { body: [SOURCE] }),
     });
     render(<AgentPage agentId={ID} />);
 
     const alerts = await screen.findAllByText('We could not load your sources, skills, tools and models. Nothing was changed.');
-    expect(alerts).toHaveLength(4);
-    expect(screen.queryByText('A source it reads was removed from the workspace.')).not.toBeInTheDocument();
+    expect(alerts).toHaveLength(3);
     fail = false;
     await userEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0]);
-    expect(await screen.findByRole('checkbox', { name: /Specs/ })).toBeChecked();
+    expect(await screen.findByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
   });
 
   it('adds a skill at its newest version and turns on the tools it needs', async () => {
@@ -331,7 +336,12 @@ describe('AgentPage', () => {
     });
     const { container } = render(<AgentPage agentId={ID} />);
 
-    const group = await screen.findByRole('group', { name: /Acme Docs/ });
+    const fold = await screen.findByRole('button', { name: /Acme Docs/ });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    expect(fold).toHaveTextContent('None picked of 1');
+    await userEvent.click(fold);
+    expect(fold).toHaveAttribute('aria-expanded', 'true');
+    const group = screen.getByRole('group', { name: /Acme Docs/ });
     expect(within(group).queryByRole('checkbox', { name: /create_doc/ })).not.toBeInTheDocument();
     expect(screen.getByText('old_tool is no longer allowed in this workspace.')).toBeInTheDocument();
     expect(screen.getByText('Before you publish').parentElement).toHaveTextContent('Remove the MCP tools that are no longer allowed.');
@@ -340,8 +350,29 @@ describe('AgentPage', () => {
 
     await userEvent.click(within(group).getByRole('checkbox', { name: /search_docs/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(fold).toHaveTextContent('1 of 1 picked');
     await waitFor(() => expect(screen.getByText('Draft saved')).toBeInTheDocument(), { timeout: 3000 });
     expect(bodyOf(calls, `PUT /api/agents/${ID}/draft`).draft.mcpTools).toEqual([{ serverId, tool: 'search_docs' }]);
+  });
+
+  it('opens every tool group once the agent is archived in place, since their buttons are off', async () => {
+    const serverId = '66666666-6666-6666-6666-666666666666';
+    api(AGENT, {
+      'GET /api/mcps': () => ({ body: [{ id: serverId, name: 'Acme Docs', address: 'https://mcp.acme.test/mcp', auth: 'NONE',
+        icon: null, logo: null, status: 'WORKS', addedAt: '2026-11-27T10:00:00Z', checkedAt: '2026-11-27T10:00:00Z',
+        tools: [{ name: 'search_docs', title: 'Search', description: 'Finds docs.', readOnly: true, allowed: true, usedBy: [] }] }] }),
+      [`POST /api/agents/${ID}/archive`]: () => ({ body: { ...AGENT, status: 'ARCHIVED', revision: 2 } }),
+    });
+    render(<AgentPage agentId={ID} />);
+    const fold = await screen.findByRole('button', { name: /Acme Docs/ });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+
+    await waitFor(() => expect(fold).toHaveAttribute('aria-expanded', 'true'));
+    expect(fold).toBeDisabled();
+    expect(fold).not.toHaveTextContent('Show');
+    expect(screen.getByRole('checkbox', { name: /search_docs/ })).not.toBeChecked();
   });
 
   it('offers GitHub’s allowed tools as their own group, marked API', async () => {
@@ -357,8 +388,10 @@ describe('AgentPage', () => {
     });
     render(<AgentPage agentId={ID} />);
 
-    const group = await screen.findByRole('group', { name: /GitHub/ });
-    expect(group).toHaveTextContent('API');
+    const fold = await screen.findByRole('button', { name: /GitHub/ });
+    expect(fold).toHaveTextContent('API');
+    await userEvent.click(fold);
+    const group = screen.getByRole('group', { name: /GitHub/ });
     expect(within(group).queryByRole('checkbox', { name: /get_file/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings › Integrations' })).toHaveAttribute('href', '#/settings/integrations');
     await userEvent.click(within(group).getByRole('checkbox', { name: /search_code/ }));
@@ -372,7 +405,7 @@ describe('AgentPage', () => {
 
     expect(await screen.findByText(/The tools of MCP servers and integrations could not load/)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /Read a transcript/ })).toBeChecked();
-    expect(await screen.findByRole('checkbox', { name: /Specs/ })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Effort' })).toBeEnabled();
   });
 
   it('says which {{name}}s the workspace has no variable for, and links to add them', async () => {

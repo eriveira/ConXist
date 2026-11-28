@@ -205,8 +205,8 @@ class LlmProvidersTest {
     }
 
     private static AgentBrief brief(String provider, String model, String effort) {
-        return new AgentBrief(java.util.UUID.randomUUID(), "Analyst", "", "Find them.", List.of(), List.of(),
-                provider, model, effort, "PRECISE", "REQUIREMENTS", 6, 120, 10, List.of(), List.of(), false);
+        return new AgentBrief(java.util.UUID.randomUUID(), "Analyst", "", "Find them.", List.of(),
+                provider, model, effort, List.of(), List.of(), false);
     }
 
     private static void assertCode(Runnable action, String code) {

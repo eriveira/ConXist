@@ -22,7 +22,6 @@ import com.anthropic.errors.UnauthorizedException;
 import com.anthropic.models.beta.messages.BetaContentBlock;
 import com.anthropic.models.beta.messages.BetaContentBlockParam;
 import com.anthropic.models.beta.messages.BetaFallbacksParam;
-import com.anthropic.models.beta.messages.BetaJsonOutputFormat;
 import com.anthropic.models.beta.messages.BetaMessage;
 import com.anthropic.models.beta.messages.BetaMessageParam;
 import com.anthropic.models.beta.messages.BetaOutputConfig;
@@ -39,8 +38,8 @@ import com.conxist.runs.application.ProviderModel;
 
 /**
  * Claude through the official Anthropic Java SDK (ADR 0012). Each turn is one Messages call: adaptive thinking (the
- * models' default), the agent's effort, strict tools, and structured output when the agent gives back a shape. Earlier
- * turns go back exactly as Claude sent them, thinking included. Each call names the key to use (the workspace's own or
+ * models' default), the agent's effort and strict tools. Earlier turns go back exactly as Claude sent them, thinking
+ * included. Each call names the key to use (the workspace's own or
  * this computer's); keys are never logged.
  */
 public final class ClaudeModel implements ModelPort {
@@ -167,11 +166,6 @@ public final class ClaudeModel implements ModelPort {
     MessageCreateParams params(Request request) {
         ModelChoice model = request.model();
         BetaOutputConfig.Builder output = BetaOutputConfig.builder().effort(effort(model.effort()));
-        if (request.outputSchema() != null) {
-            BetaJsonOutputFormat.Schema.Builder schema = BetaJsonOutputFormat.Schema.builder();
-            request.outputSchema().forEach((key, value) -> schema.putAdditionalProperty(key, JsonValue.from(value)));
-            output.format(BetaJsonOutputFormat.builder().schema(schema.build()).build());
-        }
         MessageCreateParams.Builder params = MessageCreateParams.builder()
                 .model(model.id())
                 .maxTokens(model.maxTokens())

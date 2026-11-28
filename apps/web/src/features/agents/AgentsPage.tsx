@@ -102,7 +102,6 @@ function AgentList({ agents, showArchived, onShowArchived, onNew }: AgentListPro
                   <AgentStatePill agent={agent} />
                 </span>
                 {agent.purpose && <span className="agent-card-purpose">{agent.purpose}</span>}
-                <span className="agent-card-meta">{t('agents.givesBack', { kind: t(`agent.output.${agent.givesBack}`) })}</span>
               </span>
               <Icon name="chevron" />
             </a>

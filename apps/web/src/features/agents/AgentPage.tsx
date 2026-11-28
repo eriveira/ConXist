@@ -168,8 +168,7 @@ export function AgentPage({ agentId }: { agentId: string }) {
         <AgentSections draft={draft} pinned={agent.skills} onChange={editor.edit} disabled={archived || save === 'conflict'}
           choices={choices} onRetryChoices={loadChoices} />
         <aside className="agent-side">
-          <AgentTestPanel agentId={agent.id} reads={draft.knowledgeSources} givesBack={draft.givesBack}
-            sources={choices.status === 'ready' ? choices.sources : null} block={runBlock}
+          <AgentTestPanel agentId={agent.id} sources={choices.status === 'ready' ? choices.sources : null} block={runBlock}
             provider={draft.model?.provider ?? null}
             changes={choices.status === 'ready' && choices.mcps ? changingPicks(choices.mcps, draft.mcpTools) : []} />
         </aside>

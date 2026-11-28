@@ -16,13 +16,10 @@ import com.conxist.platform.Conflict;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.UnitOfWork;
-import com.conxist.sources.SourceCatalog;
 
 /** What every agent use case shares: finding an agent of the current workspace, saving it safely, and its view. */
 public final class AgentBook {
 
-    /** Reported when a source the agent reads was removed from the workspace. */
-    static final String SOURCE_MISSING = "source-missing";
     /** Reported when a skill version the agent follows is not one this workspace can use. */
     static final String SKILL_MISSING = "skill-missing";
     /** Reported when a skill the agent follows needs a tool the agent is not allowed. */
@@ -34,18 +31,16 @@ public final class AgentBook {
 
     private final AgentRepository agents;
     private final CurrentWorkspace workspace;
-    private final SourceCatalog sources;
     private final SkillBook skills;
     private final AgentModels models;
     private final AgentMcpTools mcpTools;
     private final UnitOfWork unitOfWork;
     private final Clock clock;
 
-    public AgentBook(AgentRepository agents, CurrentWorkspace workspace, SourceCatalog sources,
-            SkillBook skills, AgentModels models, AgentMcpTools mcpTools, UnitOfWork unitOfWork, Clock clock) {
+    public AgentBook(AgentRepository agents, CurrentWorkspace workspace, SkillBook skills, AgentModels models,
+            AgentMcpTools mcpTools, UnitOfWork unitOfWork, Clock clock) {
         this.agents = agents;
         this.workspace = workspace;
-        this.sources = sources;
         this.skills = skills;
         this.models = models;
         this.mcpTools = mcpTools;
@@ -102,8 +97,8 @@ public final class AgentBook {
     }
 
     /**
-     * What stops the draft from being published: the draft's own rules, then sources it reads that are gone, then
-     * a model that can't run, then MCP tools the workspace no longer allows, then skills it follows that are gone or need a tool it is not allowed.
+     * What stops the draft from being published: the draft's own rules, then a model that can't run, then MCP tools
+     * the workspace no longer allows, then skills it follows that are gone or need a tool it is not allowed.
      */
     List<String> problems(AgentDefinition draft) {
         return problems(draft, pinnedSkills(draft));
@@ -111,9 +106,6 @@ public final class AgentBook {
 
     private List<String> problems(AgentDefinition draft, List<PinnedSkill> pinned) {
         List<String> problems = new ArrayList<>(draft.problems());
-        if (draft.knowledgeSources().stream().anyMatch(id -> sources.find(id).isEmpty())) {
-            problems.add(SOURCE_MISSING);
-        }
         if (draft.model() != null && !models.available(draft.model().provider(), draft.model().model())) {
             problems.add(MODEL_UNAVAILABLE);
         }

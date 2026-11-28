@@ -22,7 +22,6 @@ import com.conxist.agents.domain.AgentModel;
 import com.conxist.agents.domain.AgentStatus;
 import com.conxist.agents.domain.AgentTool;
 import com.conxist.agents.domain.AgentVersion;
-import com.conxist.agents.domain.InputKind;
 import com.conxist.agents.domain.McpToolPick;
 import com.conxist.agents.domain.SkillDefinition;
 import com.conxist.agents.domain.SkillPin;
@@ -30,9 +29,6 @@ import com.conxist.agents.domain.SkillSource;
 import com.conxist.platform.Conflict;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
-import com.conxist.sources.Provider;
-import com.conxist.sources.SourceCategory;
-import com.conxist.sources.SourceSummary;
 import com.conxist.testing.FixedWorkspace;
 import com.conxist.testing.ImmediateUnitOfWork;
 import com.conxist.testing.TestClock;
@@ -41,7 +37,6 @@ import org.junit.jupiter.api.Test;
 class AgentsTest {
 
     private final InMemoryAgents repository = new InMemoryAgents();
-    private final Map<UUID, SourceSummary> sources = new HashMap<>();
     private final TestClock.Moving clock = TestClock.moving();
     private FixedWorkspace workspace = FixedWorkspace.standard();
     private final SkillBook skills = new SkillBook(new InMemorySkills(), () -> workspace.id(),
@@ -49,7 +44,7 @@ class AgentsTest {
     private final Models models = new Models();
     private final java.util.Set<String> allowedMcpTools = new java.util.HashSet<>();
     private final AgentBook book = new AgentBook(repository, () -> workspace.id(),
-            id -> Optional.ofNullable(sources.get(id)), skills, models,
+            skills, models,
             (serverId, tool) -> allowedMcpTools.contains(serverId + "/" + tool), new ImmediateUnitOfWork(), clock);
     private final AddSkill addSkill = new AddSkill(skills);
     private final SaveSkillDraft saveSkill = new SaveSkillDraft(skills);
@@ -167,23 +162,6 @@ class AgentsTest {
     }
 
     @Test
-    void an_agent_that_reads_a_removed_source_cannot_be_published() {
-        UUID kept = UUID.randomUUID();
-        sources.put(kept, new SourceSummary(kept, SourceCategory.CAPTURE, Provider.UPLOAD, "Specs", null,
-                Instant.EPOCH));
-        UUID removed = UUID.randomUUID();
-        AgentView created = ready("Summarizer");
-        AgentView reading = save.save(created.id(), created.revision(),
-                withSources(created.draft(), List.of(kept, removed)));
-
-        assertThat(reading.problems()).containsExactly("source-missing");
-        assertCode(() -> publish.publish(reading.id(), reading.revision()), "agent.source-missing");
-
-        AgentView fixed = save.save(reading.id(), reading.revision(), withSources(reading.draft(), List.of(kept)));
-        assertThat(publish.publish(fixed.id(), fixed.revision()).publishedVersion()).isEqualTo(1);
-    }
-
-    @Test
     void an_agent_follows_a_skill_at_the_version_it_is_pinned_to() {
         SkillView skill = addSkill.create("Acme style");
         SkillView drafted = saveSkill.save(skill.id(), skill.revision(), new SkillDefinition("Acme style",
@@ -211,8 +189,7 @@ class AgentsTest {
     void a_skill_that_needs_a_tool_the_agent_lacks_blocks_publishing() {
         AgentView created = create.create("Writer");
         AgentView ready = save.save(created.id(), created.revision(), withSkills(
-                new AgentDefinition("Writer", "", "Write.", List.of(), List.of(), List.of(), SONNET, null,
-                        List.of(InputKind.TOPIC), null, null),
+                new AgentDefinition("Writer", "", "Write.", List.of(), List.of(), SONNET, List.of()),
                 List.of(new SkillPin(summarySkill().id(), 1))));
 
         assertThat(ready.problems()).containsExactly("skill-needs-tool");
@@ -353,8 +330,7 @@ class AgentsTest {
         AgentView created = create.create(name);
         AgentDefinition d = created.draft();
         return save.save(created.id(), created.revision(), new AgentDefinition(d.name(), "Summarizes a meeting.",
-                "Summarize the meeting.", d.knowledgeSources(), d.skills(), List.of(AgentTool.GET_TRANSCRIPT), SONNET,
-                d.style(), d.accepts(), d.givesBack(), d.limits()));
+                "Summarize the meeting.", d.skills(), List.of(AgentTool.GET_TRANSCRIPT), SONNET, List.of()));
     }
 
     /** A published skill that needs the transcript tool. */
@@ -366,28 +342,19 @@ class AgentsTest {
     }
 
     private static AgentDefinition renamed(AgentDefinition d, String name) {
-        return new AgentDefinition(name, d.purpose(), d.instructions(), d.knowledgeSources(), d.skills(), d.tools(),
-                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
+        return new AgentDefinition(name, d.purpose(), d.instructions(), d.skills(), d.tools(), d.model(), d.mcpTools());
     }
 
     private static AgentDefinition withModel(AgentDefinition d, AgentModel model) {
-        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), d.skills(), d.tools(),
-                model, d.style(), d.accepts(), d.givesBack(), d.limits());
-    }
-
-    private static AgentDefinition withSources(AgentDefinition d, List<UUID> sources) {
-        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), sources, d.skills(), d.tools(),
-                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
+        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.skills(), d.tools(), model, d.mcpTools());
     }
 
     private static AgentDefinition withSkills(AgentDefinition d, List<SkillPin> skills) {
-        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), skills, d.tools(),
-                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits());
+        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), skills, d.tools(), d.model(), d.mcpTools());
     }
 
     private static AgentDefinition withMcpTools(AgentDefinition d, List<McpToolPick> tools) {
-        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.knowledgeSources(), d.skills(), d.tools(),
-                d.model(), d.style(), d.accepts(), d.givesBack(), d.limits(), tools);
+        return new AgentDefinition(d.name(), d.purpose(), d.instructions(), d.skills(), d.tools(), d.model(), tools);
     }
 
     private static final AgentModel SONNET = new AgentModel("anthropic", "claude-sonnet-5-5", AgentModel.Effort.MEDIUM);

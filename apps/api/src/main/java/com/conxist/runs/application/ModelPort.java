@@ -25,11 +25,10 @@ public interface ModelPort {
     List<ProviderModel> models(ApiKey key, Duration timeout);
 
     /**
-     * One call. {@code exchanges} are the earlier turns with their tool results, in order; {@code outputSchema} is
-     * null when the answer is plain text.
+     * One call. {@code exchanges} are the earlier turns with their tool results, in order; the answer is plain text.
      */
     record Request(ModelChoice model, String system, String firstMessage, List<Exchange> exchanges,
-            List<ToolSpec> tools, Map<String, Object> outputSchema, Duration timeout) {
+            List<ToolSpec> tools, Duration timeout) {
     }
 
     /** @param providerState what the provider needs to see this turn again on the next call, unchanged */

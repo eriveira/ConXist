@@ -17,8 +17,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A stand-in for Anthropic's Messages API on localhost, so the real Claude adapter can be tried without a key or a
- * bill. The first turn of a run that offers {@code list_sources} asks for it; then it answers with JSON made from the
- * requested schema (the first choice of each list, one item per list), or with a line of text when there is none.
+ * bill. The first turn of a run that offers {@code list_sources} asks for it; then it answers with a line of text.
  * Every request body is kept for tests to read.
  */
 public final class FakeClaudeServer implements AutoCloseable {
@@ -143,27 +142,8 @@ public final class FakeClaudeServer implements AutoCloseable {
                     "name", "list_sources", "input", Map.of())), "tool_use"));
             return;
         }
-        JsonNode schema = request.path("output_config").path("format").path("schema");
-        String text = schema.isMissingNode() ? "A short answer from the fake model."
-                : json.writeValueAsString(example(schema));
+        String text = "A short answer from the fake model.";
         send(exchange, 200, message(model, List.of(Map.of("type", "text", "text", text)), "end_turn"));
-    }
-
-    private static Object example(JsonNode schema) {
-        if (schema.has("enum")) {
-            return schema.path("enum").get(0).asString();
-        }
-        return switch (schema.path("type").asString()) {
-            case "object" -> {
-                Map<String, Object> object = new LinkedHashMap<>();
-                schema.path("properties").properties().forEach(entry -> object.put(entry.getKey(),
-                        example(entry.getValue())));
-                yield object;
-            }
-            case "array" -> List.of(example(schema.path("items")));
-            case "integer" -> 80;
-            default -> "Example " + schema.path("description").asString("text").toLowerCase();
-        };
     }
 
     private static Map<String, Object> message(String model, List<Map<String, Object>> content, String stop) {

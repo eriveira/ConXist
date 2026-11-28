@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
-import type { OutputKind } from '../../domain/agents';
 import type { CapturedDocument, Source } from '../../domain/model';
-import { type AnswerPart, type TestRunResult, type TestRunStep, answerParts, firstChoice,
-  runChoiceGroups } from '../../domain/testRuns';
+import { type TestRunResult, type TestRunStep, firstChoice, runChoiceGroups } from '../../domain/testRuns';
 import { providerLabel, type Translate, useLanguage, useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { ApiError } from '../../api/client';
@@ -22,9 +20,6 @@ type Run = { status: 'idle' } | { status: 'running'; started: number } | { statu
 
 interface Props {
   agentId: string;
-  /** The sources the agent reads, listed first. */
-  reads: string[];
-  givesBack: OutputKind;
   /** The workspace's sources, or null while the page is still loading them. */
   sources: Source[] | null;
   block: RunBlock;
@@ -35,11 +30,10 @@ interface Props {
 }
 
 /**
- * The Test panel (ADR 0012): paste text, read a text file, or pick a meeting when the workspace has some; run the saved
- * draft once and see what it gives back, whether that has
- * the agent's shape, and what it did on the way. Nothing of a run is kept.
+ * The Try it panel (ADR 0012, ADR 0023): paste text, read a text file, or pick a meeting when the workspace has some;
+ * run the saved draft once and see what it gives back and what it did on the way. Nothing of a run is kept.
  */
-export function AgentTestPanel({ agentId, reads, givesBack, sources, block, provider, changes }: Props) {
+export function AgentTestPanel({ agentId, sources, block, provider, changes }: Props) {
   const t = useT();
   const providerName = provider ? providerLabel(t, provider) : null;
   const [status, setStatus] = useState<Status>('checking');
@@ -51,7 +45,6 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
   const [run, setRun] = useState<Run>({ status: 'idle' });
   const pickId = useId();
   const language = useLanguage();
-  const readsKey = reads.join(',');
   /** Counts runs, so an answer that arrives after the agent or the meeting changed is dropped. */
   const runCount = useRef(0);
   const failureRef = useRef<HTMLParagraphElement>(null);
@@ -70,13 +63,13 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
       .then((lists) => {
         const documents: Record<string, CapturedDocument[]> = {};
         capture.forEach((source, index) => { documents[source.id] = lists[index]; });
-        const groups = runChoiceGroups(sources, documents, readsKey ? readsKey.split(',') : [], language);
+        const groups = runChoiceGroups(sources, documents, language);
         setMeetings({ status: 'ready', groups });
         setPicked((now) => now && groups.some((group) => group.choices.some((choice) => key(choice) === now))
           ? now : keyOrEmpty(firstChoice(groups)));
       })
       .catch(() => setMeetings({ status: 'error' }));
-  }, [sources, readsKey, language]);
+  }, [sources, language]);
   useEffect(loadMeetings, [loadMeetings]);
 
   useEffect(() => {
@@ -175,7 +168,7 @@ export function AgentTestPanel({ agentId, reads, givesBack, sources, block, prov
           <Icon name="alert" /> {keyProblem(run.problem, providerName, t) ?? problemMessage(run.problem, t)}
         </p>
       )}
-      {run.status === 'done' && <RunResult result={run.result} givesBack={givesBack} />}
+      {run.status === 'done' && <RunResult result={run.result} />}
     </div>
   );
 }
@@ -190,15 +183,13 @@ function Elapsed({ started }: { started: number }) {
   return <>{t('run.running', { seconds: Math.max(0, Math.floor((now - started) / 1000)) })}</>;
 }
 
-function RunResult({ result, givesBack }: { result: TestRunResult; givesBack: OutputKind }) {
+function RunResult({ result }: { result: TestRunResult }) {
   const t = useT();
   const language = useLanguage();
   const headingRef = useRef<HTMLParagraphElement>(null);
   const number = new Intl.NumberFormat(language);
   const seconds = new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(result.millis / 1000);
-  const shape = t(`agent.output.${givesBack}` as MessageKey);
   const answered = result.outcome === 'ANSWERED';
-  const structured = result.structured !== null && result.structured !== undefined;
 
   useEffect(() => headingRef.current?.focus(), [result]);
 
@@ -208,11 +199,6 @@ function RunResult({ result, givesBack }: { result: TestRunResult; givesBack: Ou
         <Icon name={answered ? 'check' : 'info'} /> {t(`run.outcome.${result.outcome}`)}
       </p>
       <div className="test-meta">
-        {result.matchesShape !== null && (
-          <span className={`pill ${result.matchesShape ? 'live' : 'error'}`}>
-            {t(result.matchesShape ? 'run.shape.ok' : 'run.shape.no', { shape })}
-          </span>
-        )}
         <span>{result.millis < 1000 ? t('run.meta.quick') : t('run.meta.time', { seconds })}</span>
         <span>{t('run.meta.tools', { count: result.toolCalls })}</span>
         <span>{t('run.meta.tokens', { count: number.format(result.inputTokens + result.outputTokens) })}</span>
@@ -220,8 +206,8 @@ function RunResult({ result, givesBack }: { result: TestRunResult; givesBack: Ou
       </div>
       {result.answer !== null && (
         <section className="test-answer" aria-labelledby={`${result.agentId}-answer`}>
-          <h3 id={`${result.agentId}-answer`}>{t(structured || result.matchesShape !== false ? 'run.answer' : 'run.answer.raw')}</h3>
-          {structured ? <Part part={answerParts(result.structured)} t={t} /> : <p className="test-text">{result.answer}</p>}
+          <h3 id={`${result.agentId}-answer`}>{t('run.answer')}</h3>
+          <p className="test-text">{result.answer}</p>
         </section>
       )}
       <details className="test-steps">
@@ -252,36 +238,6 @@ function StepRow({ step }: { step: TestRunStep }) {
 function labelOr(t: Translate, key: string, fallback: string): string {
   const text = t(key as MessageKey);
   return text === key ? fallback : text;
-}
-
-/** Fields whose value is one of a fixed set, so it has words in the person's language; the rest is shown as written. */
-const CHOICE_FIELDS = ['type'];
-
-/** One part of a structured answer: labelled fields, a list, or text. */
-function Part({ part, t, field }: { part: AnswerPart; t: Translate; field?: string }) {
-  if (part.kind === 'text') {
-    if (part.text === '') return <span className="muted">{t('run.notSaid')}</span>;
-    return <>{field && CHOICE_FIELDS.includes(field) ? labelOr(t, `run.value.${part.text}`, part.text) : part.text}</>;
-  }
-  if (part.kind === 'list') {
-    if (part.items.length === 0) return <span className="muted">{t('run.none')}</span>;
-    const cards = part.items.some((item) => item.kind === 'fields');
-    return (
-      <ul className={cards ? 'answer-cards' : 'answer-list'}>
-        {part.items.map((item, index) => <li key={index}><Part part={item} t={t} /></li>)}
-      </ul>
-    );
-  }
-  return (
-    <dl className="answer-fields">
-      {part.fields.map((field) => (
-        <div key={field.key}>
-          <dt>{labelOr(t, `run.field.${field.key}`, field.key)}</dt>
-          <dd><Part part={field.value} t={t} field={field.key} /></dd>
-        </div>
-      ))}
-    </dl>
-  );
 }
 
 /** A refused key names the provider whose key to replace, when the panel knows it. */

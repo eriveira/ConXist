@@ -1,15 +1,8 @@
 import type { McpToolPick } from './mcps';
 import type { PinnedSkill, SkillPin } from './skills';
 
-/** What an agent accepts and gives back; a flow connects agents whose shapes match. */
-export const INPUT_KINDS = ['TRANSCRIPT', 'DOCUMENT', 'TOPIC', 'REQUIREMENT'] as const;
-export type InputKind = (typeof INPUT_KINDS)[number];
-export const OUTPUT_KINDS = ['SUMMARY', 'TOPICS', 'REQUIREMENTS', 'DECISIONS', 'DRAFTS', 'FREE_TEXT'] as const;
-export type OutputKind = (typeof OUTPUT_KINDS)[number];
 export const EFFORTS = ['LOW', 'MEDIUM', 'HIGH'] as const;
 export type Effort = (typeof EFFORTS)[number];
-export const STYLES = ['PRECISE', 'CREATIVE'] as const;
-export type Style = (typeof STYLES)[number];
 export type AgentStatus = 'ACTIVE' | 'ARCHIVED';
 
 /** What an agent runs on (ADR 0014): a provider connected in Settings, one of its models, and how hard it thinks. */
@@ -19,18 +12,14 @@ export interface AgentModel {
   effort: Effort;
 }
 
-export interface Limits {
-  maxSteps: number;
-  timeoutSeconds: number;
-  maxToolCalls: number;
-}
-
-/** The draft or a published version: everything the agent is. */
+/**
+ * The draft or a published version: everything the agent is. Style, what it takes in and gives back, Knowledge and
+ * its own limits left the agent in ADR 0023; run limits belong to the workspace.
+ */
 export interface AgentDefinition {
   name: string;
   purpose: string;
   instructions: string;
-  knowledgeSources: string[];
   /** The skills it follows, each at a fixed version. */
   skills: SkillPin[];
   tools: string[];
@@ -38,10 +27,6 @@ export interface AgentDefinition {
   mcpTools: McpToolPick[];
   /** Null only for an agent saved before agents picked their own model, until someone picks one. */
   model: AgentModel | null;
-  style: Style;
-  accepts: InputKind[];
-  givesBack: OutputKind;
-  limits: Limits;
 }
 
 export interface VersionInfo {
@@ -86,7 +71,6 @@ export interface AgentSummary {
   status: AgentStatus;
   publishedVersion: number;
   draftPublished: boolean;
-  givesBack: OutputKind;
   /** What its draft runs on, so Settings can show who uses each model. */
   model: AgentModel | null;
   /** The skills its draft follows, so a skill can show who uses it. */
@@ -110,12 +94,6 @@ export interface AgentToolInfo {
 export const MAX_NAME_LENGTH = 60;
 export const MAX_PURPOSE_LENGTH = 200;
 export const MAX_INSTRUCTIONS_LENGTH = 8_000;
-export const MAX_KNOWLEDGE_SOURCES = 20;
-export const LIMIT_RANGES: Record<keyof Limits, { min: number; max: number }> = {
-  maxSteps: { min: 1, max: 20 },
-  timeoutSeconds: { min: 10, max: 600 },
-  maxToolCalls: { min: 0, max: 50 },
-};
 
 /** Where an agent stands, as one label: archived, never published, published with changes waiting, or live. */
 export type AgentState = 'archived' | 'draft' | 'changed' | 'live';
@@ -131,15 +109,8 @@ export function localProblems(draft: AgentDefinition): string[] {
   const problems: string[] = [];
   if (!draft.name.trim()) problems.push('name-required');
   if (!draft.instructions.trim()) problems.push('instructions-required');
-  if (draft.accepts.length === 0) problems.push('accepts-required');
   if (!draft.model) problems.push('model-required');
   return problems;
-}
-
-/** Whether a limit is a whole number in its allowed range. */
-export function limitInRange(key: keyof Limits, value: number): boolean {
-  const range = LIMIT_RANGES[key];
-  return Number.isInteger(value) && value >= range.min && value <= range.max;
 }
 
 /** Adds the item if it is missing, or takes it out, keeping the order of `all`. */

@@ -18,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * A stand-in for OpenAI's Chat Completions and Models APIs on localhost, so the real OpenAI adapter can be tried without
  * a key or a bill. Like {@link FakeClaudeServer}: the first turn that offers {@code list_sources} asks for it, then the
- * answer is JSON made from the requested schema, or a line of text. The model list mixes chat models with image, audio
+ * answer is a line of text. The model list mixes chat models with image, audio
  * and embedding models, as OpenAI's does. Every chat request body is kept for tests to read.
  */
 public final class FakeOpenAiServer implements AutoCloseable {
@@ -156,27 +156,8 @@ public final class FakeOpenAiServer implements AutoCloseable {
                     "tool_calls"));
             return;
         }
-        JsonNode schema = request.path("response_format").path("json_schema").path("schema");
-        String text = schema.isMissingNode() ? "A short answer from the fake model."
-                : json.writeValueAsString(example(schema));
+        String text = "A short answer from the fake model.";
         send(exchange, 200, completion(model, message(text, null, List.of()), finishWith == null ? "stop" : finishWith));
-    }
-
-    private static Object example(JsonNode schema) {
-        if (schema.has("enum")) {
-            return schema.path("enum").get(0).asString();
-        }
-        return switch (schema.path("type").asString()) {
-            case "object" -> {
-                Map<String, Object> object = new LinkedHashMap<>();
-                schema.path("properties").properties().forEach(entry -> object.put(entry.getKey(),
-                        example(entry.getValue())));
-                yield object;
-            }
-            case "array" -> List.of(example(schema.path("items")));
-            case "integer" -> 80;
-            default -> "Example " + schema.path("description").asString("text").toLowerCase();
-        };
     }
 
     private static Map<String, Object> message(String content, String refusal, List<Map<String, Object>> calls) {

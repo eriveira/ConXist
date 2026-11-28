@@ -223,9 +223,7 @@ class SkillsIntegrationTest {
     private static String agentDraft(int revision, String skills, String tools) {
         return """
                 {"revision":%d,"draft":{"name":"Agent","purpose":"","instructions":"Write the notes.",
-                "knowledgeSources":[],"skills":%s,"tools":%s,"model":{"provider":"anthropic","model":"claude-haiku-5-5","effort":"LOW"},"style":"PRECISE",
-                "accepts":["TRANSCRIPT"],"givesBack":"FREE_TEXT",
-                "limits":{"maxSteps":6,"timeoutSeconds":120,"maxToolCalls":10}}}
+                "skills":%s,"tools":%s,"model":{"provider":"anthropic","model":"claude-haiku-5-5","effort":"LOW"}}}
                 """.formatted(revision, skills, tools);
     }
 
