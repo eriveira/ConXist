@@ -26,7 +26,7 @@ Codex, any MCP client) can't reach any of it. ConXist has no sign-in yet and lis
   tools, `runs` for running an agent, `agents` for published skills. LLM calls stay on the Anthropic and OpenAI Java
   SDKs; Spring AI is added for the MCP server only.
 - **Each workspace sees its own list.** Spring AI's server holds one tool list, so ConXist builds one MCP server
-  per workspace on first use (the SDK's `McpSyncServer`) and routes each request by its access key. The first
+  per workspace on first use (the SDK's `McpSyncServer`) and routes each request by the workspace its token or key names. The first
   pull request starts with a spike that proves this, and falls back to the MCP Java SDK directly if the starter
   can't host several servers.
 - **Only signed-in people, only their workspaces** (owner, 2026-11-28: "The ConXist MCP needs to be able to allow
