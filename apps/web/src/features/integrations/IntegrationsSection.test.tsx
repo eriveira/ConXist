@@ -7,7 +7,7 @@ import { SettingsPage } from '../settings/SettingsPage';
 
 const WORKSPACE = { id: 'w1', name: 'Acme Product', description: '', sourceCount: 0, createdAt: '2026-11-18T12:00:00Z' };
 const ID = '77777777-7777-7777-7777-777777777777';
-const KEY = 'nw_live_0123456789a9F2';
+const KEY = 'nw_fake_key_a9F2';
 const tool = (name: string, patch: Partial<ApiTool> = {}): ApiTool => ({
   name, section: 'Contacts', method: 'GET', path: `/${name}`, description: `About ${name}.`, params: [], reads: true,
   imported: true, allowed: false, usedBy: [], ...patch,
