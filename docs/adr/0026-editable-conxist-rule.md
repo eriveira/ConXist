@@ -1,6 +1,6 @@
 # 0026. A workspace may replace ConXist's rule, and tighten the copy guard
 
-- Status: Proposed
+- Status: Accepted (owner, 2026-11-28)
 - Date: 2026-11-28
 - Deciders: owner, Claude
 - Changes: ADR 0025, point 5 (ConXist's rule is no longer locked; how many words in a row count as copying is no
