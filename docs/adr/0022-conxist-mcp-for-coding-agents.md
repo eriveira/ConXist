@@ -6,6 +6,7 @@
 - Follows: ADR 0002 (the "MCP server" row: Spring AI, its own module), ADR 0017, 0019 to 0021 (the tools a workspace
   allows), ADR 0010 and 0011 (published agents and skills)
 - Mock: `App/mocks/coding-agents-mcp-v1/` (Settings › Coding agents)
+- Bundle format: `App/specs/conxist-bundle-v1/conxist-bundle.md` (thread "Redesign agent creation and setup")
 
 ## Context
 
@@ -40,30 +41,38 @@ Codex, any MCP client) can't reach any of it. ConXist has no sign-in yet and lis
   approval for every call (the owner's write-tool rule of 2026-11-27, applied here too). A tool the workspace stops
   allowing stops being shared.
 - **What a coding agent gets.**
-  - *Tools*: each shared tool, named as agents see it (`github__search_code`, `get_transcript`). Calls go through
-    `McpToolbox` exactly as test runs do: allowed checked again on every call, the same size and time caps, the
-    workspace's own credential. Results go back as tool results; the coding agent's model reads them as data.
-  - *Agents as tools*: each shared published agent is a tool `ask_<agent>` with one input (`request`, up to 20,000
-    characters) that runs the agent's **live** version once, on the workspace's provider key, with its tools,
-    sources and limits, and returns its answer. Drafts are never run from outside.
-  - *Skills as prompts*: each shared published skill is an MCP prompt named by its slug that returns the live
-    version's SKILL.md body, with variables filled in. Claude Code shows prompts as slash commands
-    (`/mcp__conxist__bug-report`).
+  - *Tools*: each shared tool, named as ConXist's agents see it (`<server>__<tool>`, for example
+    `github__search_code`; ConXist's own keep their plain name, `get_transcript`), so a coding agent sees
+    `mcp__conxist__github__search_code`. Calls go through `McpToolbox` exactly as test runs do: allowed checked again
+    on every call, the same size and time caps, the workspace's own credential. Results go back as tool results; the
+    coding agent's model reads them as data.
+  - *The bundle*: shared published agents and skills, in ConXist's provider-neutral format
+    (`App/specs/conxist-bundle-v1/conxist-bundle.md`): agents as Markdown with a `conxist:` block (version, effort,
+    skills, tools), skills as SKILL.md. It is served as the MCP resource `conxist://bundle` (and
+    `GET /api/coding-agents/bundle` with the same key). A ConXist plugin for Claude Code or Codex reads it and writes
+    each tool's native files (a subagent, a skill); the agent then runs inside the coding agent, on its own model,
+    and reaches tools only through this server. Variables are filled in; secrets never go in a bundle. Drafts never
+    go out.
+  - *Skills as prompts* too: each shared skill is also an MCP prompt that returns its live SKILL.md, so a client
+    without the plugin can still use it (Claude Code shows `/mcp__conxist__bug-report`).
+  - Later, if the owner wants it: `ask_<agent>`, a tool that runs a published agent inside ConXist on the
+    workspace's LLM key. Not in the first pull request.
 - **Changes take effect at once.** Publishing an agent or skill, restoring a version, archiving or deleting one,
   switching a share, unticking an allowed tool, removing a server or turning off a key each raise a Modulith event.
-  The `mcp` module listens and updates that workspace's server, which sends `notifications/tools/list_changed` or
-  `notifications/prompts/list_changed` to its open sessions. Nothing restarts. A call always reads the current state,
+  The `mcp` module listens and updates that workspace's server, which sends `notifications/tools/list_changed`,
+  `notifications/prompts/list_changed` or `notifications/resources/updated` (for `conxist://bundle`) to its open
+  sessions; the plugin then fetches the bundle again and replaces the files whose `version` changed. Nothing restarts. A call always reads the current state,
   so even a client that ignores the notification can't call something no longer shared. ConXist's own agents already
   read their definition on every run; this record adds nothing there.
 - **Guards.** The endpoint checks the `Origin` header (MCP's rule against DNS rebinding for local servers) and
-  refuses a request with no valid key. Each key may make 60 calls a minute and run one agent at a time. Every call is
+  refuses a request with no valid key. Each key may make 60 calls a minute. Every call is
   logged with tool, key name, workspace, time taken and outcome, never arguments or results; the Access keys tab shows
   last use and calls today.
 
 ## Consequences
 
-- A coding agent can read meetings, code, issues and email the workspace allows, ask a published agent, and pull a
-  team skill, with one line of setup, and sees changes without reconnecting.
+- A coding agent can read meetings, code, issues and email the workspace allows, and run the team's published agents
+  and skills as its own, with one line of setup, and sees changes without reconnecting.
 - A shared tool runs on the workspace's sign-in, not the caller's. Anyone holding a key gets that reach; the screens
   say so and the key is shown once.
 - The product page's "MCP access" line moves from coming soon to available once this ships (not before).
