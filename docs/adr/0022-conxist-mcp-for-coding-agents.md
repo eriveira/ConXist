@@ -29,11 +29,22 @@ Codex, any MCP client) can't reach any of it. ConXist has no sign-in yet and lis
   per workspace on first use (the SDK's `McpSyncServer`) and routes each request by its access key. The first
   pull request starts with a spike that proves this, and falls back to the MCP Java SDK directly if the starter
   can't host several servers.
-- **Sign-in: an access key per coding agent.** Settings › Coding agents › Create access key makes a key
-  (`cxk_live_` and 32 random characters), shown once. ConXist keeps only its SHA-256 and last 4 characters (table
-  `mcp_access_keys`, next migration: workspace, name, hash, last 4, created, last used, turned off). The client sends
-  it as `Authorization: Bearer`. A key reaches one workspace. Turning a key off ends its open sessions. When sign-in
-  exists, the MCP OAuth flow (the client signs in as a person) replaces pasted keys; keys stay for machines.
+- **Only signed-in people, only their workspaces** (owner, 2026-11-28: "The ConXist MCP needs to be able to allow
+  only authorized user to interact with authorized Workspaces"). ConXist has no sign-in yet, so this needs people and
+  workspace members first (ADR 0002 "Open": auth provider). Proposed:
+  - *People and members* come first, in their own record and pull request: a person signs in to ConXist; each
+    workspace has members with a role (Owner, Member). Settings › Coding agents and its switches are for Owners.
+  - *The MCP signs people in with MCP's own OAuth flow.* ConXist is the authorization server; a client like
+    Claude Code finds it from `/.well-known/oauth-protected-resource` (RFC 9728), registers (RFC 7591), and opens
+    ConXist's sign-in in the browser (PKCE S256, resource indicator RFC 8707 for `/mcp`). The person then picks
+    which of *their* workspaces this client may use. The token names the person and those workspaces, lives one
+    hour, and refreshes.
+  - *Every request checks again*: the person is still a member of that workspace, and the item is still shared.
+    Leaving a workspace, or losing access, cuts it off on the next call; open sessions for it are closed.
+  - *Access keys* stay for machines with no browser (CI, a build box): a key belongs to one person and one
+    workspace, is made by that person, stops working when their membership ends, and is listed on the Access
+    keys tab with its owner. Stored as SHA-256 and last 4 characters (table `mcp_access_keys`).
+  - Until sign-in exists, the MCP is not built.
 - **Nothing is shared until a person turns it on.** Settings › Coding agents › Shared lists, grouped by where they
   come from: ConXist's tools, each MCP server's and integration's tools *that the workspace already allows*, published
   agents, and published skills. Each has a switch, off by default (table `mcp_shares`: workspace, kind, reference).
@@ -73,10 +84,10 @@ Codex, any MCP client) can't reach any of it. ConXist has no sign-in yet and lis
 
 - A coding agent can read meetings, code, issues and email the workspace allows, and run the team's published agents
   and skills as its own, with one line of setup, and sees changes without reconnecting.
-- A shared tool runs on the workspace's sign-in, not the caller's. Anyone holding a key gets that reach; the screens
-  say so and the key is shown once.
+- A shared tool runs on the workspace's sign-in, not the caller's, so every member a workspace lets in gets that
+  reach; the screens say so. Sign-in and members come first, which moves the MCP after that work.
 - The product page's "MCP access" line moves from coming soon to available once this ships (not before).
 - Codex reads tool list changes when it next lists tools; whether it acts on `list_changed` mid-session is to be
   checked during the build.
-- REFACTOR LATER: OAuth sign-in for people; per-key shares if the owner wants one key to see less than another;
-  a run's cost shown to the caller; when ConXist is hosted, keys bound to a person and per-person rate limits.
+- REFACTOR LATER: shares per person or role, if the owner wants one member to see less than another; per-person
+  rate limits when ConXist is hosted.
