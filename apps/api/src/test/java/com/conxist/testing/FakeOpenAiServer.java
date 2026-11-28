@@ -149,7 +149,7 @@ public final class FakeOpenAiServer implements AutoCloseable {
         for (JsonNode tool : request.path("tools")) {
             offersSources |= "list_sources".equals(tool.path("function").path("name").asString());
         }
-        boolean firstTurn = request.path("messages").size() == 2; // the developer message and the first one
+        boolean firstTurn = request.path("messages").size() == 2; // the system message and the first one
         if (firstTurn && offersSources) {
             send(exchange, 200, completion(model, message(null, null, List.of(Map.of("id", "call_fake_1",
                     "type", "function", "function", Map.of("name", "list_sources", "arguments", badArguments ? "{not json" : "{}")))),

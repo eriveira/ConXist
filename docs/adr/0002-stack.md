@@ -4,6 +4,8 @@
 - Date: 2026-11-17
 - Decided by: Eugenio Riviera ("Back end we will build with Spring Boot using also Modulith", project thread, 2026-11-17)
 - Supersedes: the earlier proposal in this file (one TypeScript monorepo with Fastify).
+- Changed by: ADR 0024 (2026-11-28): model calls go through Spring AI's chat models, behind the `runs` module's
+  `ModelPort`.
 
 ## Context
 

@@ -6,6 +6,8 @@
 - Changes: ADR 0010's "agents name a setting (Fast, Balanced, Thorough), never a model"
 - Changed by: ADR 0015 (2026-11-25): template tiers removed; `conxist.runs.new-agents` is where new agents start.
 - Changed by: ADR 0018 (2026-11-27): Topics became Variables; `workspace_topics` was moved into a `topics` variable and set aside as `workspace_topics_v13` (V19).
+- Changed by: ADR 0024 (2026-11-28): OpenAI is called through Spring AI; the rules go as the system message, and tools
+  are strict only when every tool of a call is.
 - Amended 2026-11-25 (owner): LLM providers keeps only what adding a provider needs, Anthropic only; Settings lists
   every model the provider offers and the workspace ticks the ones agents may pick (mock
   `App/mocks/workspace-settings-v3/`). See "Allowed models" below.

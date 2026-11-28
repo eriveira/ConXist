@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * What the API's settings say about models (ADR 0014): the ones a workspace allows until it ticks its own, how to call
- * each (fallbacks, answer length), where a new agent starts, and the answer length of any other model a provider lists.
+ * each (its answer length), where a new agent starts, and the answer length of any other model a provider lists.
  */
 public record ModelCatalog(List<ModelOption> models, ModelStart newAgents, long defaultMaxTokens) {
 
@@ -26,10 +26,10 @@ public record ModelCatalog(List<ModelOption> models, ModelStart newAgents, long 
     }
 
     /**
-     * How to call a model: as the settings list it, or, for another model its provider offers, without fallbacks (not
-     * every model takes them) and with the default answer length.
+     * How to call a model: as the settings list it, or, for another model its provider offers, with the default answer
+     * length.
      */
     ModelOption callable(String provider, String id) {
-        return option(provider, id).orElseGet(() -> new ModelOption(provider, id, id, false, defaultMaxTokens));
+        return option(provider, id).orElseGet(() -> new ModelOption(provider, id, id, defaultMaxTokens));
     }
 }

@@ -6,11 +6,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.core.JsonValue;
 import com.anthropic.core.RequestOptions;
 import com.anthropic.errors.AnthropicException;
 import com.anthropic.errors.AnthropicIoException;
@@ -19,33 +16,27 @@ import com.anthropic.errors.OverloadedException;
 import com.anthropic.errors.PermissionDeniedException;
 import com.anthropic.errors.RateLimitException;
 import com.anthropic.errors.UnauthorizedException;
-import com.anthropic.models.beta.messages.BetaContentBlock;
-import com.anthropic.models.beta.messages.BetaContentBlockParam;
-import com.anthropic.models.beta.messages.BetaFallbacksParam;
-import com.anthropic.models.beta.messages.BetaMessage;
-import com.anthropic.models.beta.messages.BetaMessageParam;
-import com.anthropic.models.beta.messages.BetaOutputConfig;
-import com.anthropic.models.beta.messages.BetaStopReason;
-import com.anthropic.models.beta.messages.BetaTool;
-import com.anthropic.models.beta.messages.BetaToolResultBlockParam;
-import com.anthropic.models.beta.messages.MessageCreateParams;
+import com.anthropic.models.messages.OutputConfig;
 import com.anthropic.models.models.ModelListPage;
 import com.anthropic.models.models.ModelListParams;
 import com.conxist.runs.application.ApiKey;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.ProviderModel;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.anthropic.AnthropicChatOptions;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.prompt.Prompt;
 
 /**
- * Claude through the official Anthropic Java SDK (ADR 0012). Each turn is one Messages call: adaptive thinking (the
- * models' default), the agent's effort and strict tools. Earlier turns go back exactly as Claude sent them, thinking
- * included. Each call names the key to use (the workspace's own or
- * this computer's); keys are never logged.
+ * Claude through Spring AI's Anthropic chat model (ADR 0012, ADR 0024). Each turn is one Messages call with adaptive
+ * thinking (the models' default) and the agent's effort; earlier turns go back as Claude sent them, thinking included.
+ * Spring AI runs no tool here (SpringAiTurns). Each key has its own client, built by ConXist so that no key is ever read
+ * from this computer's environment; keys are never logged. Listing a key's models uses Anthropic's own library, which
+ * Spring AI does not cover.
  */
 public final class ClaudeModel implements ModelPort {
 
-    /** Server-side fallback when a model declines (the Anthropic API's beta), for the models that offer it. */
-    static final String FALLBACK_BETA = "server-side-fallback-2026-07-01";
     /** Models asked for per page, and the most pages read: a guard against a list that never ends. */
     private static final long PAGE_SIZE = 100;
     private static final int MAX_PAGES = 10;
@@ -57,32 +48,47 @@ public final class ClaudeModel implements ModelPort {
     private static final String BUSY = "Anthropic is busy right now. Try again in a minute.";
     private final String baseUrl;
     /**
-     * The SDK sets the key per client, so each key has its own, kept for its connections. Dropped clients are not
-     * closed: a call may still be using one, and their idle connections and threads end on their own.
+     * The library sets the key per client, so each key has its own client and chat model, kept for its connections.
+     * Dropped ones are not closed: a call may still be using one, and their idle connections and threads end on their
+     * own.
      */
-    private final Map<ApiKey, AnthropicClient> clients = new LinkedHashMap<>(16, 0.75f, true) {
+    private final Map<ApiKey, Keyed> clients = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<ApiKey, AnthropicClient> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<ApiKey, Keyed> eldest) {
             return size() > MAX_CLIENTS;
         }
     };
 
+    /** Anthropic's own address, set on every client so that none reads one from this computer's environment. */
+    static final String ANTHROPIC_URL = "https://api.anthropic.com";
+
     /** @param baseUrl the API's address; blank for Anthropic's own */
     public ClaudeModel(String baseUrl) {
-        this.baseUrl = baseUrl;
+        this.baseUrl = baseUrl == null || baseUrl.isBlank() ? ANTHROPIC_URL : baseUrl;
     }
 
-    private AnthropicClient client(ApiKey key) {
+    /** One key's client and the chat model that calls through it. */
+    record Keyed(AnthropicClient client, AnthropicChatModel chat) {
+    }
+
+    /**
+     * The key's client and chat model. ConXist builds both clients Spring AI uses, from the key and the configured
+     * address, so Spring AI never builds one from this computer's environment; the defaults say the same, in case it
+     * ever reads them.
+     */
+    Keyed keyed(ApiKey key) {
         synchronized (clients) {
             return clients.computeIfAbsent(key, any -> {
-                AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder()
+                AnthropicClient client = AnthropicOkHttpClient.builder()
                         .apiKey(key.value())
+                        .baseUrl(baseUrl)
                         // A run has its own time limit; a retry would hide a slow call inside it, so the person sees it.
-                        .maxRetries(0);
-                if (baseUrl != null && !baseUrl.isBlank()) {
-                    builder.baseUrl(baseUrl);
-                }
-                return builder.build();
+                        .maxRetries(0)
+                        .build();
+                AnthropicChatOptions defaults = (AnthropicChatOptions) AnthropicChatOptions.builder()
+                        .apiKey(key.value()).baseUrl(baseUrl).maxRetries(0).build();
+                return new Keyed(client, AnthropicChatModel.builder().anthropicClient(client)
+                        .anthropicClientAsync(client.async()).options(defaults).build());
             });
         }
     }
@@ -98,10 +104,12 @@ public final class ClaudeModel implements ModelPort {
     @Override
     public Turn next(ApiKey key, Request request) {
         try {
-            BetaMessage message = client(key).beta().messages().create(params(request),
-                    RequestOptions.builder().timeout(request.timeout()).build());
-            return turn(message);
-        } catch (AnthropicException | IllegalArgumentException | IllegalStateException failure) {
+            // An answer with no content at all comes back from Spring AI as no answer, its stop reason dropped: it is
+            // read as an empty answer (ADR 0024). A refusal that says why still comes back as one.
+            return SpringAiTurns.turn(keyed(key).chat().call(new Prompt(SpringAiTurns.messages(request), options(request))))
+                    .orElseGet(() -> new Turn("", List.of(), Stop.DONE, 0, 0, AssistantMessage.builder().content("").build()));
+        } catch (RuntimeException failure) {
+            // Spring AI wraps some failures in a plain RuntimeException whose message can quote a tool's schema.
             throw failure(failure, "run this test");
         }
     }
@@ -109,7 +117,7 @@ public final class ClaudeModel implements ModelPort {
     /** Reads every page within one time limit; a model id ConXist can't keep is left out, and only counted in the log. */
     @Override
     public List<ProviderModel> models(ApiKey key, Duration timeout) {
-        AnthropicClient client = client(key);
+        AnthropicClient client = keyed(key).client();
         long deadline = System.nanoTime() + timeout.toNanos();
         List<ProviderModel> models = new ArrayList<>();
         int skipped = 0;
@@ -163,97 +171,22 @@ public final class ClaudeModel implements ModelPort {
         };
     }
 
-    MessageCreateParams params(Request request) {
+    AnthropicChatOptions options(Request request) {
         ModelChoice model = request.model();
-        BetaOutputConfig.Builder output = BetaOutputConfig.builder().effort(effort(model.effort()));
-        MessageCreateParams.Builder params = MessageCreateParams.builder()
+        return (AnthropicChatOptions) AnthropicChatOptions.builder()
                 .model(model.id())
-                .maxTokens(model.maxTokens())
-                .system(request.system())
-                .outputConfig(output.build())
-                .addMessage(BetaMessageParam.ofUser(request.firstMessage()));
-        if (model.fallbacks()) {
-            params.addBeta(FALLBACK_BETA).fallbacks(BetaFallbacksParam.ofDefault());
-        }
-        request.tools().forEach(tool -> params.addTool(tool(tool)));
-        for (Exchange exchange : request.exchanges()) {
-            params.addMessage((BetaMessage) Objects.requireNonNull(exchange.turn().providerState()));
-            List<BetaContentBlockParam> results = exchange.results().stream()
-                    .map(result -> BetaContentBlockParam.ofToolResult(BetaToolResultBlockParam.builder()
-                            .toolUseId(result.callId()).content(result.content()).isError(result.error()).build()))
-                    .toList();
-            params.addMessage(BetaMessageParam.ofUserOfContentBlockParams(results));
-        }
-        return params.build();
-    }
-
-    private static BetaTool tool(ToolSpec spec) {
-        Map<String, Object> schema = spec.inputSchema();
-        BetaTool.InputSchema.Properties.Builder properties = BetaTool.InputSchema.Properties.builder();
-        // An MCP server's schema is its own: no properties, or a "required" that is not a list, must not break a run.
-        if (schema.get("properties") instanceof Map<?, ?> fields) {
-            fields.forEach((name, field) -> properties.putAdditionalProperty(String.valueOf(name), JsonValue.from(field)));
-        }
-        List<String> required = schema.get("required") instanceof List<?> names
-                ? names.stream().filter(String.class::isInstance).map(String.class::cast).toList()
-                : List.of();
-        BetaTool.InputSchema.Builder input = BetaTool.InputSchema.builder().properties(properties.build()).required(required);
-        if (spec.strict()) {
-            input.putAdditionalProperty("additionalProperties", JsonValue.from(false));
-        } else {
-            schema.forEach((key, value) -> {
-                if (!Set.of("type", "properties", "required").contains(key) && value != null) {
-                    input.putAdditionalProperty(key, JsonValue.from(value));
-                }
-            });
-        }
-        return BetaTool.builder()
-                .name(spec.name())
-                .description(spec.description())
-                .strict(spec.strict())
-                .inputSchema(input.build())
+                .maxTokens(Math.toIntExact(model.maxTokens()))
+                .effort(effort(model.effort()))
+                .timeout(request.timeout())
+                .toolCallbacks(SpringAiTurns.tools(request.tools(), spec -> ToolSchemas.forClaude(spec.inputSchema())))
                 .build();
     }
 
-    private static Turn turn(BetaMessage message) {
-        StringBuilder text = new StringBuilder();
-        List<ToolCall> calls = new ArrayList<>();
-        for (BetaContentBlock block : message.content()) {
-            block.text().ifPresent(part -> text.append(part.text()));
-            block.toolUse().ifPresent(use -> calls.add(new ToolCall(use.id(), use.name(), input(use._input()))));
-        }
-        Stop stop = message.stopReason().map(ClaudeModel::stop).orElse(Stop.DONE);
-        if (stop == Stop.TOOL_USE && calls.isEmpty()) {
-            stop = Stop.DONE;
-        }
-        return new Turn(text.toString().strip(), List.copyOf(calls), stop, message.usage().inputTokens(),
-                message.usage().outputTokens(), message);
-    }
-
-    private static Stop stop(BetaStopReason reason) {
-        if (reason.equals(BetaStopReason.TOOL_USE)) {
-            return Stop.TOOL_USE;
-        }
-        if (reason.equals(BetaStopReason.REFUSAL)) {
-            return Stop.REFUSED;
-        }
-        if (reason.equals(BetaStopReason.MAX_TOKENS) || reason.equals(BetaStopReason.MODEL_CONTEXT_WINDOW_EXCEEDED)) {
-            return Stop.CUT_OFF;
-        }
-        return Stop.DONE;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> input(JsonValue input) {
-        Map<String, Object> values = input.convert(Map.class);
-        return values == null ? Map.of() : values;
-    }
-
-    private static BetaOutputConfig.Effort effort(ModelChoice.Effort effort) {
+    private static OutputConfig.Effort effort(ModelChoice.Effort effort) {
         return switch (effort) {
-            case LOW -> BetaOutputConfig.Effort.LOW;
-            case MEDIUM -> BetaOutputConfig.Effort.MEDIUM;
-            case HIGH -> BetaOutputConfig.Effort.HIGH;
+            case LOW -> OutputConfig.Effort.LOW;
+            case MEDIUM -> OutputConfig.Effort.MEDIUM;
+            case HIGH -> OutputConfig.Effort.HIGH;
         };
     }
 }

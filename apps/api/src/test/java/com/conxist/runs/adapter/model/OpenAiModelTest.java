@@ -18,8 +18,8 @@ import tools.jackson.databind.JsonNode;
 
 class OpenAiModelTest {
 
-    private static final ModelChoice GPT = new ModelChoice("gpt-5.2", ModelChoice.Effort.HIGH, false, 16_000);
-    private static final ModelChoice GPT_41 = new ModelChoice("gpt-4.1", ModelChoice.Effort.LOW, false, 8_000);
+    private static final ModelChoice GPT = new ModelChoice("gpt-5.2", ModelChoice.Effort.HIGH, 16_000);
+    private static final ModelChoice GPT_41 = new ModelChoice("gpt-4.1", ModelChoice.Effort.LOW, 8_000);
     private static final ModelPort.ToolSpec LIST_SOURCES = new ModelPort.ToolSpec("list_sources", "Lists sources.",
             Map.of("type", "object", "properties", Map.of(), "required", List.of()));
     private static final ApiKey KEY = new ApiKey(FakeOpenAiServer.KEY);
@@ -47,7 +47,8 @@ class OpenAiModelTest {
         assertThat(sent.path("model").asString()).isEqualTo("gpt-5.2");
         assertThat(sent.path("reasoning_effort").asString()).isEqualTo("high");
         assertThat(sent.path("max_completion_tokens").asLong()).isEqualTo(16_000);
-        assertThat(sent.path("messages").get(0).path("role").asString()).isEqualTo("developer");
+        // Spring AI sends the rules as the system message, which OpenAI reads as the developer's (ADR 0024).
+        assertThat(sent.path("messages").get(0).path("role").asString()).isEqualTo("system");
         assertThat(sent.path("messages").get(0).path("content").asString()).isEqualTo("The rules.");
         assertThat(sent.has("temperature")).isFalse();
         assertThat(sent.path("store").isBoolean()).isTrue();
@@ -177,6 +178,28 @@ class OpenAiModelTest {
         assertThat(first.path("parameters").path("properties").isObject()).isTrue();
         assertThat(first.path("parameters").has("additionalProperties")).isFalse();
         assertThat(tools.get(1).path("function").path("parameters").path("$defs").has("Space")).isTrue();
+    }
+
+    @Test
+    void one_mcp_tool_turns_strict_mode_off_for_every_tool_of_the_call() {
+        ModelPort.ToolSpec mcp = new ModelPort.ToolSpec("docs__list_spaces", "Lists spaces.", Map.of("type", "object"),
+                false);
+        openAi.next(KEY, request(GPT, List.of(LIST_SOURCES, mcp), List.of()));
+        JsonNode mixed = server.requests().getLast().path("tools");
+        assertThat(mixed.get(0).path("function").path("strict").asBoolean()).isFalse();
+        assertThat(mixed.get(1).path("function").path("strict").asBoolean()).isFalse();
+
+        openAi.next(KEY, request(GPT, List.of(LIST_SOURCES), List.of()));
+        assertThat(server.requests().getLast().path("tools").get(0).path("function").path("strict").asBoolean()).isTrue();
+    }
+
+    @Test
+    void each_key_calls_through_conxists_own_client_with_that_key_never_one_from_the_environment() {
+        OpenAiModel.Keyed keyed = openAi.keyed(KEY);
+
+        assertThat(keyed.chat().getOptions().getApiKey()).isEqualTo(FakeOpenAiServer.KEY);
+        assertThat(keyed.chat().getOptions().getBaseUrl()).isEqualTo(server.baseUrl().toString());
+        assertThat(new OpenAiModel(" ").keyed(KEY).chat().getOptions().getBaseUrl()).isEqualTo(OpenAiModel.OPENAI_URL);
     }
 
     private static ModelPort.Request request(ModelChoice model, List<ModelPort.ToolSpec> tools,

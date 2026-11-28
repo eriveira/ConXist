@@ -2,20 +2,17 @@ package com.conxist.runs.adapter.model;
 
 import java.io.InterruptedIOException;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import com.conxist.runs.application.ApiKey;
 import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelPort;
 import com.conxist.runs.application.ProviderModel;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
-import com.openai.core.JsonValue;
-import com.openai.core.ObjectMappers;
 import com.openai.core.RequestOptions;
 import com.openai.errors.InternalServerException;
 import com.openai.errors.OpenAIException;
@@ -24,26 +21,20 @@ import com.openai.errors.OpenAIServiceException;
 import com.openai.errors.PermissionDeniedException;
 import com.openai.errors.RateLimitException;
 import com.openai.errors.UnauthorizedException;
-import com.openai.models.FunctionDefinition;
-import com.openai.models.FunctionParameters;
-import com.openai.models.ReasoningEffort;
-import com.openai.models.chat.completions.ChatCompletion;
-import com.openai.models.chat.completions.ChatCompletionCreateParams;
-import com.openai.models.chat.completions.ChatCompletionFunctionTool;
-import com.openai.models.chat.completions.ChatCompletionMessage;
-import com.openai.models.chat.completions.ChatCompletionMessageToolCall;
-import com.openai.models.chat.completions.ChatCompletionToolMessageParam;
 import com.openai.models.models.Model;
 import com.openai.models.models.ModelListParams;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 
 /**
- * OpenAI's GPT models through the official OpenAI Java SDK (ADR 0014). Each turn is one Chat Completions call with the
- * agent's effort as the reasoning effort (for models that reason) and strict function tools. Earlier turns go back
- * exactly as OpenAI sent them. Each call names the key to use (the workspace's own or this computer's); keys are never
- * logged.
+ * OpenAI's GPT models through Spring AI's OpenAI chat model (ADR 0014, ADR 0024). Each turn is one Chat Completions call
+ * with the agent's effort as the reasoning effort (for models that reason); tools are strict when every tool of the run
+ * is (ConXist's own are, an MCP server's schema is its own). Earlier turns go back as OpenAI sent them. Spring AI runs no
+ * tool here (SpringAiTurns). Each key has its own client, built by ConXist so that no key is read from this computer's
+ * environment; keys are never logged. Listing a key's models uses OpenAI's own library.
  */
 public final class OpenAiModel implements ModelPort {
 
@@ -58,30 +49,43 @@ public final class OpenAiModel implements ModelPort {
     private static final int MAX_CLIENTS = 32;
 
     private final String baseUrl;
-    /** The SDK sets the key per client, so each key has its own (as in ClaudeModel). */
-    private final Map<ApiKey, OpenAIClient> clients = new LinkedHashMap<>(16, 0.75f, true) {
+    /** The library sets the key per client, so each key has its own client and chat model (as in ClaudeModel). */
+    private final Map<ApiKey, Keyed> clients = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<ApiKey, OpenAIClient> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<ApiKey, Keyed> eldest) {
             return size() > MAX_CLIENTS;
         }
     };
 
+    /** OpenAI's own address, set on every client so that none reads one from this computer's environment. */
+    static final String OPENAI_URL = "https://api.openai.com/v1";
+
     /** @param baseUrl the API's address, ending in {@code /v1}; blank for OpenAI's own */
     public OpenAiModel(String baseUrl) {
-        this.baseUrl = baseUrl;
+        this.baseUrl = baseUrl == null || baseUrl.isBlank() ? OPENAI_URL : baseUrl;
     }
 
-    private OpenAIClient client(ApiKey key) {
+    /** One key's client and the chat model that calls through it. */
+    record Keyed(OpenAIClient client, OpenAiChatModel chat) {
+    }
+
+    /**
+     * The key's client and chat model. ConXist builds both clients Spring AI uses, from the key and the configured
+     * address, so Spring AI never builds one from this computer's environment (as in ClaudeModel).
+     */
+    Keyed keyed(ApiKey key) {
         synchronized (clients) {
             return clients.computeIfAbsent(key, any -> {
-                OpenAIOkHttpClient.Builder builder = OpenAIOkHttpClient.builder()
+                OpenAIClient client = OpenAIOkHttpClient.builder()
                         .apiKey(key.value())
+                        .baseUrl(baseUrl)
                         // A run has its own time limit; a retry would hide a slow call inside it.
-                        .maxRetries(0);
-                if (baseUrl != null && !baseUrl.isBlank()) {
-                    builder.baseUrl(baseUrl);
-                }
-                return builder.build();
+                        .maxRetries(0)
+                        .build();
+                OpenAiChatOptions defaults = (OpenAiChatOptions) OpenAiChatOptions.builder()
+                        .apiKey(key.value()).baseUrl(baseUrl).maxRetries(0).build();
+                return new Keyed(client, OpenAiChatModel.builder().openAiClient(client)
+                        .openAiClientAsync(client.async()).options(defaults).build());
             });
         }
     }
@@ -94,10 +98,10 @@ public final class OpenAiModel implements ModelPort {
     @Override
     public Turn next(ApiKey key, Request request) {
         try {
-            ChatCompletion completion = client(key).chat().completions().create(params(request),
-                    RequestOptions.builder().timeout(request.timeout()).build());
-            return turn(completion);
-        } catch (OpenAIException | IllegalArgumentException | IllegalStateException failure) {
+            return SpringAiTurns.turn(keyed(key).chat().call(new Prompt(SpringAiTurns.messages(request), options(request))))
+                    .orElseThrow(() -> new IllegalStateException("no choices"));
+        } catch (RuntimeException failure) {
+            // Spring AI wraps some failures in a plain RuntimeException whose message can quote a tool's schema.
             throw failure(failure, "run this test");
         }
     }
@@ -110,7 +114,7 @@ public final class OpenAiModel implements ModelPort {
     public List<ProviderModel> models(ApiKey key, Duration timeout) {
         List<Model> listed;
         try {
-            listed = client(key).models().list(ModelListParams.none(),
+            listed = keyed(key).client().models().list(ModelListParams.none(),
                     RequestOptions.builder().timeout(timeout).build()).data();
         } catch (OpenAIException | IllegalArgumentException | IllegalStateException failure) {
             throw failure(failure, "list its models");
@@ -142,108 +146,37 @@ public final class OpenAiModel implements ModelPort {
         };
     }
 
-    ChatCompletionCreateParams params(Request request) {
+    OpenAiChatOptions options(Request request) {
         ModelChoice model = request.model();
-        ChatCompletionCreateParams.Builder params = ChatCompletionCreateParams.builder()
+        // Strict mode holds every tool of a call; an MCP server's schema rarely meets it, so one such tool turns it off.
+        boolean strict = !request.tools().isEmpty() && request.tools().stream().allMatch(ToolSpec::strict);
+        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder()
                 .model(model.id())
-                .maxCompletionTokens(model.maxTokens())
+                .maxCompletionTokens(Math.toIntExact(model.maxTokens()))
                 // Nothing of a run is kept (ADR 0012): OpenAI is asked not to store the completion either.
                 .store(false)
-                .addDeveloperMessage(request.system())
-                .addUserMessage(request.firstMessage());
+                .timeout(request.timeout())
+                .toolCallbacks(SpringAiTurns.tools(request.tools(), OpenAiModel::schema));
+        if (!request.tools().isEmpty()) {
+            options.strict(strict);
+        }
         if (OpenAiModels.reasons(model.id())) {
-            params.reasoningEffort(effort(model.effort()));
+            options.reasoningEffort(effort(model.effort()));
         }
-        request.tools().forEach(tool -> params.addTool(tool(tool)));
-        for (Exchange exchange : request.exchanges()) {
-            params.addMessage((ChatCompletionMessage) Objects.requireNonNull(exchange.turn().providerState()));
-            exchange.results().forEach(result -> params.addMessage(ChatCompletionToolMessageParam.builder()
-                    .toolCallId(result.callId())
-                    // Chat Completions has no error flag on a tool result; a failed tool's text already says so.
-                    .content(result.content())
-                    .build()));
-        }
-        return params.build();
+        return (OpenAiChatOptions) options.build();
     }
 
-    private static ChatCompletionFunctionTool tool(ToolSpec spec) {
-        FunctionParameters.Builder parameters = FunctionParameters.builder();
-        spec.inputSchema().forEach((key, value) -> {
-            if (value != null) {
-                parameters.putAdditionalProperty(key, JsonValue.from(value));
-            }
-        });
-        if (!spec.inputSchema().containsKey("properties")) {
-            parameters.putAdditionalProperty("properties", JsonValue.from(Map.of()));
+    /** OpenAI refuses a function whose schema has no {@code properties}, which an MCP server may leave out. */
+    private static Map<String, Object> schema(ToolSpec spec) {
+        if (spec.inputSchema().containsKey("properties")) {
+            return spec.inputSchema();
         }
-        // Strict mode needs every property listed as required, which an MCP server's schema rarely is.
-        if (spec.strict()) {
-            parameters.putAdditionalProperty("additionalProperties", JsonValue.from(false));
-        }
-        return ChatCompletionFunctionTool.builder()
-                .function(FunctionDefinition.builder()
-                        .name(spec.name())
-                        .description(spec.description())
-                        .strict(spec.strict())
-                        .parameters(parameters.build())
-                        .build())
-                .build();
+        Map<String, Object> schema = new LinkedHashMap<>(spec.inputSchema());
+        schema.put("properties", Map.of());
+        return schema;
     }
 
-    private static Turn turn(ChatCompletion completion) {
-        if (completion.choices().isEmpty()) {
-            throw new IllegalStateException("no choices");
-        }
-        ChatCompletion.Choice choice = completion.choices().getFirst();
-        ChatCompletionMessage message = choice.message();
-        List<ToolCall> calls = new ArrayList<>();
-        for (ChatCompletionMessageToolCall call : message.toolCalls().orElse(List.of())) {
-            call.function().ifPresent(function -> calls.add(new ToolCall(function.id(), function.function().name(),
-                    input(function.function().arguments()))));
-        }
-        Stop stop = stop(choice.finishReason(), message);
-        if (stop == Stop.TOOL_USE && calls.isEmpty()) {
-            stop = Stop.DONE;
-        }
-        long input = completion.usage().map(u -> u.promptTokens()).orElse(0L);
-        long output = completion.usage().map(u -> u.completionTokens()).orElse(0L);
-        return new Turn(message.content().orElse("").strip(), List.copyOf(calls), stop, input, output, message);
-    }
-
-    private static Stop stop(ChatCompletion.Choice.FinishReason reason, ChatCompletionMessage message) {
-        if (message.refusal().filter(text -> !text.isBlank()).isPresent()
-                || reason.equals(ChatCompletion.Choice.FinishReason.CONTENT_FILTER)) {
-            return Stop.REFUSED;
-        }
-        if (reason.equals(ChatCompletion.Choice.FinishReason.TOOL_CALLS)) {
-            return Stop.TOOL_USE;
-        }
-        if (reason.equals(ChatCompletion.Choice.FinishReason.LENGTH)) {
-            return Stop.CUT_OFF;
-        }
-        return Stop.DONE;
-    }
-
-    /** A tool call's arguments, which OpenAI sends as JSON text. */
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> input(String arguments) {
-        if (arguments == null || arguments.isBlank()) {
-            return Map.of();
-        }
-        try {
-            Map<String, Object> values = ObjectMappers.jsonMapper().readValue(arguments, Map.class);
-            return values == null ? Map.of() : values;
-        } catch (JsonProcessingException unreadable) {
-            // The arguments are customer data, so only where reading stopped is kept, not the text.
-            throw new IllegalStateException("unreadable tool arguments at " + unreadable.getLocation().offsetDescription());
-        }
-    }
-
-    private static ReasoningEffort effort(ModelChoice.Effort effort) {
-        return switch (effort) {
-            case LOW -> ReasoningEffort.LOW;
-            case MEDIUM -> ReasoningEffort.MEDIUM;
-            case HIGH -> ReasoningEffort.HIGH;
-        };
+    private static String effort(ModelChoice.Effort effort) {
+        return effort.name().toLowerCase(Locale.ROOT);
     }
 }

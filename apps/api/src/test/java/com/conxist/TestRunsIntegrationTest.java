@@ -127,9 +127,10 @@ class TestRunsIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(openAi.requests().getLast().path("reasoning_effort").asString())
                 .isEqualTo("high");
         org.assertj.core.api.Assertions.assertThat(claude.requests()).hasSize(claudeBefore);
-        // The run's rules go as the developer message; the meeting and each tool result stay marked as data.
+        // The run's rules go as the system message (Spring AI, ADR 0024); the meeting and each tool result stay marked
+        // as data.
         tools.jackson.databind.JsonNode messages = openAi.requests().getLast().path("messages");
-        org.assertj.core.api.Assertions.assertThat(messages.get(0).path("role").asString()).isEqualTo("developer");
+        org.assertj.core.api.Assertions.assertThat(messages.get(0).path("role").asString()).isEqualTo("system");
         org.assertj.core.api.Assertions.assertThat(messages.get(0).path("content").asString())
                 .startsWith("You are an agent in ConXist");
         org.assertj.core.api.Assertions.assertThat(messages.get(1).path("content").asString())

@@ -218,7 +218,7 @@ public final class LlmProviders implements AgentModels {
         log.info("Workspace {} opened its {} key ({}) for a test run of agent {}", workspace.id(), agent.provider(),
                 key.get().source(), agent.id());
         return Optional.of(new Call(port.get(), key.get().value(), new ModelChoice(option.id(),
-                ModelChoice.Effort.valueOf(agent.effort()), option.fallbacks(), option.maxTokens())));
+                ModelChoice.Effort.valueOf(agent.effort()), option.maxTokens())));
     }
 
     /** The key that calls the provider for this workspace, if it has one, opened. */

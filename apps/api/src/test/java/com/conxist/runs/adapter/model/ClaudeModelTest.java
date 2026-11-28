@@ -17,8 +17,8 @@ import tools.jackson.databind.JsonNode;
 
 class ClaudeModelTest {
 
-    private static final ModelChoice SONNET = new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.MEDIUM, true, 16_000);
-    private static final ModelChoice HAIKU = new ModelChoice("claude-haiku-5-5", ModelChoice.Effort.LOW, false, 16_000);
+    private static final ModelChoice SONNET = new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.MEDIUM, 16_000);
+    private static final ModelChoice HAIKU = new ModelChoice("claude-haiku-5-5", ModelChoice.Effort.LOW, 16_000);
     private static final ModelPort.ToolSpec LIST_SOURCES = new ModelPort.ToolSpec("list_sources", "Lists sources.",
             Map.of("type", "object", "properties", Map.of(), "required", List.of(), "additionalProperties", false));
 
@@ -55,12 +55,13 @@ class ClaudeModelTest {
         assertThat(sent.path("system").asString()).isEqualTo("The rules.");
         assertThat(sent.path("output_config").path("effort").asString()).isEqualTo("medium");
         assertThat(sent.path("output_config").has("format")).isFalse();
-        assertThat(sent.path("fallbacks").asString()).isEqualTo("default");
+        // Spring AI calls Claude without the fallback model or strict tools (ADR 0024); ConXist checks each input itself.
+        assertThat(sent.has("fallbacks")).isFalse();
         assertThat(sent.has("thinking")).isFalse();
         assertThat(sent.has("temperature")).isFalse();
         JsonNode tool = sent.path("tools").get(0);
-        assertThat(tool.path("strict").asBoolean()).isTrue();
-        assertThat(tool.path("input_schema").path("additionalProperties").asBoolean()).isFalse();
+        assertThat(tool.path("name").asString()).isEqualTo("list_sources");
+        assertThat(tool.path("input_schema").path("properties").isObject()).isTrue();
 
         JsonNode second = server.requests().get(1).path("messages");
         assertThat(second).hasSize(3);
@@ -72,12 +73,11 @@ class ClaudeModelTest {
     }
 
     @Test
-    void a_model_without_fallbacks_sends_none() {
+    void the_agents_effort_reaches_claude() {
         ModelPort.Turn turn = claude.next(KEY, request(HAIKU, List.of(), List.of()));
 
         assertThat(turn.text()).isEqualTo("A short answer from the fake model.");
         JsonNode sent = server.requests().get(0);
-        assertThat(sent.has("fallbacks")).isFalse();
         assertThat(sent.path("output_config").has("format")).isFalse();
         assertThat(sent.path("output_config").path("effort").asString()).isEqualTo("low");
     }
@@ -126,7 +126,7 @@ class ClaudeModelTest {
     }
 
     @Test
-    void an_mcp_servers_own_schema_is_sent_as_it_is_without_strict_mode() {
+    void an_mcp_servers_own_schema_keeps_what_its_definitions_say() {
         ModelPort.ToolSpec bare = new ModelPort.ToolSpec("docs__list_spaces", "Lists spaces.", Map.of("type", "object"),
                 false);
         ModelPort.ToolSpec odd = new ModelPort.ToolSpec("docs__get_space", "Gets a space.", Map.of("type", "object",
@@ -135,12 +135,46 @@ class ClaudeModelTest {
         claude.next(KEY, request(HAIKU, List.of(bare, odd), List.of()));
 
         JsonNode tools = server.requests().get(0).path("tools");
-        assertThat(tools.get(0).path("strict").asBoolean()).isFalse();
         assertThat(tools.get(0).path("input_schema").path("properties").isObject()).isTrue();
-        assertThat(tools.get(0).path("input_schema").has("additionalProperties")).isFalse();
+        // Spring AI sends only properties and required, so a pointer into $defs is replaced by what it points to.
         JsonNode odd2 = tools.get(1).path("input_schema");
+        assertThat(odd2.path("properties").path("id").path("type").asString()).isEqualTo("string");
         assertThat(odd2.path("required").isEmpty()).isTrue();
-        assertThat(odd2.path("$defs").has("Space")).isTrue();
+    }
+
+    @Test
+    void an_answer_with_no_content_is_an_empty_answer() {
+        server.sayNothing();
+
+        ModelPort.Turn turn = claude.next(KEY, request(HAIKU, List.of(), List.of()));
+
+        assertThat(turn.stop()).isEqualTo(ModelPort.Stop.DONE);
+        assertThat(turn.text()).isEmpty();
+    }
+
+    @Test
+    void each_key_calls_through_conxists_own_client_with_that_key_never_one_from_the_environment() {
+        ClaudeModel.Keyed keyed = claude.keyed(KEY);
+
+        assertThat(keyed.chat().getAnthropicClient()).isSameAs(keyed.client());
+        assertThat(keyed.chat().getOptions().getApiKey()).isEqualTo(FakeClaudeServer.KEY);
+        assertThat(keyed.chat().getOptions().getBaseUrl()).isEqualTo(server.baseUrl().toString());
+        assertThat(claude.keyed(WRONG).client()).isNotSameAs(keyed.client());
+        assertThat(new ClaudeModel("").keyed(KEY).chat().getOptions().getBaseUrl())
+                .isEqualTo(ClaudeModel.ANTHROPIC_URL);
+    }
+
+    @Test
+    void a_schema_spring_ai_could_not_read_ends_the_turn_as_a_failure_that_quotes_nothing() {
+        List<Object> required = new java.util.ArrayList<>(List.of("id"));
+        required.add(Map.of("secret", "schema words"));
+        ModelPort.ToolSpec odd = new ModelPort.ToolSpec("docs__get", "Gets.", Map.of("type", "object",
+                "properties", Map.of("id", Map.of("type", "string")), "required", required), false);
+
+        // Only the text names are sent, so the call goes through.
+        assertThat(claude.next(KEY, request(HAIKU, List.of(odd), List.of())).text()).isNotBlank();
+        assertThat(server.requests().getLast().path("tools").get(0).path("input_schema").path("required"))
+                .singleElement().satisfies(name -> assertThat(name.asString()).isEqualTo("id"));
     }
 
     private static ModelPort.Request request(ModelChoice model, List<ModelPort.ToolSpec> tools,
