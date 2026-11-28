@@ -40,8 +40,9 @@ public interface ModelPort {
     }
 
     /**
-     * A tool the model may call. {@code strict} asks the provider to hold the model to the schema exactly; ConXist's own
-     * tools are written for that, while an MCP server's schema is its own and is passed as it is.
+     * A tool the model may call. {@code strict} says the schema is written for a provider's strict mode, as ConXist's own
+     * tools are; an MCP server's schema is its own. A provider uses it where it can: OpenAI holds a call to its tools'
+     * schemas when every tool of the call is strict, and Claude is not sent it (ADR 0024).
      */
     record ToolSpec(String name, String description, Map<String, Object> inputSchema, boolean strict) {
 

@@ -21,9 +21,9 @@ final class TestModels {
     }
 
     static ModelCatalog catalog() {
-        return new ModelCatalog(List.of(new ModelOption(ANTHROPIC, HAIKU, "Claude Haiku 5.5", false, 8_000),
-                new ModelOption(ANTHROPIC, SONNET, "Claude Sonnet 5.5", true, 16_000),
-                new ModelOption(ANTHROPIC, OPUS, "Claude Opus 5.5", true, 16_000)),
+        return new ModelCatalog(List.of(new ModelOption(ANTHROPIC, HAIKU, "Claude Haiku 5.5", 8_000),
+                new ModelOption(ANTHROPIC, SONNET, "Claude Sonnet 5.5", 16_000),
+                new ModelOption(ANTHROPIC, OPUS, "Claude Opus 5.5", 16_000)),
                 new ModelStart(ANTHROPIC, SONNET, ModelChoice.Effort.MEDIUM), 16_000);
     }
 

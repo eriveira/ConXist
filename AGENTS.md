@@ -76,8 +76,8 @@ Sources page does not show it for now, owner decision 2026-11-17).
   and links those agents. Nothing uses an agent yet; flows and schedules will plug
   into the `AgentUses` port.
 - Test run (ADR 0012, step 3): a `runs` module and the Try it panel on an agent's page. It runs the saved draft once on
-  pasted text, a text file (read in the browser, up to 150,000 characters) or a picked meeting (ADR 0022), with the agent's model (Claude through the Anthropic Java SDK, or OpenAI through the OpenAI Java
-  SDK), with the draft's tools and the workspace's run limits (Settings › General, V25, ADR 0023), and shows the
+  pasted text, a text file (read in the browser, up to 150,000 characters) or a picked meeting (ADR 0022), with the agent's model (Claude or OpenAI, each called through Spring AI's chat
+  model, ADR 0024), with the draft's tools and the workspace's run limits (Settings › General, V25, ADR 0023), and shows the
   answer as plain text and each step. Nothing of a run is kept. It runs on the workspace's key for that provider (below);
   without one the panel links to Settings, and agents can't be published either, since their provider is not
   connected (ADR 0014). `mvn spring-boot:test-run` also runs a fake Claude that takes any key starting with

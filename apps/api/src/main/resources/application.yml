@@ -19,6 +19,10 @@ logging:
   structured:
     format:
       console: ecs
+  level:
+    # Spring AI logs a whole prompt (meetings, instructions, tool results) at DEBUG; customer data is never logged in
+    # full (AGENTS.md), so it stays at WARN even when the rest of Spring is turned up.
+    org.springframework.ai: WARN
 
 server:
   # No sign-in yet (ADR 0002): the API only listens on this machine, and refuses to start otherwise.
@@ -90,24 +94,21 @@ conxist:
       - provider: anthropic
         id: claude-haiku-5-5
         label: Claude Haiku 5.5
-        fallbacks: false # Haiku has no server-side fallback
         max-tokens: 8000
       - provider: anthropic
         id: claude-sonnet-5-5
         label: Claude Sonnet 5.5
-        fallbacks: true
         max-tokens: 16000
       - provider: anthropic
         id: claude-opus-5-5
         label: Claude Opus 5.5
-        fallbacks: true
         # A call that does not stream; more room than this needs streaming (ADR 0012, later).
         max-tokens: 16000
     # Where a workspace's new agents start until it picks its own default in Settings.
     new-agents:
       model: claude-sonnet-5-5
       effort: MEDIUM
-    # The answer length of a model the provider offers that is not listed above (no fallbacks for it).
+    # The answer length of a model the provider offers that is not listed above.
     default-max-tokens: 16000
     # How long the provider's model list is kept before Settings asks again, how old it must be before Refresh asks
     # again, and how long asking may take (all pages together).

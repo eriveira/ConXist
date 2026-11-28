@@ -157,7 +157,7 @@ class StartTestRunTest {
         assertThat(result.model()).isEqualTo("claude-opus-5-5");
         assertThat(result.effort()).isEqualTo("LOW");
         assertThat(model.requests.get(0).model())
-                .isEqualTo(new ModelChoice("claude-opus-5-5", ModelChoice.Effort.LOW, true, 16_000));
+                .isEqualTo(new ModelChoice("claude-opus-5-5", ModelChoice.Effort.LOW, 16_000));
     }
 
 
@@ -208,7 +208,7 @@ class StartTestRunTest {
         assertThat(result.steps()).extracting(TestRunResult.Step::kind).containsExactly("MODEL", "TOOL", "MODEL");
         assertThat(result.steps().get(1).ok()).isTrue();
         ModelPort.Request first = model.requests.get(0);
-        assertThat(first.model()).isEqualTo(new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.MEDIUM, true, 16_000));
+        assertThat(first.model()).isEqualTo(new ModelChoice("claude-sonnet-5-5", ModelChoice.Effort.MEDIUM, 16_000));
         assertThat(first.firstMessage()).contains("<meeting title=\"Weekly sync\">").contains("guest checkout");
         assertThat(first.tools()).extracting(ModelPort.ToolSpec::name).containsExactly("list_sources", "get_transcript");
         assertThat(first.system()).contains("Give back your answer in plain text.");

@@ -12,6 +12,7 @@ import com.conxist.runs.application.ModelChoice;
 import com.conxist.runs.application.ModelOption;
 import com.conxist.runs.application.ModelStart;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -39,8 +40,8 @@ public record RunsProperties(
         @NotNull Duration modelListMinRefresh,
         @NotNull Duration modelListTimeout) {
 
-    public record Model(@NotBlank String provider, @NotBlank String id, @NotBlank String label, boolean fallbacks,
-            @Positive long maxTokens) {
+    public record Model(@NotBlank String provider, @NotBlank String id, @NotBlank String label,
+            @Positive @Max(Integer.MAX_VALUE) long maxTokens) {
     }
 
     /** Where a new agent starts until its workspace picks a default: one of {@code models}, by id, and an effort. */
@@ -50,7 +51,7 @@ public record RunsProperties(
     /** Fails at start when new agents would start on a model that is not listed. */
     ModelCatalog catalog() {
         List<ModelOption> options = models.stream()
-                .map(m -> new ModelOption(m.provider(), m.id(), m.label(), m.fallbacks(), m.maxTokens())).toList();
+                .map(m -> new ModelOption(m.provider(), m.id(), m.label(), m.maxTokens())).toList();
         ModelOption model = options.stream().filter(o -> o.id().equals(newAgents.model())).findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "conxist.runs.new-agents: the model must be one of conxist.runs.models: " + newAgents.model()));

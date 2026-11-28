@@ -145,17 +145,17 @@ class LlmProvidersTest {
         LlmProviders.Call call = providers.callFor(brief("anthropic", TestModels.HAIKU, "HIGH")).orElseThrow();
 
         assertThat(call.port()).isSameAs(anthropic);
-        assertThat(call.choice()).isEqualTo(new ModelChoice(TestModels.HAIKU, ModelChoice.Effort.HIGH, false, 8_000));
+        assertThat(call.choice()).isEqualTo(new ModelChoice(TestModels.HAIKU, ModelChoice.Effort.HIGH, 8_000));
         assertThat(providers.callFor(brief(null, null, null))).isEmpty();
         assertThat(providers.callFor(brief("anthropic", "claude-retired", "LOW"))).isEmpty();
     }
 
     @Test
-    void a_ticked_model_the_settings_do_not_list_runs_without_fallbacks_at_the_default_length() {
+    void a_ticked_model_the_settings_do_not_list_runs_at_the_default_length() {
         tick(TestPort.FABLE, true);
 
         assertThat(providers.callFor(brief("anthropic", TestPort.FABLE.id(), "LOW")).orElseThrow().choice())
-                .isEqualTo(new ModelChoice(TestPort.FABLE.id(), ModelChoice.Effort.LOW, false, 16_000));
+                .isEqualTo(new ModelChoice(TestPort.FABLE.id(), ModelChoice.Effort.LOW, 16_000));
     }
 
     @Test

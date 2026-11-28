@@ -31,6 +31,7 @@ public final class FakeClaudeServer implements AutoCloseable {
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<JsonNode> requests = Collections.synchronizedList(new ArrayList<>());
     private volatile String declineWith;
+    private volatile boolean silent;
     private volatile java.time.Duration wait;
     private volatile boolean garbled;
 
@@ -59,9 +60,14 @@ public final class FakeClaudeServer implements AutoCloseable {
         garbled = true;
     }
 
-    /** From now on every answer is a refusal, as when a model declines. */
+    /** From now on every answer is a refusal that says why, as when a model declines. */
     public void decline() {
         declineWith = "refusal";
+    }
+
+    /** From now on every answer ends without any content. */
+    public void sayNothing() {
+        silent = true;
     }
 
     /** The models the fake offers, newest first, as Anthropic's Models API lists them. */
@@ -118,7 +124,12 @@ public final class FakeClaudeServer implements AutoCloseable {
         }
         String model = request.path("model").asString();
         if (declineWith != null) {
-            send(exchange, 200, message(model, List.of(), "refusal"));
+            send(exchange, 200, message(model, List.of(Map.of("type", "text", "text", "I can't help with that.")),
+                    declineWith));
+            return;
+        }
+        if (silent) {
+            send(exchange, 200, message(model, List.of(), "end_turn"));
             return;
         }
         boolean offersSources = false;

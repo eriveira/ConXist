@@ -23,6 +23,7 @@
     <archunit.version>1.5.1</archunit.version>
     <anthropic.version>3.12.0</anthropic.version>
     <openai.version>4.105.0</openai.version>
+    <spring-ai.version>2.1.0</spring-ai.version>
   </properties>
 
   <dependencyManagement>
@@ -34,6 +35,24 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <dependency>
+        <groupId>org.springframework.ai</groupId>
+        <artifactId>spring-ai-bom</artifactId>
+        <version>${spring-ai.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Spring AI ships older provider libraries; one version of each, the one ConXist lists models with (ADR 0024) -->
+      <dependency>
+        <groupId>com.anthropic</groupId>
+        <artifactId>anthropic-java-core</artifactId>
+        <version>${anthropic.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.openai</groupId>
+        <artifactId>openai-java-core</artifactId>
+        <version>${openai.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -43,13 +62,22 @@
       <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>
     <dependency>
-      <!-- Claude, the first model provider; used only by the runs module's model adapter (ADR 0012) -->
+      <!-- Every model call goes through Spring AI's chat models (ADR 0024); only the runs module's model adapters use them -->
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-anthropic</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.ai</groupId>
+      <artifactId>spring-ai-openai</artifactId>
+    </dependency>
+    <dependency>
+      <!-- Claude's own library: the key's client, its model list and its errors (ADR 0012, 0024) -->
       <groupId>com.anthropic</groupId>
       <artifactId>anthropic-java</artifactId>
       <version>${anthropic.version}</version>
     </dependency>
     <dependency>
-      <!-- OpenAI, the second model provider; used only by the runs module's model adapter (ADR 0014) -->
+      <!-- OpenAI's own library: the key's client, its model list and its errors (ADR 0014, 0024) -->
       <groupId>com.openai</groupId>
       <artifactId>openai-java</artifactId>
       <version>${openai.version}</version>
