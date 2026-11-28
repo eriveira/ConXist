@@ -12,11 +12,11 @@ import java.util.stream.Collectors;
 import com.conxist.agents.AgentBrief;
 import com.conxist.agents.AgentBriefs;
 import com.conxist.capture.MeetingLibrary;
+import com.conxist.connectors.McpToolbox;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.WorkspaceVariables;
 import com.conxist.platform.NotFound;
 import com.conxist.platform.RuleViolation;
-import com.conxist.connectors.McpToolbox;
 import com.conxist.runs.domain.CopyGuard;
 import com.conxist.runs.domain.RunLimits;
 import com.conxist.runs.domain.RunOutcome;
@@ -34,7 +34,6 @@ public final class StartTestRun {
     private static final System.Logger log = System.getLogger(StartTestRun.class.getName());
     /** The most tool answer text one run may read, in characters: about three long meetings. */
     static final int MAX_TOOL_TEXT = 400_000;
-    private static final String LIMIT = String.format(java.util.Locale.ENGLISH, "%,d", CopyGuard.MAX_CHANGE_CHARACTERS);
 
     private final AgentBriefs agents;
     private final MeetingLibrary library;
@@ -222,15 +221,26 @@ public final class StartTestRun {
         }
 
         private ModelPort.ToolResult call(ModelPort.ToolCall call) {
-            if (FoundRequests.isReport(call)) {
-                return found.report(call);
-            }
             Instant at = clock.instant();
-            Optional<McpToolbox.OfferedTool> outside = tools.outside(call.name(), scope);
-            Optional<CopyGuard.Refusal> refusal = outside.flatMap(tool -> guard.check(
-                    call.input() == null ? Map.of() : call.input(), tool.changesThings()));
-            if (refusal.isPresent()) {
-                return refuse(call, refusal.get(), at);
+            if (FoundRequests.isReport(call)) {
+                ModelPort.ToolResult reported = found.report(call);
+                logCall(call, reported.error() ? errorCode(reported) : "ok", since(at));
+                return reported;
+            }
+            if (tools.isOutside(call.name(), scope)) {
+                Map<String, Object> input = call.input() == null ? Map.of() : call.input();
+                if (String.valueOf(input).length() > McpToolbox.MAX_ARGUMENT_CHARACTERS) {
+                    return refuse(call, "input-too-long", "ConXist did not send this: one call may hold up to "
+                            + RunPrompt.inputLimitText() + " characters. Write it shorter.", "Refused by ConXist: it"
+                            + " holds more than " + RunPrompt.inputLimitText() + " characters.", at);
+                }
+                Optional<String> copied = guard.copiedFrom(input);
+                if (copied.isPresent()) {
+                    return refuse(call, "copy-refused", "ConXist did not send this: it repeats a passage of what a"
+                            + " tool returned. Send only what the agent instructions call for, or text of the meeting"
+                            + " you were given.", "Refused by ConXist: it copies a long passage from " + copied.get()
+                            + ".", at);
+                }
             }
             RunTools.Called called = tools.call(call, scope);
             ModelPort.ToolResult result = called.result();
@@ -250,22 +260,13 @@ public final class StartTestRun {
         }
 
         /**
-         * A call the copy guard stopped: it is not sent, counts as a tool call, and shows as a refused step. The model is
-         * told why, without the name of what it read.
+         * A call ConXist stopped before it left (ADR 0025): it is not sent, counts as a tool call, and shows as a
+         * refused step. The model is told why, without the name of what it read.
          */
-        private ModelPort.ToolResult refuse(ModelPort.ToolCall call, CopyGuard.Refusal refusal, Instant at) {
+        private ModelPort.ToolResult refuse(ModelPort.ToolCall call, String code, String toModel, String toPerson,
+                Instant at) {
             toolCalls++;
             refused++;
-            boolean copies = refusal.reason() == CopyGuard.Refusal.Reason.COPIES_SOURCE;
-            String code = copies ? "copy-refused" : "change-too-long";
-            String toModel = copies
-                    ? "ConXist did not send this: it repeats a passage of what a tool returned. Send only your own"
-                            + " short words, or text of the meeting you were given. Do not try again with that text."
-                    : "ConXist did not send this: a change may hold up to " + LIMIT + " characters of text. Write it"
-                            + " shorter, in your own words.";
-            String toPerson = copies
-                    ? "Refused by ConXist: it copies a long passage from " + refusal.from() + "."
-                    : "Refused by ConXist: it holds more than " + LIMIT + " characters of text.";
             long millis = since(at);
             steps.add(new TestRunResult.Step("TOOL", call.name(), ids(call.input()), false, toPerson, millis));
             logCall(call, code, millis);

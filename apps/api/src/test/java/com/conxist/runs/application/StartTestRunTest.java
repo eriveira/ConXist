@@ -425,9 +425,9 @@ class StartTestRunTest {
 
         assertThat(mcpCalls).containsExactly(Map.of("body", PRICING));
         assertThat(model.requests.get(1).exchanges().get(0).results().get(1).content())
-                .startsWith("Error change-too-long");
+                .startsWith("Error input-too-long");
         assertThat(result.steps()).filteredOn(step -> step.refusal() != null).singleElement()
-                .satisfies(step -> assertThat(step.refusal()).contains("more than 4,000 characters"));
+                .satisfies(step -> assertThat(step.refusal()).isEqualTo("Refused by ConXist: it holds more than 4,000 characters."));
     }
 
     @Test

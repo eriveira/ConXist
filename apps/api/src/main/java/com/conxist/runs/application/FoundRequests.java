@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import com.conxist.runs.domain.RunPrompt;
 
 /**
@@ -16,7 +17,9 @@ final class FoundRequests {
 
     /** The most requests one run reports. */
     static final int MAX = 10;
+    /** The most characters kept of what one request asked. */
     static final int MAX_REQUEST = 500;
+    /** The most characters kept of where one request was read. */
     static final int MAX_WHERE = 200;
 
     static final ModelPort.ToolSpec SPEC = new ModelPort.ToolSpec(RunPrompt.REPORT_TOOL,
@@ -52,10 +55,19 @@ final class FoundRequests {
         return List.copyOf(found);
     }
 
+    /**
+     * The model writes this, and a hostile source can steer it, so control, invisible and direction characters become
+     * spaces, and it is cut on a whole character. The app shows it as quoted plain text.
+     */
     private static String cut(String text, int max) {
-        String stripped = text.strip();
-        return stripped.length() <= max ? stripped : stripped.substring(0, max) + "…";
+        String plain = UNSHOWN.matcher(text).replaceAll(" ").strip();
+        if (plain.codePointCount(0, plain.length()) <= max) {
+            return plain;
+        }
+        return plain.substring(0, plain.offsetByCodePoints(0, max)) + "…";
     }
+
+    private static final Pattern UNSHOWN = Pattern.compile("[\\p{Cc}\\p{Cf}]+");
 
     private static Map<String, Object> schema() {
         Map<String, Object> request = new LinkedHashMap<>();

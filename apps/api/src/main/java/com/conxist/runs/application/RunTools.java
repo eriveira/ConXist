@@ -87,8 +87,12 @@ public final class RunTools {
         return List.copyOf(descriptions);
     }
 
-    /** The outside tool (an MCP server's or an integration's) this run offers under that name, if it is one. */
-    Optional<McpToolbox.OfferedTool> outside(String name, Scope scope) {
+    /** Whether the name is an outside tool (an MCP server's or an integration's) this run offers. */
+    boolean isOutside(String name, Scope scope) {
+        return outside(name, scope).isPresent();
+    }
+
+    private Optional<McpToolbox.OfferedTool> outside(String name, Scope scope) {
         return scope.mcpTools().stream().filter(tool -> tool.modelName().equals(name)).findFirst();
     }
 

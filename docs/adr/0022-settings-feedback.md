@@ -3,6 +3,7 @@
 - Status: Proposed
 - Date: 2026-11-27
 - Deciders: owner, Claude
+- Changed by: ADR 0025 (2026-11-28): a ticked change tool is still checked by the copy guard on every call.
 - Changes: ADR 0014 (one default for new agents becomes one per provider, plus the provider new agents start on),
   ADR 0012 (a test run also takes pasted text or a text file), ADR 0007 (a workspace can be deleted; Sources leaves the
   menu), ADR 0017 (tools that change things can be allowed; the site's icon stands in for a missing logo)

@@ -32,11 +32,8 @@ public final class CallMcpTools implements McpToolbox {
     static final int MAX_ANSWER_CHARACTERS = 100_000;
     /** An error says what went wrong in a few lines; more is not resent to the model turn after turn. */
     static final int MAX_ERROR_CHARACTERS = 2_000;
-    /**
-     * What the model may send a server in one call. A lookup needs a few words; a limit keeps meeting text or earlier
-     * answers from leaving ConXist in a tool's arguments, whatever a transcript or a tool's description asks.
-     */
-    static final int MAX_ARGUMENT_CHARACTERS = 4_000;
+    /** What the model may send a server in one call (the toolbox's own limit, which a run also checks first). */
+    static final int MAX_ARGUMENT_CHARACTERS = McpToolbox.MAX_ARGUMENT_CHARACTERS;
 
     private final McpServerRepository servers;
     private final McpCredentials credentials;

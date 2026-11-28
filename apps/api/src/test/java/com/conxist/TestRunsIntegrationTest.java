@@ -335,7 +335,10 @@ class TestRunsIntegrationTest {
                 .andExpect(jsonPath("$.model").value("claude-opus-5-5"))
                 .andExpect(jsonPath("$.effort").value("HIGH"))
                 .andExpect(jsonPath("$.answer").value("A short answer from the fake model."))
-                .andExpect(jsonPath("$.steps[0].kind").value("MODEL"));
+                .andExpect(jsonPath("$.steps[0].kind").value("MODEL"))
+                .andExpect(jsonPath("$.steps[0].refusal").isEmpty())
+                .andExpect(jsonPath("$.requestsFound").isArray())
+                .andExpect(jsonPath("$.requestsFound").isEmpty());
 
         String system = claude.requests().getLast().path("system").asString();
         org.assertj.core.api.Assertions.assertThat(system).startsWith("You are an agent in ConXist");

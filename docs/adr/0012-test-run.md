@@ -6,6 +6,8 @@
 - Changed by: ADR 0022 (2026-11-27): a test run also takes pasted text or a text file.
 - Changed by: ADR 0024 (2026-11-28): Claude is called through Spring AI, without Anthropic's server-side fallback or
   strict tools.
+- Changed by: ADR 0025 (2026-11-28): a run reports requests found in the data and refuses outside calls that copy
+  what it read.
 
 ## Context
 
