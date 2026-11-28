@@ -87,6 +87,17 @@ public final class CallMcpTools implements McpToolbox {
     }
 
     @Override
+    public List<OfferedTool> readTools() {
+        List<ToolRef> picks = new ArrayList<>();
+        integrations.findAll(workspace.id()).forEach(integration -> integration.tools().stream()
+                .filter(tool -> tool.allowed() && tool.readOnly())
+                .forEach(tool -> picks.add(new ToolRef(integration.id(), tool.name()))));
+        // Not the tools of MCP servers: a server labels its own tools read-only, and its calls leave ConXist, so Tuga
+        // gets them only once a person picks them for it (ADR 0027).
+        return offer(picks);
+    }
+
+    @Override
     public Result call(ToolRef ref, Map<String, Object> arguments) {
         Optional<Integration> integration = integrations.find(workspace.id(), ref.serverId());
         if (integration.isPresent()) {

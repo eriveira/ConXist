@@ -22,6 +22,13 @@ public interface McpToolbox {
      */
     List<OfferedTool> offer(List<ToolRef> picks);
 
+    /**
+     * Every tool of the workspace's integrations that it allows and that only reads (ConXist's own code, GET only), with
+     * the name the model sees: what Tuga may use (ADR 0027). No tool of an MCP server is in it: the server itself says
+     * which tools only read, and a person has not picked any for Tuga.
+     */
+    List<OfferedTool> readTools();
+
     /** Calls the tool on its server. A failure comes back as an error result the model can act on, never an exception. */
     Result call(ToolRef tool, Map<String, Object> arguments);
 

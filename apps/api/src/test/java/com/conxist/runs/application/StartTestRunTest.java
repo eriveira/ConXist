@@ -101,6 +101,11 @@ class StartTestRunTest {
         }
 
         @Override
+        public List<OfferedTool> readTools() {
+            return List.of();
+        }
+
+        @Override
         public Result call(ToolRef tool, Map<String, Object> arguments) {
             mcpCalls.add(arguments);
             return mcpAnswers.get(tool.serverId() + "/" + tool.tool());

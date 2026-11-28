@@ -32,11 +32,11 @@
 .agent-section h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 2px; font-size: 17px; font-weight: 800; }
 .agent-section .lead { margin: 0 0 14px; color: var(--cx-fg-muted); font-size: 14px; }
 .step-no { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--cx-accent-soft); color: var(--cx-accent-text); font-size: 13px; flex: none; }
-.agent-section .field textarea, .agent-section .field select {
+.agent-section .field textarea, .agent-section .field select, .model-pick .field select {
   border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); padding: 10px 12px;
   background: var(--cx-surface); color: var(--cx-fg); font: inherit; width: 100%;
 }
-.agent-section .field select { min-height: 44px; padding: 0 12px; }
+.agent-section .field select, .model-pick .field select { min-height: 44px; padding: 0 12px; }
 .agent-section textarea { resize: vertical; line-height: 1.5; }
 .agent-section textarea.instructions { min-height: 200px; }
 .agent-section .field [aria-invalid="true"], .agent-section [aria-invalid="true"] { border-color: var(--cx-err-fg); }

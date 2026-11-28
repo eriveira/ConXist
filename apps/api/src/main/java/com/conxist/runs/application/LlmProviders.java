@@ -206,19 +206,32 @@ public final class LlmProviders implements AgentModels {
 
     /** What the agent runs on, when its provider is connected and the workspace still allows its model. */
     Optional<Call> callFor(AgentBrief agent) {
-        if (agent.provider() == null || !available(agent.provider(), agent.model())) {
+        if (agent.provider() == null || agent.effort() == null) {
             return Optional.empty();
         }
-        ModelOption option = catalog.callable(agent.provider(), agent.model());
-        Optional<ModelPort> port = port(agent.provider());
-        Optional<ProviderKeys.Key> key = keys.current(agent.provider());
+        return callFor(new ModelStart(agent.provider(), agent.model(), ModelChoice.Effort.valueOf(agent.effort())),
+                "a test run of agent " + agent.id());
+    }
+
+    /**
+     * What the model runs on, when its provider is connected and the workspace still allows it.
+     *
+     * @param forWhat what opens the key, for the log: never customer text
+     */
+    Optional<Call> callFor(ModelStart start, String forWhat) {
+        if (start.provider() == null || !available(start.provider(), start.model())) {
+            return Optional.empty();
+        }
+        ModelOption option = catalog.callable(start.provider(), start.model());
+        Optional<ModelPort> port = port(start.provider());
+        Optional<ProviderKeys.Key> key = keys.current(start.provider());
         if (port.isEmpty() || key.isEmpty()) {
             return Optional.empty(); // disconnected meanwhile
         }
-        log.info("Workspace {} opened its {} key ({}) for a test run of agent {}", workspace.id(), agent.provider(),
-                key.get().source(), agent.id());
-        return Optional.of(new Call(port.get(), key.get().value(), new ModelChoice(option.id(),
-                ModelChoice.Effort.valueOf(agent.effort()), option.maxTokens())));
+        log.info("Workspace {} opened its {} key ({}) for {}", workspace.id(), start.provider(), key.get().source(),
+                forWhat);
+        return Optional.of(new Call(port.get(), key.get().value(), new ModelChoice(option.id(), start.effort(),
+                option.maxTokens())));
     }
 
     /** The key that calls the provider for this workspace, if it has one, opened. */

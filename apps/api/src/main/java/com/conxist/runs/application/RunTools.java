@@ -58,6 +58,14 @@ public final class RunTools {
     }
 
     /**
+     * What Tuga may use (ADR 0027): every one of ConXist's own read tools, and every tool of the workspace's MCP servers
+     * and integrations that the workspace allows and that only reads.
+     */
+    Scope everything() {
+        return new Scope(registry.values().stream().map(Tool::fullName).toList(), mcp.readTools());
+    }
+
+    /**
      * The tools the agent has on: ConXist's own in the registry's order (names it does not know are left out), then
      * the MCP tools in the agent's order.
      */

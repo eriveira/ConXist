@@ -272,7 +272,7 @@ describe('SettingsPage', () => {
     open('#/settings/connectors');
 
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
-    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['General', 'LLM providers', 'MCPs', 'Integrations', 'Variables', 'Guardrails']);
+    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['General', 'LLM providers', 'Tuga', 'MCPs', 'Integrations', 'Variables', 'Guardrails']);
     expect(within(nav).getByRole('link', { name: 'General' })).toHaveAttribute('aria-current', 'page');
   });
 
