@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JdbcRunsWorkspaceData implements WorkspaceData {
 
-    private static final List<String> TABLES = List.of("workspace_provider_keys", "workspace_allowed_models",
+    private static final List<String> TABLES = List.of("tuga_settings", "workspace_provider_keys", "workspace_allowed_models",
             "workspace_model_defaults", "workspace_run_limits", "workspace_guardrails");
 
     private final JdbcClient jdbc;

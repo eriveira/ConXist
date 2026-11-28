@@ -59,7 +59,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   `mvn spring-boot:test-run` runs a fake Plaud that signs in as `alex@acme.test`.
 - Workspaces (ADR 0007): a person keeps several; first run asks for one (name, optional description up to 500
   characters). Every workspace request sends `X-Workspace-Id`; the app keeps the last one used. The header menu is
-  Home (empty for now), Agents, Skills; the app opens on Agents. Flow, Knowledge, Memories, Ask ConXist and Sources
+  Home (empty for now), Agents, Skills; the app opens on Agents. Flow, Knowledge, Memories and Sources
   come back when they work (owner, 2026-11-27). The workspace menu lists each workspace on one line. Settings › General
   deletes a workspace, and everything in it, once its exact name is typed; the last one stays (ADR 0022: each module
   deletes its rows through the platform port `WorkspaceData`, in one transaction).
@@ -89,7 +89,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, a default model and effort per provider,
   and which provider new agents start on, grouped by provider in lists that fold away (ADR 0022, V23)),
-  MCPs (ADR 0017, below), Integrations (ADR 0019, 0020 and 0021, below), Variables (ADR 0018, below), and Guardrails
+  Tuga (ADR 0027, below), MCPs (ADR 0017, below), Integrations (ADR 0019, 0020 and 0021, below), Variables (ADR 0018, below), and Guardrails
   (ADR 0025, V26; ADR 0026, V27: ConXist's rule, which a workspace may replace with its own version after a warning and
   restore (owner, 2026-11-28); the workspace's own rules up to 2,000 characters that every agent follows after it; and
   the copy guard, which it can only make stricter: 6 to 11 words in a row instead of 12, and the most text one outside
@@ -127,6 +127,13 @@ Sources page does not show it for now, owner decision 2026-11-17).
   place. Agents' and skills' instructions use one as `{{name}}`; a run puts the value in its place, and a name the
   workspace lacks stays as written (the agent page says so). V19 moved each workspace's topics into one `topics`
   variable and renamed `workspace_topics` to `workspace_topics_v13` (dropped later). Values are not for secrets.
+- Tuga (ADR 0027, owner 2026-11-28): ConXist's own assistant, a button in the corner of every page that opens a plain
+  chat. It reads with ConXist's own read tools and the allowed integration read tools (no MCP server tools yet), never
+  one that changes things, and answers in plain text ending with "From:". Nothing is kept: the app sends the chat so far
+  (up to 40 messages) to `POST /api/tuga/chat`. It runs through the same `runs/application/ToolLoop` as test runs
+  (limits, copy guard, `report_request`). Settings › Tuga (V28 `tuga_settings`) picks its provider, model and effort
+  (else where new agents start) and holds its prompt, editable after a warning and restorable; Tuga's own fixed rules
+  (`TugaPrompt.RULES`) and the Guardrails come first.
 - No sign-in yet: any workspace on the machine can be named, and the API listens on 127.0.0.1 only.
   Nothing is deployed. Hosting is not decided.
 
@@ -161,7 +168,8 @@ Sources page does not show it for now, owner decision 2026-11-17).
 - Transcripts, documents, tickets and repository content are customer data and
   untrusted input: never instructions, never logged in full. This holds by default; a workspace may replace ConXist's
   rule after a warning (ADR 0026), and the code checks still run.
-- Orders come only from the agent (owner, 2026-11-28; ADR 0025). Every run's fixed rules say so and name the kinds of
+- Orders come only from the agent (owner, 2026-11-28; ADR 0025), and for Tuga only from the person in the chat
+  (ADR 0027). Every run's fixed rules say so and name the kinds of
   data; the model reports what data asked for with ConXist's own `report_request` tool (at most 10, shown in Try it,
   not a tool call the limits count). The workspace's own rules (Settings › Guardrails) come after ConXist's rule in a
   `<workspace-rules>` block and can only add limits. A workspace may replace ConXist's rule after a warning (ADR 0026;

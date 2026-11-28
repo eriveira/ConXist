@@ -6,11 +6,12 @@ import { SETTINGS_SECTIONS, settingsHref, useSettingsSection } from '../../navig
 import { GeneralSection } from './GeneralSection';
 import { GuardrailsSection } from './GuardrailsSection';
 import { LlmProvidersSection } from './LlmProvidersSection';
+import { TugaSection } from './TugaSection';
 import { VariablesSection } from './VariablesSection';
 import { IntegrationsSection } from '../integrations/IntegrationsSection';
 import { McpsSection } from '../mcps/McpsSection';
 
-/** A workspace's Settings, opened from the workspace menu: General, LLM providers, MCPs, Integrations and Variables. */
+/** A workspace's Settings, opened from the workspace menu: General, LLM providers, Tuga, MCPs, Integrations and Variables. */
 export function SettingsPage({ workspace, onSaved, canDelete, onDeleted }: {
   workspace: Workspace; onSaved: (workspace: Workspace) => void;
   /** False for the only workspace, which stays. */
@@ -49,6 +50,7 @@ export function SettingsPage({ workspace, onSaved, canDelete, onDeleted }: {
             <GeneralSection workspace={workspace} onSaved={onSaved} canDelete={canDelete} onDeleted={onDeleted} />
           )}
           {section === 'llm' && <LlmProvidersSection />}
+          {section === 'tuga' && <TugaSection workspace={workspace} />}
           {section === 'mcps' && <McpsSection />}
           {section === 'integrations' && <IntegrationsSection workspaceName={workspace.name} />}
           {section === 'variables' && <VariablesSection />}

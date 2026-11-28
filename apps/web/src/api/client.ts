@@ -9,6 +9,7 @@ import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
 import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels } from '../domain/settings';
 import type { RunLimits } from '../domain/runLimits';
 import type { Guardrails, GuardrailsChange } from '../domain/guardrails';
+import type { ChatLine, TugaAnswer, TugaChange, TugaSettings } from '../domain/tuga';
 import type { Variable } from '../domain/variables';
 import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
@@ -126,6 +127,12 @@ export const api = {
   saveRunLimits: (limits: RunLimits) => putJson<RunLimits>('/api/run-limits', limits),
   guardrails: () => request<Guardrails>('/api/guardrails'),
   saveGuardrails: (change: GuardrailsChange) => putJson<Guardrails>('/api/guardrails', change),
+  tuga: () => request<TugaSettings>('/api/tuga'),
+  saveTuga: (change: TugaChange) => putJson<TugaSettings>('/api/tuga', change),
+  /** Sends the chat so far, ending with the person's new message; nothing of it is kept. */
+  askTuga: (messages: ChatLine[], signal?: AbortSignal) => request<TugaAnswer>('/api/tuga/chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages }), signal,
+  }),
   variables: () => request<Variable[]>('/api/variables'),
   addVariable: (variable: Omit<Variable, 'id'>) => postJson<Variable>('/api/variables', variable),
   changeVariable: (id: string, variable: Omit<Variable, 'id'>) =>

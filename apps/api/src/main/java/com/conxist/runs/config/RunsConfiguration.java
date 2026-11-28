@@ -21,6 +21,8 @@ import com.conxist.runs.application.ProviderModelLists;
 import com.conxist.runs.application.RunTools;
 import com.conxist.runs.application.RunLimitsRepository;
 import com.conxist.runs.application.StartTestRun;
+import com.conxist.runs.application.Tuga;
+import com.conxist.runs.application.TugaSettingsRepository;
 import com.conxist.runs.application.WorkspaceRunLimits;
 import com.conxist.runs.application.GuardrailsRepository;
 import com.conxist.runs.application.WorkspaceGuardrails;
@@ -29,7 +31,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 
-/** Wires test runs and LLM providers: the read tools, Claude and OpenAI as the models, keys, model lists, and the use cases. */
+/** Wires test runs, Tuga and LLM providers: the read tools, Claude and OpenAI as the models, keys, model lists, and the use cases. */
 @Configuration(proxyBeanMethods = false)
 class RunsConfiguration {
 
@@ -88,6 +90,12 @@ class RunsConfiguration {
             WorkspaceRunLimits limits, WorkspaceGuardrails guardrails, CurrentWorkspace workspace,
             WorkspaceVariables variables, Clock clock) {
         return new StartTestRun(agents, library, tools, providers, limits, guardrails, workspace, variables, clock);
+    }
+
+    @Bean
+    Tuga tuga(TugaSettingsRepository settings, RunTools tools, LlmProviders providers, WorkspaceRunLimits limits,
+            WorkspaceGuardrails guardrails, CurrentWorkspace workspace, WorkspaceVariables variables, Clock clock) {
+        return new Tuga(settings, tools, providers, limits, guardrails, workspace, variables, clock);
     }
 
     @Bean

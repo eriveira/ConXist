@@ -36,10 +36,13 @@ final class SpringAiTurns {
     private SpringAiTurns() {
     }
 
-    /** The rules, the first message, then each earlier turn exactly as the model sent it with its tools' results. */
+    /** The rules, an earlier conversation, the first message, then each earlier turn exactly as the model sent it with its tools' results. */
     static List<Message> messages(ModelPort.Request request) {
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(request.system()));
+        for (ModelPort.Said said : request.history()) {
+            messages.add(said.fromPerson() ? new UserMessage(said.text()) : new AssistantMessage(said.text()));
+        }
         messages.add(new UserMessage(request.firstMessage()));
         for (ModelPort.Exchange exchange : request.exchanges()) {
             messages.add((AssistantMessage) Objects.requireNonNull(exchange.turn().providerState()));

@@ -13,6 +13,7 @@ import { useRoute } from './features/shell/useRoute';
 import { SourcePage } from './features/source/SourcePage';
 import { SourcesPage } from './features/sources/SourcesPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { TugaChat } from './features/tuga/TugaChat';
 import { CreateWorkspacePage } from './features/workspaces/CreateWorkspacePage';
 import { NewWorkspaceDialog } from './features/workspaces/NewWorkspaceDialog';
 import { useWorkspaces } from './features/workspaces/useWorkspaces';
@@ -100,6 +101,8 @@ function Workspaces(settings: SettingsProps) {
             onDeleted={(gone) => { deleted(gone.id); setNotice(t('workspace.deleted', { name: gone.name })); go('agents'); }} />
         )}
       </main>
+      {/* Keyed by workspace, so a chat never follows the person into another workspace. */}
+      <TugaChat key={`tuga-${state.current.id}`} workspaceName={state.current.name} />
       {newOpen && <NewWorkspaceDialog onClose={() => setNewOpen(false)} onCreated={onCreated} />}
     </div>
   );

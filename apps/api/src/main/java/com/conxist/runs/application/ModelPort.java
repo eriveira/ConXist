@@ -25,10 +25,25 @@ public interface ModelPort {
     List<ProviderModel> models(ApiKey key, Duration timeout);
 
     /**
-     * One call. {@code exchanges} are the earlier turns with their tool results, in order; the answer is plain text.
+     * One call. {@code history} is an earlier conversation that comes before {@code firstMessage}, oldest first (Tuga's
+     * chat, ADR 0027; empty for an agent's run); {@code exchanges} are the earlier turns of this call's loop with their
+     * tool results, in order; the answer is plain text.
      */
-    record Request(ModelChoice model, String system, String firstMessage, List<Exchange> exchanges,
+    record Request(ModelChoice model, String system, List<Said> history, String firstMessage, List<Exchange> exchanges,
             List<ToolSpec> tools, Duration timeout) {
+
+        public Request {
+            history = List.copyOf(history);
+        }
+
+        public Request(ModelChoice model, String system, String firstMessage, List<Exchange> exchanges,
+                List<ToolSpec> tools, Duration timeout) {
+            this(model, system, List.of(), firstMessage, exchanges, tools, timeout);
+        }
+    }
+
+    /** One earlier message of a conversation: the person's ({@code fromPerson}) or the model's answer, as text. */
+    record Said(boolean fromPerson, String text) {
     }
 
     /** @param providerState what the provider needs to see this turn again on the next call, unchanged */

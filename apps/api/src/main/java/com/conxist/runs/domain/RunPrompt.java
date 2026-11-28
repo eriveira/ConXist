@@ -108,12 +108,35 @@ public final class RunPrompt {
         if (!guardrails.baseRuleEdited()) {
             return VERSION;
         }
+        return VERSION + "+workspace-rule-" + shortHash(guardrails.baseRule());
+    }
+
+    /** The first 8 hex characters of the text's SHA-256: tells versions apart in logs without the text. */
+    static String shortHash(String text) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(guardrails.baseRule().getBytes(StandardCharsets.UTF_8));
-            return VERSION + "+workspace-rule-" + HexFormat.of().formatHex(digest, 0, 4);
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, 4);
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("Every Java runtime has SHA-256", impossible);
+        }
+    }
+
+    /** The workspace's own rules in marked delimiters (ADR 0025), or nothing when it has none. */
+    static void appendWorkspaceRules(StringBuilder text, Guardrails guardrails, Map<String, String> variables) {
+        if (!guardrails.rules().isEmpty()) {
+            text.append("<workspace-rules>\n").append(WORKSPACE_RULES_LEAD).append("\n\n")
+                    .append(neutralized(filled(guardrails.rules(), variables, "guardrails.variables-too-long",
+                            "The variables used in the workspace rules"))).append("\n</workspace-rules>\n\n");
+        }
+    }
+
+    /** The tools a run offers, by the name the model sees, with ConXist's own words on each. */
+    static void appendTools(StringBuilder text, List<ToolDescription> tools) {
+        if (!tools.isEmpty()) {
+            text.append("Tools you may use:\n");
+            tools.forEach(tool -> text.append("- ").append(tool.name()).append(tool.changesThings() ? " (changes things)" : "")
+                    .append(": ").append(tool.description()).append('\n'));
+            text.append('\n');
         }
     }
 
@@ -145,17 +168,8 @@ public final class RunPrompt {
         StringBuilder text = new StringBuilder(guardrails.baseRuleEdited() ? neutralized(guardrails.baseRule()) : RULES)
                 .append(changes ? CHANGES.formatted(characters(guardrails.maxInputCharacters())) : READ_ONLY)
                 .append("\n\n");
-        if (!guardrails.rules().isEmpty()) {
-            text.append("<workspace-rules>\n").append(WORKSPACE_RULES_LEAD).append("\n\n")
-                    .append(neutralized(filled(guardrails.rules(), variables, "guardrails.variables-too-long",
-                            "The variables used in the workspace rules"))).append("\n</workspace-rules>\n\n");
-        }
-        if (!tools.isEmpty()) {
-            text.append("Tools you may use:\n");
-            tools.forEach(tool -> text.append("- ").append(tool.name()).append(tool.changesThings() ? " (changes things)" : "")
-                    .append(": ").append(tool.description()).append('\n'));
-            text.append('\n');
-        }
+        appendWorkspaceRules(text, guardrails, variables);
+        appendTools(text, tools);
         text.append("<agent name=\"").append(attribute(agent.name())).append("\">\n")
                 .append("Purpose: ").append(neutralized(filled(agent.purpose().strip(), variables))).append("\n\n")
                 .append(neutralized(filled(agent.instructions().strip(), variables))).append("\n</agent>\n");
@@ -183,7 +197,7 @@ public final class RunPrompt {
         return filled(text, variables, "run.variables-too-long", "The variables used in the agent or one of its skills");
     }
 
-    private static String filled(String text, Map<String, String> variables, String code, String what) {
+    static String filled(String text, Map<String, String> variables, String code, String what) {
         if (variables.isEmpty() || !text.contains("{{")) {
             return text;
         }
@@ -220,16 +234,17 @@ public final class RunPrompt {
      * A closing tag inside a block would end it early, so it is escaped; an opening workspace-rules tag would pass data
      * off as the workspace's rules, so it is escaped too. Nothing else in the text changes.
      */
-    private static String neutralized(String text) {
+    static String neutralized(String text) {
         String closed = CLOSING_TAG.matcher(text).replaceAll("<\\\\/$1");
         return OPENING_RULES_TAG.matcher(closed).replaceAll("(workspace-rules");
     }
 
-    private static final Pattern CLOSING_TAG = Pattern.compile("(?i)</\\s*(meeting|data|agent|skill|workspace-rules)");
+    private static final Pattern CLOSING_TAG =
+            Pattern.compile("(?i)</\\s*(meeting|data|agent|skill|workspace-rules|tuga)");
 
     private static final Pattern OPENING_RULES_TAG = Pattern.compile("(?i)<\\s*workspace-rules");
 
-    private static String attribute(String value) {
+    static String attribute(String value) {
         return value.replace("\"", "'").replace("<", "(").replace(">", ")");
     }
 

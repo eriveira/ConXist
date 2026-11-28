@@ -451,6 +451,58 @@ class TestRunsIntegrationTest {
     }
 
     @Test
+    void tuga_answers_a_chat_on_the_workspaces_settings_and_keeps_nothing_of_it() throws Exception {
+        String workspace = workspace("Tuga");
+        String other = workspace("Other Tuga");
+        mvc.perform(get("/api/tuga").header(HEADER, workspace))
+                .andExpect(jsonPath("$.revision").value(0))
+                .andExpect(jsonPath("$.ready").value(true))
+                .andExpect(jsonPath("$.modelPicked").value(false))
+                .andExpect(jsonPath("$.model.provider").value("anthropic"))
+                .andExpect(jsonPath("$.promptEdited").value(false))
+                .andExpect(jsonPath("$.prompt").value(org.hamcrest.Matchers.startsWith("Help the person")));
+
+        mvc.perform(put("/api/tuga").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"revision\":0,\"provider\":\"anthropic\",\"model\":\"claude-opus-5-5\","
+                                + "\"effort\":\"LOW\",\"prompt\":\"Answer in Spanish.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revision").value(1))
+                .andExpect(jsonPath("$.modelPicked").value(true))
+                .andExpect(jsonPath("$.model.effort").value("LOW"))
+                .andExpect(jsonPath("$.promptEdited").value(true))
+                .andExpect(jsonPath("$.promptChangedAt").isNotEmpty());
+        mvc.perform(put("/api/tuga").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"revision\":0,\"prompt\":\"\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("tuga.changed"));
+        mvc.perform(get("/api/tuga").header(HEADER, other)).andExpect(jsonPath("$.promptEdited").value(false));
+
+        mvc.perform(post("/api/tuga/chat").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"messages":[{"from":"PERSON","text":"Hi"},{"from":"TUGA","text":"Hola."},
+                                {"from":"PERSON","text":"What did we decide?"}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("ANSWERED"))
+                .andExpect(jsonPath("$.model").value("claude-opus-5-5"))
+                .andExpect(jsonPath("$.answer").value("A short answer from the fake model."));
+        tools.jackson.databind.JsonNode request = claude.requests().getLast();
+        org.assertj.core.api.Assertions.assertThat(request.path("system").asString()).startsWith("You are Tuga")
+                .contains("<tuga>\nAnswer in Spanish.\n</tuga>");
+        org.assertj.core.api.Assertions.assertThat(request.path("messages")).hasSize(3);
+        mvc.perform(post("/api/tuga/chat").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"messages\":[{\"from\":\"TUGA\",\"text\":\"Hola.\"}]}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("tuga.nothing-to-answer"));
+
+        mvc.perform(put("/api/tuga").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"revision\":1}"))
+                .andExpect(jsonPath("$.modelPicked").value(false))
+                .andExpect(jsonPath("$.promptEdited").value(false))
+                .andExpect(jsonPath("$.promptChangedAt").doesNotExist());
+    }
+
+    @Test
     void each_workspace_keeps_its_own_run_limits_within_bounds() throws Exception {
         String workspace = workspace("Limits");
         String other = workspace("Other limits");

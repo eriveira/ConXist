@@ -113,6 +113,19 @@ class CallMcpToolsTest {
                 + "\n(The answer was cut here.)".length());
     }
 
+    @Test
+    void tuga_gets_no_tool_of_an_mcp_server_even_one_it_labels_read_only() {
+        McpTool search = new McpTool("search_docs", "Search", "Finds docs.", true, Map.of("type", "object"), false);
+        McpTool create = new McpTool("create_page", "Create", "Makes a page.", false, Map.of("type", "object"), false);
+        McpTool unticked = new McpTool("list_spaces", "Spaces", "Lists spaces.", true, Map.of("type", "object"), false);
+        McpServer server = McpServer.add(UUID.randomUUID(), WORKSPACE, "Acme Docs", URI.create("https://mcp.acme.test/mcp"),
+                McpAuth.NONE, null, List.of(search, create, unticked), Set.of("search_docs", "create_page"),
+                CLOCK.instant());
+        stored.put(server.id(), server);
+
+        assertThat(toolbox.readTools()).isEmpty();
+    }
+
     private McpServer added() {
         McpTool search = new McpTool("search_docs", "Search", "Finds docs.", true,
                 Map.of("type", "object", "properties", Map.of("query", Map.of("type", "string"))), false);
