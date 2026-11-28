@@ -1,20 +1,22 @@
 package com.conxist.connectors.application;
 
+import java.net.URI;
 import java.time.Clock;
-import java.util.EnumMap;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.conxist.agents.AgentBriefs;
-import com.conxist.connectors.domain.GmailTools;
+import com.conxist.connectors.domain.ApiAuth;
+import com.conxist.connectors.domain.ApiTool;
 import com.conxist.connectors.domain.Integration;
 import com.conxist.connectors.domain.InvalidIntegration;
+import com.conxist.connectors.domain.Logo;
 import com.conxist.platform.Conflict;
 import com.conxist.platform.CurrentWorkspace;
 import com.conxist.platform.NotFound;
@@ -22,30 +24,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The integrations a workspace connected, GitHub (ADR 0019), Bitbucket (ADR 0020) and Gmail (ADR 0021): check a
- * credential, add it with the tools agents may use (and, for Bitbucket, the repositories they may read; for Gmail, the
- * labels), change those, check it again,
- * replace the credential, remove it. A tool or an integration agents use stays: the person removes it from those
- * agents first.
+ * The APIs a workspace connected (ADR 0027): connect one by its address and sign-in, check it, import its OpenAPI
+ * description or write tools by hand, try a tool once, tick the tools agents may use, set its logo, remove it. A tool
+ * or an API agents use stays: the person removes it from those agents first.
  */
 public final class ManageIntegrations {
 
-    /** Who changed what, and when: the workspace, the integration and the action; never a credential. */
+    /** Who changed what, and when: the workspace, the API and the action; never a secret or what an API answered. */
     private static final Logger log = LoggerFactory.getLogger(ManageIntegrations.class);
+    /** What Try it shows of an answer. */
+    static final int MAX_TRY_CHARACTERS = 20_000;
 
     private final IntegrationRepository integrations;
-    private final Map<Integration.Kind, IntegrationApi> apis = new EnumMap<>(Integration.Kind.class);
+    private final ApiGateway gateway;
+    private final ApiConnections connections;
+    private final ApiDescriptions descriptions;
     private final IntegrationViews views;
     private final CurrentWorkspace workspace;
     private final Clock clock;
 
-    public ManageIntegrations(IntegrationRepository integrations, List<IntegrationApi> apis, IntegrationViews views,
-            CurrentWorkspace workspace, Clock clock) {
+    public ManageIntegrations(IntegrationRepository integrations, ApiGateway gateway, ApiDescriptions descriptions,
+            IntegrationViews views, CurrentWorkspace workspace, Clock clock) {
         this.integrations = integrations;
-        apis.forEach(api -> this.apis.put(api.kind(), api));
+        this.gateway = gateway;
+        this.connections = new ApiConnections(gateway);
+        this.descriptions = descriptions;
         this.views = views;
         this.workspace = workspace;
         this.clock = clock;
+    }
+
+    /**
+     * What a person typed to connect an API.
+     *
+     * @param secret   the key, the token or the password; for an edit, null or empty keeps the stored one
+     * @param username for a username and password only
+     */
+    public record Connection(String name, String address, ApiAuth auth, String username, String secret,
+            String checkPath) {
     }
 
     public List<IntegrationViews.IntegrationView> list() {
@@ -58,53 +74,196 @@ public final class ManageIntegrations {
         return views.view(load(integrationId));
     }
 
-    /** Asks the service what the credential reaches. Nothing is saved. */
-    public IntegrationViews.TokenCheckView checkToken(Integration.Kind kind, String email, String token) {
-        IntegrationApi.Account account = account(kind, IntegrationCredentials.checked(kind, email, token));
-        return new IntegrationViews.TokenCheckView(account.login(), account.repositories(),
-                kind.tools().stream().map(tool -> McpServerViews.tool(tool, List.of())).toList());
+    /** Checks the sign-in with the API, then saves it with no tools yet. */
+    public IntegrationViews.IntegrationView add(Connection connection) {
+        UUID workspaceId = workspace.id();
+        URI address = connections.guarded(connection.address(), "address");
+        String secret = ApiConnections.secret(connection, null);
+        Instant now = clock.instant();
+        Integration draft = new Integration(UUID.randomUUID(), workspaceId, connection.name(), address,
+                connection.auth(), ApiConnections.account(connection), ApiConnections.ending(connection.auth(), secret),
+                connection.checkPath(), Integration.Status.WORKS, null, null, null, List.of(), now, now);
+        connections.refuseIfFails(draft, secret);
+        Integration integration = draft.connected(draft.name(), address, draft.auth(), draft.account(), draft.ending(),
+                draft.checkPath(), connections.icon(address), now);
+        if (!integrations.insert(integration, secret)) {
+            throw taken(integration.name());
+        }
+        log.info("Workspace {} added API {}", workspaceId, integration.id());
+        return views.view(integration);
+    }
+
+    /** Checks a changed connection with the API, then saves it; its tools stay. */
+    public IntegrationViews.IntegrationView edit(UUID integrationId, Connection connection) {
+        Integration integration = load(integrationId);
+        URI address = connections.guarded(connection.address(), "address");
+        // The stored secret goes only to the address it was given for: another one, or a new kind of sign-in, needs it
+        // typed again.
+        String kept = ApiConnections.keepsSecret(integration, address, connection.auth())
+                ? integrations.secret(integration.workspaceId(), integrationId).orElse(null) : null;
+        String secret = ApiConnections.secret(connection, kept);
+        Integration changed = integration.connected(connection.name(), address, connection.auth(),
+                ApiConnections.account(connection), ApiConnections.ending(connection.auth(), secret),
+                connection.checkPath(), address.getHost().equalsIgnoreCase(integration.address().getHost())
+                        ? integration.icon() : connections.icon(address), clock.instant());
+        connections.refuseIfFails(changed, secret);
+        // The secret is saved whole each time: for Basic it holds the username too.
+        if (!integrations.updateConnection(changed, secret)) {
+            throw taken(changed.name());
+        }
+        log.info("Workspace {} changed the connection of API {}", integration.workspaceId(), integrationId);
+        return views.view(changed);
+    }
+
+    /** Calls the check path now with the stored sign-in, and saves whether it works. */
+    public IntegrationViews.CheckView check(UUID integrationId) {
+        Integration integration = load(integrationId);
+        ApiConnections.Outcome outcome = connections.check(integration, secretOf(integration));
+        Integration.Status status = outcome.works() ? Integration.Status.WORKS
+                : "sign-in-refused".equals(outcome.error()) ? Integration.Status.SIGN_IN_NEEDED
+                        : Integration.Status.UNREACHABLE;
+        Integration checked = integration.withStatus(status, clock.instant());
+        integrations.update(checked);
+        log.info("Workspace {} checked API {}: {}", integration.workspaceId(), integrationId,
+                outcome.works() ? "works" : outcome.error());
+        return new IntegrationViews.CheckView(outcome.works(), outcome.error(), outcome.status(), outcome.millis(),
+                outcome.request(), views.view(checked));
     }
 
     /**
-     * Checks the credential again and saves the integration with the ticked tools allowed. For a service whose
-     * repositories the person picks here, {@code repositories} are those, each one the credential reaches.
+     * Reads an OpenAPI description, fetched from {@code address} or given as {@code text}, into the API's tools.
+     * Tools it had from an earlier import are replaced, keeping their ticks; tools a person wrote stay, and so does
+     * an imported tool agents use. On the first import the tools that read come ticked; later new ones start off.
      */
-    public IntegrationViews.IntegrationView add(Integration.Kind kind, String email, String token,
-            List<String> repositories, Set<String> allowed) {
-        return insert(kind, IntegrationCredentials.checked(kind, email, token), repositories, allowed);
+    public IntegrationViews.ImportView importDescription(UUID integrationId, String address, String text) {
+        Integration integration = load(integrationId);
+        URI from = null;
+        String source = text;
+        if (address != null && !address.isBlank()) {
+            from = connections.guarded(address, "description");
+            try {
+                source = gateway.description(from);
+            } catch (ApiGateway.Unreachable unreachable) {
+                throw new InvalidIntegration("description-unreachable", "ConXist could not fetch that description."
+                        + " Check the address, or upload the file instead.");
+            }
+        }
+        if (source == null || source.isBlank()) {
+            throw new InvalidIntegration("description-required", "Give the description's address or its file.");
+        }
+        if (source.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > ApiGateway.MAX_DESCRIPTION_BYTES) {
+            throw new InvalidIntegration("description-too-big", "That description is over 2 MB.");
+        }
+        ApiDescriptions.Read read;
+        try {
+            read = descriptions.read(source, integration.address(), from, Integration.MAX_TOOLS);
+        } catch (ApiDescriptions.Unreadable unreadable) {
+            throw new InvalidIntegration("description-unreadable", "ConXist can't read this as an OpenAPI"
+                    + " description: " + unreadable.getMessage());
+        }
+        boolean first = integration.description() == null && integration.tools().stream().noneMatch(ApiTool::imported);
+        Set<String> used = views.usesOf(integrationId).stream().map(AgentBriefs.McpToolUse::tool)
+                .collect(Collectors.toSet());
+        ToolMerge.Merged merged = ToolMerge.merge(integration.tools(), read.tools(), used, first);
+        List<ApiDescriptions.LeftOut> leftOut = new ArrayList<>(read.leftOut());
+        merged.overflow().forEach(name -> leftOut.add(new ApiDescriptions.LeftOut(name, ToolMerge.FULL)));
+        Integration changed = integration.withTools(merged.tools(), new Integration.Description(read.title(), read.version(),
+                from, clock.instant()));
+        integrations.update(changed);
+        log.info("Workspace {} imported a description into API {} ({} tools, {} left out)", integration.workspaceId(),
+                integrationId, read.tools().size(), leftOut.size());
+        return new IntegrationViews.ImportView(read.tools().size(), merged.added(), merged.kept(), leftOut,
+                views.view(changed));
     }
 
-    /** Adds Gmail with the refresh token of a finished Google sign-in (ADR 0021), as {@link #add} does a token. */
-    IntegrationViews.IntegrationView addSignedIn(Integration.Kind kind, String credential, List<String> labels,
-            Set<String> allowed) {
-        return insert(kind, credential, labels, allowed);
+    /** Adds a tool a person wrote. One that changes things starts off. */
+    public IntegrationViews.IntegrationView addTool(UUID integrationId, ApiTool tool) {
+        Integration integration = load(integrationId);
+        refuseSignInInputs(integration, tool);
+        List<ApiTool> tools = new ArrayList<>(integration.tools());
+        tools.add(new ApiTool(tool.name(), tool.section(), tool.method(), tool.path(), tool.description(),
+                tool.params(), tool.reads(), false, false).withAllowed(tool.allowed() && tool.reads()));
+        Integration changed = integration.withTools(tools);
+        integrations.update(changed);
+        log.info("Workspace {} added tool {} to API {}", integration.workspaceId(), tool.name(), integrationId);
+        return views.view(changed);
     }
 
-    private IntegrationViews.IntegrationView insert(Integration.Kind kind, String credential,
-            List<String> repositories, Set<String> allowed) {
-        UUID workspaceId = workspace.id();
-        if (integrations.findAll(workspaceId).stream().anyMatch(each -> each.kind() == kind)) {
-            throw taken(kind);
+    /**
+     * Saves a changed tool in place of {@code toolName}. A tool agents use keeps its name, and stays one that reads if
+     * it read; a tool that now changes things is unticked, so it is allowed again only after the warning.
+     */
+    public IntegrationViews.IntegrationView updateTool(UUID integrationId, String toolName, ApiTool tool) {
+        Integration integration = load(integrationId);
+        ApiTool earlier = integration.tool(toolName).orElseThrow(() -> toolGone(toolName));
+        refuseSignInInputs(integration, tool);
+        List<AgentBriefs.McpToolUse> uses = views.usesOf(integrationId).stream()
+                .filter(use -> use.tool().equals(toolName)).toList();
+        ApiTool changed = new ApiTool(tool.name(), tool.section(), tool.method(), tool.path(), tool.description(),
+                tool.params(), tool.reads(), false, false);
+        boolean allowed = ToolMerge.keepsTick(earlier, changed);
+        if (!uses.isEmpty() && (!changed.name().equals(toolName) || (earlier.allowed() && !allowed))) {
+            throw new Conflict("integration.tool-in-use", agentNames(uses) + " use " + toolName + ". Remove it"
+                    + " from them first to rename it, let it change things or change what it calls.");
         }
-        IntegrationApi.Account account = account(kind, credential);
-        List<String> reachable = kind.picksRepositories() ? picked(kind, repositories, account.repositories())
-                : account.repositories();
-        Integration integration = new Integration(UUID.randomUUID(), workspaceId, kind, account.login(), reachable,
-                ending(credential, account), allowed, Integration.Status.WORKS,
-                clock.instant(), clock.instant());
-        if (!integrations.insertIfKindFree(integration, credential)) {
-            throw taken(kind);
+        List<ApiTool> tools = integration.tools().stream()
+                .map(each -> each.name().equals(toolName) ? changed.withAllowed(allowed) : each).toList();
+        Integration saved = integration.withTools(tools);
+        integrations.update(saved);
+        log.info("Workspace {} changed tool {} of API {}", integration.workspaceId(), toolName, integrationId);
+        return views.view(saved);
+    }
+
+    /** Removes a tool no agent uses. */
+    public IntegrationViews.IntegrationView removeTool(UUID integrationId, String toolName) {
+        Integration integration = load(integrationId);
+        integration.tool(toolName).orElseThrow(() -> toolGone(toolName));
+        List<AgentBriefs.McpToolUse> uses = views.usesOf(integrationId).stream()
+                .filter(use -> use.tool().equals(toolName)).toList();
+        if (!uses.isEmpty()) {
+            throw new Conflict("integration.tool-in-use", agentNames(uses) + " use " + toolName
+                    + ". Remove it from them first.");
         }
-        log.info("Workspace {} added {} integration {} ({} repositories, {} tools allowed)", workspaceId, kind,
-                integration.id(), reachable.size(), allowed.size());
-        return views.view(integration);
+        Integration changed = integration.withTools(integration.tools().stream()
+                .filter(tool -> !tool.name().equals(toolName)).toList());
+        integrations.update(changed);
+        log.info("Workspace {} removed tool {} of API {}", integration.workspaceId(), toolName, integrationId);
+        return views.view(changed);
+    }
+
+    /**
+     * Sends one call of a tool, saved or not, with these inputs and the stored sign-in, for a person to see what the
+     * API answers. Nothing is kept. A tool that changes things really changes them; the app warns first.
+     */
+    public IntegrationViews.TryView tryTool(UUID integrationId, ApiTool tool, Map<String, Object> inputs) {
+        Integration integration = load(integrationId);
+        String secret = secretOf(integration);
+        ApiGateway.Request request;
+        try {
+            request = ApiRequests.build(integration, secret, tool, inputs);
+        } catch (ApiRequests.Problem problem) {
+            throw new InvalidIntegration("try-input", problem.getMessage());
+        }
+        ApiGateway.Answer answer;
+        try {
+            answer = gateway.send(request);
+        } catch (ApiGateway.AddressRefused refused) {
+            throw new InvalidIntegration("address-refused", "ConXist no longer calls this address: " + refused.code());
+        } catch (ApiGateway.Unreachable unreachable) {
+            throw new InvalidIntegration("unreachable", integration.name() + " did not answer. Try again in a minute.");
+        }
+        log.info("Workspace {} tried tool {} of API {}: HTTP {}", integration.workspaceId(), tool.name(),
+                integrationId, answer.status());
+        return new IntegrationViews.TryView(answer.status(), answer.contentType(), answer.bytes(),
+                answer.took().toMillis(), ApiRequests.shown(request), answer.text() == null ? null
+                        : cut(ApiRequests.redacted(answer.text(), secret), MAX_TRY_CHARACTERS));
     }
 
     /** Allows exactly the ticked tools. A tool agents use can't be unticked. */
     public IntegrationViews.IntegrationView allow(UUID integrationId, Set<String> allowed) {
         Integration integration = load(integrationId);
-        Set<String> unticked = integration.allowedTools().stream().filter(tool -> !allowed.contains(tool))
-                .collect(Collectors.toSet());
+        Set<String> unticked = integration.tools().stream().filter(ApiTool::allowed).map(ApiTool::name)
+                .filter(tool -> !allowed.contains(tool)).collect(Collectors.toSet());
         List<AgentBriefs.McpToolUse> blocking = views.usesOf(integrationId).stream()
                 .filter(use -> unticked.contains(use.tool())).toList();
         if (!blocking.isEmpty()) {
@@ -113,96 +272,40 @@ public final class ManageIntegrations {
         }
         Integration changed = integration.allow(allowed);
         integrations.update(changed);
-        log.info("Workspace {} changed integration {} ({} tools allowed)", integration.workspaceId(), integrationId,
+        log.info("Workspace {} changed API {} ({} tools allowed)", integration.workspaceId(), integrationId,
                 allowed.size());
         return views.view(changed);
     }
 
-    /** The repositories the credential reaches now, to pick from again. Nothing is saved. */
-    public IntegrationViews.TokenCheckView reachable(UUID integrationId) {
+    /** Shows the image at this address as the API's logo; ConXist fetches it once, without the secret. */
+    public IntegrationViews.IntegrationView useLogo(UUID integrationId, String address) {
         Integration integration = load(integrationId);
-        IntegrationApi.Account account = account(integration.kind(), credential(integration));
-        return new IntegrationViews.TokenCheckView(account.login(), account.repositories(),
-                views.view(integration).tools());
-    }
-
-    /** Lets agents read exactly these repositories, each one the credential reaches (Bitbucket). */
-    public IntegrationViews.IntegrationView pickRepositories(UUID integrationId, List<String> repositories) {
-        Integration integration = load(integrationId);
-        if (!integration.kind().picksRepositories()) {
-            throw new InvalidIntegration("repositories-not-picked", integration.name()
-                    + " reaches the repositories its token was made for. Change them on " + integration.name() + ".");
-        }
-        IntegrationApi.Account account = account(integration.kind(), credential(integration));
-        Integration changed = integration.withRepositories(picked(integration.kind(), repositories,
-                account.repositories()), clock.instant());
-        integrations.update(changed);
-        log.info("Workspace {} picked {} repositories for integration {}", integration.workspaceId(),
-                changed.repositories().size(), integrationId);
-        return views.view(changed);
-    }
-
-    /** Asks the service again what the credential reaches. */
-    public IntegrationViews.CheckView check(UUID integrationId) {
-        Integration integration = load(integrationId);
+        URI at = connections.guarded(address, "logo");
+        String image;
         try {
-            IntegrationApi.Account account = api(integration.kind()).account(credential(integration));
-            List<String> reachable = stillReachable(integration, account);
-            if (reachable.isEmpty()) {
-                log.info("Workspace {} checked integration {}: none of the picked repositories is reachable",
-                        integration.workspaceId(), integrationId);
-                return new IntegrationViews.CheckView(false, "repositories-lost", views.view(integration));
-            }
-            Integration checked = integration.checked(account.login(), reachable, integration.tokenEnding(),
-                    clock.instant());
-            integrations.update(checked);
-            log.info("Workspace {} checked integration {}: works", integration.workspaceId(), integrationId);
-            return new IntegrationViews.CheckView(true, null, views.view(checked));
-        } catch (IntegrationApi.TokenRefused refused) {
-            return failed(integration, Integration.Status.SIGN_IN_NEEDED, "sign-in-needed");
-        } catch (IntegrationApi.Refused refused) {
-            return failed(integration, Integration.Status.UNREACHABLE, "refused");
-        } catch (IntegrationApi.Unreachable | IntegrationApi.Missing unreachable) {
-            return failed(integration, Integration.Status.UNREACHABLE, "unreachable");
+            image = gateway.image(at);
+        } catch (ApiGateway.Unreachable unreachable) {
+            throw new InvalidIntegration("logo-unreachable", "ConXist could not reach this address. Check it and try"
+                    + " again.");
         }
-    }
-
-    /** Saves a new credential once the service accepts it, with what it reaches. */
-    public IntegrationViews.IntegrationView replaceToken(UUID integrationId, String email, String token) {
-        Integration integration = load(integrationId);
-        return replace(integration, IntegrationCredentials.checked(integration.kind(), email, token));
-    }
-
-    /** Gmail signed in with Google again (ADR 0021): the new refresh token replaces the old one. */
-    IntegrationViews.IntegrationView replaceSignedIn(UUID integrationId, String credential) {
-        return replace(load(integrationId), credential);
-    }
-
-    private IntegrationViews.IntegrationView replace(Integration integration, String credential) {
-        IntegrationApi.Account account = account(integration.kind(), credential);
-        if (account.tag() != null && !account.tag().equals(integration.tokenEnding())) {
-            log.info("Workspace {} signed in again to integration {} with another account; nothing changed",
-                    integration.workspaceId(), integration.id());
-            throw new InvalidIntegration(integration.kind().code("other-account"), "This is not the mailbox "
-                    + integration.account() + ". Sign in with that one, or remove " + integration.name()
-                    + " and connect the other.");
+        if (image == null) {
+            throw new InvalidIntegration("logo-not-image",
+                    "That address isn't an image. Use the address of a PNG, JPG, SVG, WebP or ICO up to 100 KB.");
         }
-        List<String> reachable = stillReachable(integration, account);
-        if (reachable.isEmpty()) {
-            throw new InvalidIntegration(integration.kind().code("repositories-lost"),
-                    integration.kind() == Integration.Kind.GMAIL
-                            ? "This mailbox has none of the picked labels. Sign in with the mailbox that has them."
-                            : "This token reaches none of the picked repositories. Use a token of an account that can"
-                                    + " see them.");
-        }
-        Integration replaced = integration.checked(account.login(), reachable, ending(credential, account),
-                clock.instant());
-        integrations.replaceToken(replaced, credential);
-        log.info("Workspace {} replaced the token of integration {}", integration.workspaceId(), integration.id());
-        return views.view(replaced);
+        return saveLogo(integration, new Logo(image, at, clock.instant()));
     }
 
-    /** The agents that use the integration's tools; while there are any, it can't be removed. */
+    /** Shows an uploaded file as the API's logo. */
+    public IntegrationViews.IntegrationView uploadLogo(UUID integrationId, String dataUrl) {
+        return saveLogo(load(integrationId), Logo.uploaded(dataUrl, clock.instant()));
+    }
+
+    /** Goes back to the logo ConXist found for the API's site. */
+    public IntegrationViews.IntegrationView dropLogo(UUID integrationId) {
+        return saveLogo(load(integrationId), null);
+    }
+
+    /** The agents that use the API's tools; while there are any, it can't be removed. */
     public List<McpViews.AgentUseView> uses(UUID integrationId) {
         load(integrationId);
         Map<UUID, AgentBriefs.McpToolUse> byAgent = new LinkedHashMap<>();
@@ -215,98 +318,34 @@ public final class ManageIntegrations {
         Integration integration = load(integrationId);
         List<AgentBriefs.McpToolUse> uses = views.usesOf(integrationId);
         if (!uses.isEmpty()) {
-            throw new Conflict("integration." + integration.kind().code("in-use"), "Agents use "
-                    + integration.name() + "'s tools. Remove them from " + agentNames(uses) + " first.");
+            throw new Conflict("integration.in-use", "Agents use " + integration.name() + "'s tools. Remove them from "
+                    + agentNames(uses) + " first.");
         }
         integrations.delete(integration.workspaceId(), integrationId);
-        log.info("Workspace {} removed integration {}", integration.workspaceId(), integrationId);
+        log.info("Workspace {} removed API {}", integration.workspaceId(), integrationId);
     }
 
-    /**
-     * The repositories agents may read after a check: for GitHub all the credential reaches; for Bitbucket the
-     * picked ones it still reaches, so a repository the person lost access to drops out. When the service's list
-     * was cut at {@link Integration#MAX_REPOSITORIES}, a picked one missing from it may only sort later, so all
-     * picks stay.
-     */
-    private static List<String> stillReachable(Integration integration, IntegrationApi.Account account) {
-        if (!integration.kind().picksRepositories()) {
-            return account.repositories();
-        }
-        if (integration.allMail() || account.repositories().size() >= Integration.MAX_REPOSITORIES) {
-            return integration.repositories();
-        }
-        return integration.repositories().stream()
-                .filter(picked -> account.repositories().stream().anyMatch(picked::equalsIgnoreCase)).toList();
+    private IntegrationViews.IntegrationView saveLogo(Integration integration, Logo logo) {
+        Integration changed = integration.withLogo(logo);
+        integrations.update(changed);
+        log.info("Workspace {} {} the logo of API {}", integration.workspaceId(), logo == null ? "reset" : "set",
+                integration.id());
+        return views.view(changed);
     }
 
-    /** The picked repositories as the service writes them, each one it reaches. */
-    private static List<String> picked(Integration.Kind kind, List<String> repositories, List<String> reachable) {
-        if (repositories == null || repositories.isEmpty()) {
-            throw new InvalidIntegration("repositories-required", kind == Integration.Kind.GMAIL
-                    ? "Pick at least one label, or all email." : "Pick at least one repository.");
+    private String secretOf(Integration integration) {
+        if (!integration.auth().hasSecret()) {
+            return null;
         }
-        if (kind == Integration.Kind.GMAIL && repositories.contains(GmailTools.ALL_MAIL)) {
-            if (repositories.size() > 1) {
-                throw new InvalidIntegration("labels-or-all-mail", "Pick labels or all email, not both.");
-            }
-            return List.of(GmailTools.ALL_MAIL);
-        }
-        Map<String, String> byName = new LinkedHashMap<>();
-        reachable.forEach(name -> byName.put(name.toLowerCase(Locale.ROOT), name));
-        Set<String> picked = new LinkedHashSet<>();
-        for (String repository : repositories) {
-            String found = Optional.ofNullable(repository)
-                    .map(name -> byName.get(name.strip().toLowerCase(Locale.ROOT)))
-                    .orElseThrow(() -> new InvalidIntegration("repository-unknown",
-                            "The token doesn't reach " + repository + " on " + kind.label() + "."));
-            picked.add(found);
-        }
-        return List.copyOf(picked);
+        return integrations.secret(integration.workspaceId(), integration.id()).orElseThrow(ManageIntegrations::gone);
     }
 
-    /** The token's last 4 characters, or the account's own mark when it has one (Gmail: never part of a token). */
-    private static String ending(String credential, IntegrationApi.Account account) {
-        return account.tag() != null ? account.tag() : Integration.endingOf(IntegrationCredentials.tokenOf(credential));
-    }
-
-    private IntegrationApi.Account account(Integration.Kind kind, String credential) {
-        try {
-            IntegrationApi.Account account = api(kind).account(credential);
-            if (account.repositories().isEmpty() && kind != Integration.Kind.GMAIL) {
-                throw new InvalidIntegration(kind.code("no-repositories"), kind == Integration.Kind.GITHUB
-                        ? "This token reaches no repositories. On GitHub, pick at least one for it."
-                        : "This account reaches no repositories on " + kind.label() + ".");
-            }
-            return account;
-        } catch (IntegrationApi.TokenRefused refused) {
-            throw new InvalidIntegration(kind.code("token-refused"), kind.label() + " refused this token. It may"
-                    + " have expired or been revoked: make a new one.");
-        } catch (IntegrationApi.Refused refused) {
-            throw new InvalidIntegration(kind.code("refused"), kind.label() + " refused what ConXist asked. Check"
-                    + " the token can read repositories, then try again.");
-        } catch (IntegrationApi.Unreachable | IntegrationApi.Missing unreachable) {
-            throw new InvalidIntegration(kind.code("unreachable"), kind.label() + " did not answer. Try again in a"
-                    + " minute.");
-        }
-    }
-
-    private IntegrationApi api(Integration.Kind kind) {
-        IntegrationApi api = apis.get(kind);
-        if (api == null) {
-            throw new IllegalStateException("No API for " + kind);
-        }
-        return api;
-    }
-
-    private String credential(Integration integration) {
-        return integrations.token(integration.workspaceId(), integration.id()).orElseThrow(ManageIntegrations::gone);
-    }
-
-    private IntegrationViews.CheckView failed(Integration integration, Integration.Status status, String code) {
-        Integration marked = integration.withStatus(status, clock.instant());
-        integrations.update(marked);
-        log.info("Workspace {} checked integration {}: {}", integration.workspaceId(), integration.id(), code);
-        return new IntegrationViews.CheckView(false, code, views.view(marked));
+    /** ConXist sets the sign-in's key itself: a tool written by hand can't take it as an input. */
+    private static void refuseSignInInputs(Integration integration, ApiTool tool) {
+        tool.params().stream().filter(integration.auth()::sets).findFirst().ifPresent(param -> {
+            throw new InvalidIntegration("tool-input-sign-in", param.name() + " is where ConXist puts "
+                    + integration.name() + "'s sign-in. Remove that input: ConXist sends it on every call.");
+        });
     }
 
     private Integration load(UUID integrationId) {
@@ -314,7 +353,11 @@ public final class ManageIntegrations {
     }
 
     private static NotFound gone() {
-        return new NotFound("integration.not-found", "This integration is no longer in this workspace.");
+        return new NotFound("integration.not-found", "This API is no longer in this workspace.");
+    }
+
+    private static NotFound toolGone(String name) {
+        return new NotFound("integration.tool-not-found", "This API no longer has a tool called " + name + ".");
     }
 
     private static String agentNames(List<AgentBriefs.McpToolUse> uses) {
@@ -323,7 +366,11 @@ public final class ManageIntegrations {
         return String.join(", ", names);
     }
 
-    private static InvalidIntegration taken(Integration.Kind kind) {
-        return new InvalidIntegration(kind.code("taken"), kind.label() + " is already connected in this workspace.");
+    private static InvalidIntegration taken(String name) {
+        return new InvalidIntegration("name-taken", "This workspace already has an API called " + name + ".");
+    }
+
+    private static String cut(String text, int max) {
+        return text.length() <= max ? text : text.substring(0, max) + "\n(The answer was cut here.)";
     }
 }

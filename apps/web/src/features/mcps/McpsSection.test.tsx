@@ -226,4 +226,28 @@ describe('Settings › MCPs', () => {
     expect(await screen.findByText(/ConXist found this logo/)).toBeInTheDocument();
     expect(screen.getByLabelText('Logo address')).toHaveValue('');
   });
+
+  it('a server’s page keeps an uploaded logo, and refuses a file that is too big or not an image', async () => {
+    const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+    const uploaded = { ...SERVER, icon: PNG, logo: { address: null, fetchedAt: '2026-11-28T16:00:00Z' } };
+    const calls = stubApi({
+      'GET /api/mcps': () => ({ body: [SERVER] }),
+      [`GET /api/mcps/${SERVER_ID}`]: () => ({ body: SERVER }),
+      [`PUT /api/mcps/${SERVER_ID}/logo`]: () => ({ body: uploaded }),
+    });
+    const { container } = open(`#/settings/mcps/${SERVER_ID}`);
+
+    await screen.findByLabelText('Logo address');
+    const input = container.querySelector<HTMLInputElement>('.mcp-logo-box input[type=file]');
+    if (!input) throw new Error('no file input');
+    await userEvent.upload(input, new File(['x'.repeat(100 * 1024 + 1)], 'big.png', { type: 'image/png' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('That file is over 100 KB.');
+    await userEvent.upload(input, new File(['<html>'], 'page.html', { type: 'text/html' }), { applyAccept: false });
+    expect(screen.getByRole('alert')).toHaveTextContent('Use a PNG, JPG, SVG, WebP or ICO file.');
+    expect(calls.map((call) => call.key)).not.toContain(`PUT /api/mcps/${SERVER_ID}/logo`);
+
+    await userEvent.upload(input, new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'logo.png', { type: 'image/png' }));
+    expect(await screen.findByText('Your uploaded logo. ConXist keeps its own copy.')).toBeInTheDocument();
+    expect(String(bodyOf(calls, `PUT /api/mcps/${SERVER_ID}/logo`).image)).toMatch(/^data:image\/png;base64,/);
+  });
 });

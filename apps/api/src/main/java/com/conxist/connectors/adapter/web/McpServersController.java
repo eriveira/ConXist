@@ -88,10 +88,11 @@ class McpServersController {
         return servers.check(serverId);
     }
 
-    /** Fetches the image at this address once and shows it as the server's logo. */
+    /** Shows an image as the server's logo: fetched once from its address, or an uploaded file. */
     @PutMapping("/{serverId}/logo")
     McpViews.ServerView useLogo(@PathVariable UUID serverId, @Valid @RequestBody LogoRequest request) {
-        return servers.useLogo(serverId, request.address());
+        return request.image() != null && !request.image().isBlank() ? servers.uploadLogo(serverId, request.image())
+                : servers.useLogo(serverId, request.address());
     }
 
     /** Goes back to the logo ConXist found. */
@@ -129,7 +130,8 @@ class McpServersController {
             @NotNull @Size(max = McpServer.MAX_TOOLS) List<@NotNull @Pattern(regexp = McpTool.NAME_PATTERN) String> allowedTools) {
     }
 
-    record LogoRequest(@NotNull @Size(max = MAX_ADDRESS) String address) {
+    /** @param image an uploaded file as a {@code data:image/...} address (ADR 0027); else {@code address} is fetched */
+    record LogoRequest(@Size(max = MAX_ADDRESS) String address, @Size(max = 140_000) String image) {
     }
 
     record CredentialRequest(@NotNull UUID connectionId) {

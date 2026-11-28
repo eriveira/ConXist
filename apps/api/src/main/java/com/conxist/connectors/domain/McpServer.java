@@ -27,13 +27,12 @@ public record McpServer(UUID id, UUID workspaceId, String name, URI address, Mcp
      * shows if that address changes.
      *
      * @param image     the copy, as a {@code data:image/...} address
-     * @param address   where it was fetched from, to show the person
+     * @param address   where it was fetched from, to show the person; null when a person uploaded it (ADR 0027)
      * @param fetchedAt when
      */
     public record Logo(String image, URI address, Instant fetchedAt) {
         public Logo {
             Objects.requireNonNull(image, "image");
-            Objects.requireNonNull(address, "address");
             Objects.requireNonNull(fetchedAt, "fetchedAt");
         }
     }

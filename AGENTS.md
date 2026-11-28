@@ -89,7 +89,7 @@ Sources page does not show it for now, owner decision 2026-11-17).
   its own key uses `CONXIST_ANTHROPIC_API_KEY` or `CONXIST_OPENAI_API_KEY` when set; every model the key offers with an
   Allowed box (OpenAI's list keeps only the chat models agents can run on), who uses each and at what effort, a default model and effort per provider,
   and which provider new agents start on, grouped by provider in lists that fold away (ADR 0022, V23)),
-  MCPs (ADR 0017, below), Integrations (ADR 0019, 0020 and 0021, below), Variables (ADR 0018, below), and Guardrails
+  MCPs (ADR 0017, below), Integrations (ADR 0027, below), Variables (ADR 0018, below), and Guardrails
   (ADR 0025, V26; ADR 0026, V27: ConXist's rule, which a workspace may replace with its own version after a warning and
   restore (owner, 2026-11-28); the workspace's own rules up to 2,000 characters that every agent follows after it; and
   the copy guard, which it can only make stricter: 6 to 11 words in a row instead of 12, and the most text one outside
@@ -104,24 +104,18 @@ Sources page does not show it for now, owner decision 2026-11-17).
   Tools section lists them by server, and test runs call them, results as data. A tool or server agents use cannot
   be unticked or removed. `mvn spring-boot:test-run` runs three fake MCP servers (OAuth, token `mcp-fake-token`,
   public).
-- Integrations (ADR 0019, owner 2026-11-27): Settings › Integrations, in the `connectors` module (table `integrations`,
-  V20). GitHub connects with a fine-grained token (`github_pat_`, checked with GitHub, sealed per workspace; only its
-  last 4 characters show). ConXist's own five read tools (`search_code`, `get_file`, `list_issues`, `get_issue`,
-  `get_pull_request`) reach only the repositories the token was checked for, and only by GET. Agents pick them like MCP
-  tools (`mcpTools`, the integration's id as `serverId`). `mvn spring-boot:test-run` runs a fake GitHub API that takes
-  any token starting with `github_pat_fake`.
-- Bitbucket (ADR 0020, owner 2026-11-27): the second integration (V21 adds the kind). It connects with the person's
-  Atlassian email and an API token (`ATATT…`), sealed together; the token reaches every repository its person sees, so
-  the person picks the ones agents may read (Change repositories on its page). Five read tools: `search_code`,
-  `get_file`, `list_pull_requests`, `get_pull_request`, `list_commits`. Integrations share one `IntegrationApi` port
-  with an adapter per service; error codes that name a service start with its kind (`integration.bitbucket-…`).
-  `mvn spring-boot:test-run` runs a fake Bitbucket API that takes any email with a token starting with `ATATTfake`.
-- Gmail (ADR 0021, owner 2026-11-27): the third integration (V22 adds the kind). Sign in with Google for read-only
-  Gmail only (`gmail.readonly`, PKCE); a sign-in granting more is refused. The sealed credential is the refresh token;
-  the account shows shortened (`al…@acme.test`). The person picks the labels agents may read, or all email but Spam
-  and Trash (`*`). Four read tools: `search_emails`, `get_email`, `get_thread`, `list_labels`; every email is checked
-  against the labels. Offered only when `CONXIST_GOOGLE_CLIENT_ID` and `CONXIST_GOOGLE_CLIENT_SECRET` are set.
-  `mvn spring-boot:test-run` runs a fake Google that signs in as `alex@acme.test`.
+- Integrations (ADR 0027, owner 2026-11-28; replaces GitHub, Bitbucket and Gmail, ADR 0019 to 0021): Settings ›
+  Integrations, in the `connectors` module (table `integrations`, V28). Any API: an https address and a sign-in (none,
+  an API key in a header or the query, a bearer token, or Basic), checked with one GET before it is saved and sealed
+  per workspace (only its last 4 characters show; OAuth later). Its tools come from an OpenAPI 3 or Swagger 2
+  description (by address or file, JSON or YAML, up to 2 MB; what ConXist can't call is listed as left out) or are
+  written by hand, grouped by the API's sections, at most 200. A GET only reads and a DELETE changes; a POST, PUT or
+  PATCH changes unless a person says it only reads. Reads come ticked on the first import, changes start unticked and
+  warn (ADR 0022). Agents pick API tools like MCP tools (`mcpTools`, the API's id as `serverId`); calls go only under
+  the API's address, never follow redirects, and pass the run's guardrails. Try it sends one real call, nothing kept.
+  Logos by address or upload (up to 100 KB), for MCP servers too. `mvn spring-boot:test-run` runs a fake API,
+  "Northwind CRM", that takes any `X-Api-Key` starting with `nw_fake` and publishes its description at
+  `.../v1/openapi.json`.
 - Variables (ADR 0018, owner 2026-11-27): Settings › Variables replaces Topics. A name (letters, digits, underscores,
   starting with a letter; unique ignoring case) and a value up to 2,000 characters, up to 100 per workspace, edited in
   place. Agents' and skills' instructions use one as `{{name}}`; a run puts the value in its place, and a name the

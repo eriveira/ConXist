@@ -130,10 +130,7 @@
 .mcp-actions { justify-content: flex-start; margin: 0 0 8px; }
 .mcp-found { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .mcp-found h3 { margin: 0; overflow-wrap: anywhere; }
-.github-steps { margin: 0 0 16px; padding-left: 20px; color: var(--cx-fg-muted); font-size: 14px; display: grid; gap: 4px; }
 .ok-line { display: flex; align-items: flex-start; gap: 6px; color: var(--cx-ok-fg); font-weight: 600; overflow-wrap: anywhere; }
-.repo-list { list-style: none; margin: 8px 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.repo-list li { padding: 4px 10px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); font-size: 13.5px; overflow-wrap: anywhere; }
 .mcp-selrow { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: 13.5px; }
 .mcp-wait { display: flex; gap: 8px; align-items: center; }
 .mcp-switch { align-self: flex-start; }
@@ -164,28 +161,68 @@
   .variable:not(.editing) { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
 
-/* Settings › Integrations: the Add menu and Bitbucket's repository picker (ADR 0020). */
-.kind-picker { margin: 0; }
-.kind-option { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-.kind-option:hover:not(:disabled) { border-color: var(--cx-action); }
-.kind-option:focus-visible { outline: 2px solid var(--cx-action); outline-offset: 2px; }
-.kind-option:disabled { cursor: default; }
-.kind-option { flex-wrap: nowrap; }
-.kind-option .grow { flex-basis: auto; min-width: 0; }
-.repo-picker { border: 0; margin: 0; padding: 0; min-width: 0; }
-.repo-options { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; }
-.repo-options .check { display: flex; align-items: center; gap: 10px; padding: 8px 12px; min-height: 44px; border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); cursor: pointer; overflow-wrap: anywhere; }
-.repo-options input { width: 18px; height: 18px; flex: none; accent-color: var(--cx-action); }
-.label-choice { display: grid; gap: 10px; }
-.label-option { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-sm); padding: 8px 14px 12px; min-width: 0; }
-.label-option.on { border-color: var(--cx-accent); }
-.label-choice { border: 0; margin: 0; padding: 0; min-width: 0; }
-.label-option .radio { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding-top: 12px; cursor: pointer; }
-.label-option .radio > span { min-width: 0; }
-.label-option .radio input { width: 18px; height: 18px; accent-color: var(--cx-accent); flex: none; margin: 2px 0 0; }
-.label-option > .hint { margin: 0 0 8px 28px; }
-.label-option .repo-picker { margin-top: 6px; }
-.gmail-wait { display: flex; align-items: center; gap: 10px; }
+/* Settings › Integrations: custom APIs (ADR 0027), the Add API steps, the grouped tool table and the tool editor. */
+.steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 14px; padding: 0; font-size: 13px; color: var(--cx-fg-muted); }
+.steps li[aria-current=step] { color: var(--cx-fg); font-weight: 700; }
+.field-legend { font-size: 13px; font-weight: 700; margin-bottom: 6px; padding: 0; }
+.api-auth { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.api-auth > legend, .api-place > legend { grid-column: 1 / -1; }
+.api-place { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.api-place label { align-items: center; }
+.field input.mono, .field .mono { font-family: var(--cx-font-mono); }
+.api-way { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); padding: 12px 14px; margin: 0 0 12px; }
+.api-way h4 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
+.api-way .hint { margin: 0 0 10px; }
+.api-import-row { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-start; }
+.api-import-row .field { flex: 1 1 260px; min-width: 0; margin: 0; }
+.api-import-row > .btn { margin-top: 22px; min-height: 44px; }
+.api-import-file { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; }
+.api-import-summary { margin: 0 0 10px; }
+.api-left-out { margin: 8px 0 0; font-size: 13.5px; }
+.api-left-out summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+.api-left-out ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.api-meta { margin: 12px 0 12px; max-width: 720px; }
+.api-meta dd.mono { font-family: var(--cx-font-mono); font-weight: 500; }
+.api-find { max-width: 320px; margin: 0 0 10px; }
+.api-tools tr.api-section th, .api-tools tr.api-section td { background: var(--cx-surface); }
+.api-fold { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.api-fold:focus-visible { outline: 2px solid var(--cx-action); outline-offset: 2px; }
+.api-section-name { font-weight: 800; font-size: 14px; text-transform: none; letter-spacing: 0; }
+.api-fold .muted { font-size: 12.5px; font-weight: 500; }
+.api-route { color: var(--cx-fg-muted); }
+.api-method { font-weight: 700; color: var(--cx-fg); }
+.api-tools .act { width: 1%; white-space: nowrap; text-align: right; }
+.api-how ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+.api-tool-form .api-sub { margin: 18px 0 4px; font-size: 15px; font-weight: 800; }
+.api-tool-form textarea, .api-tool-form select, .api-inputs input[type=text], .api-inputs select {
+  border: 1px solid var(--cx-input-border); border-radius: var(--cx-radius-sm); background: var(--cx-surface); color: var(--cx-fg); width: 100%;
+}
+.api-tool-form textarea { padding: 10px 12px; resize: vertical; line-height: 1.5; }
+.api-tool-form select { min-height: 44px; padding: 0 10px; }
+.api-tool-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+.api-route-fields { display: flex; gap: 0 12px; align-items: flex-start; }
+.api-method-field { flex: 0 0 120px; }
+.api-route-fields .grow { flex: 1; min-width: 0; }
+.api-path { display: flex; align-items: center; gap: 6px; }
+.api-path > span { font-size: 13px; white-space: nowrap; }
+.api-reads { margin: 0 0 6px; }
+.api-inputs input[type=text], .api-inputs select { min-height: 40px; padding: 0 8px; min-width: 90px; }
+.api-inputs td { padding: 6px 8px; }
+.api-try { margin-top: 18px; border-top: 1px solid var(--cx-border); padding-top: 4px; }
+.api-try-field label .muted { font-weight: 500; }
+.api-answer { border: 1px solid var(--cx-border); border-radius: var(--cx-radius-md); margin: 10px 0 0; overflow: hidden; }
+.api-answer.failed { border-color: var(--cx-err-fg); }
+.api-answer-head { margin: 0; padding: 8px 12px; background: var(--cx-surface); font-size: 13.5px; overflow-wrap: anywhere; }
+.api-answer-body { margin: 0; padding: 10px 12px; max-height: 280px; overflow: auto; font-family: var(--cx-font-mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.api-answer-body:focus-visible { outline: 2px solid var(--cx-action); outline-offset: -2px; }
+.confirm-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; }
+@media (max-width: 640px) {
+  .api-tool-grid { grid-template-columns: minmax(0, 1fr); }
+  .api-route-fields { flex-direction: column; }
+  .api-method-field { flex-basis: auto; width: 100%; }
+  .api-path > span { display: none; }
+  .api-tools td.act, .api-tools th.act { width: auto; }
+}
 
 /* Delete workspace, at the end of General. */
 .danger-zone { margin-top: 28px; padding: 16px; border: 1px solid var(--cx-err-fg); border-radius: var(--cx-radius-md); }
@@ -237,3 +274,14 @@
 .warn-list { margin: 8px 0 12px; padding-left: 20px; display: grid; gap: 6px; }
 .copy-example { margin: 0 0 16px; padding: 12px 14px; border: 1px dashed var(--cx-border); border-radius: var(--cx-radius-sm); font-size: 13.5px; max-width: 72ch; }
 .guardrails-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 320px)); gap: 16px; }
+/* Review fixes (ADR 0027): a wrong field shows it, long addresses wrap, and each input's fields keep a label on phones. */
+.api-tool-form textarea[aria-invalid="true"], .api-inputs input[aria-invalid="true"] { border-color: var(--cx-err-fg); }
+.api-how > div { min-width: 0; }
+.api-how li, .status-line, .field .hint { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .api-inputs tr { grid-template-columns: minmax(0, 1fr); }
+  .api-inputs td.allow { display: flex; align-items: center; gap: 8px; }
+  .api-inputs td[data-label]::before { content: attr(data-label); display: block; margin: 0 0 4px; font-size: 12.5px; font-weight: 700; color: var(--cx-fg-muted); }
+  .api-inputs td.allow[data-label]::before { display: inline; margin: 0; order: 2; }
+}
+.api-left-out .mono, .api-path .mono, .api-try-field .mono { font-family: var(--cx-font-mono); overflow-wrap: anywhere; }

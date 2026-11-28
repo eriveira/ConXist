@@ -134,18 +134,23 @@ public final class FakeClaudeServer implements AutoCloseable {
         }
         boolean offersSources = false;
         String searchTool = null;
+        Map<String, Object> searchInput = Map.of("query", "checkout");
         for (JsonNode tool : request.path("tools")) {
             offersSources |= "list_sources".equals(tool.path("name").asString());
             if (tool.path("name").asString().endsWith("__search_docs")
                     || tool.path("name").asString().endsWith("__search_code")) {
                 searchTool = tool.path("name").asString();
+            } else if (tool.path("name").asString().endsWith("__search_deals")) {
+                // A custom API's search (ADR 0027, the fake API's searchDeals).
+                searchTool = tool.path("name").asString();
+                searchInput = Map.of("company", "Globex");
             }
         }
         boolean firstTurn = request.path("messages").size() == 1;
         if (firstTurn && searchTool != null) {
-            // An MCP server's or GitHub's search tool (ADR 0017, 0019): the fake model searches it once.
+            // An MCP server's or a custom API's search tool (ADR 0017, 0027): the fake model searches it once.
             send(exchange, 200, message(model, List.of(Map.of("type", "tool_use", "id", "toolu_fake_mcp",
-                    "name", searchTool, "input", Map.of("query", "checkout"))), "tool_use"));
+                    "name", searchTool, "input", searchInput)), "tool_use"));
             return;
         }
         if (firstTurn && offersSources) {

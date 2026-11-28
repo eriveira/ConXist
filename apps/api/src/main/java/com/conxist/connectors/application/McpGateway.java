@@ -44,6 +44,12 @@ public interface McpGateway {
      */
     String image(URI address);
 
+    /**
+     * The logo of the address's site (its home page's icons, touch icon or favicon, its parent domain's, else a public
+     * favicon service by host name), as a {@code data:image/...} address; null when none is found.
+     */
+    String siteIcon(URI address);
+
     /** Calls one tool and returns its text; {@code error} is true when the tool says it failed. */
     ToolAnswer call(URI address, String bearer, String tool, Map<String, Object> arguments);
 

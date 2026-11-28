@@ -1,165 +1,139 @@
 package com.conxist.connectors.domain;
 
+import java.net.URI;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
- * A tool a workspace connected through its own API: GitHub (ADR 0019), Bitbucket (ADR 0020) or Gmail (ADR 0021).
- * ConXist knows its tools; the workspace picks the ones agents may use. The credential itself is kept apart,
- * encrypted; only its last characters are here.
+ * An API a workspace connected (ADR 0027): its address, how ConXist signs in, and the operations agents can call as
+ * tools. The secret is kept apart, sealed; only its last characters are here.
  *
- * @param account      the account the token belongs to
- * @param repositories the repositories agents may read, as {@code owner/name}: for GitHub all the token reached when
- *                     last checked (the person picks them on GitHub), for Bitbucket the ones the person picked here;
- *                     for Gmail the labels agents may read, by name, or {@link GmailTools#ALL_MAIL} alone
- * @param tokenEnding  the token's last 4 characters, to tell tokens apart; for Gmail the mailbox's mark instead
- *                     (4 hex characters of its address's SHA-256), so no part of the refresh token is kept
+ * @param account     for a username and password, the username; null otherwise
+ * @param ending      the secret's last 4 characters, to tell secrets apart; null without one
+ * @param checkPath   the path ConXist calls with GET to check the sign-in, or null to check the address answers
+ * @param icon        the logo ConXist found for the address's site, as a {@code data:image/...} address, or null
+ * @param logo        the logo a person chose instead, or null
+ * @param description the OpenAPI description the imported tools came from, or null
+ * @param tools       its tools, in the order shown; at most {@link #MAX_TOOLS}
  */
-public record Integration(UUID id, UUID workspaceId, Kind kind, String account, List<String> repositories,
-        String tokenEnding, Set<String> allowedTools, Status status, Instant addedAt, Instant checkedAt) {
+public record Integration(UUID id, UUID workspaceId, String name, URI address, ApiAuth auth, String account,
+        String ending, String checkPath, Status status, String icon, Logo logo, Description description,
+        List<ApiTool> tools, Instant addedAt, Instant checkedAt) {
 
-    public static final int MAX_REPOSITORIES = 100;
-
-    public enum Kind {
-        GITHUB("GitHub", GitHubTools.ALL, GitHubTools.REPOSITORY, false),
-        BITBUCKET("Bitbucket", BitbucketTools.ALL, BitbucketTools.REPOSITORY, true),
-        /** Its "repositories" are labels; it signs in with Google, never with a pasted token. */
-        GMAIL("Gmail", GmailTools.ALL, GmailTools.LABEL, true);
-
-        private final String label;
-        private final List<McpTool> tools;
-        private final Pattern repository;
-        private final boolean picksRepositories;
-
-        Kind(String label, List<McpTool> tools, Pattern repository, boolean picksRepositories) {
-            this.label = label;
-            this.tools = tools;
-            this.repository = repository;
-            this.picksRepositories = picksRepositories;
-        }
-
-        /** The name people see. */
-        public String label() {
-            return label;
-        }
-
-        /** ConXist's own tools for this service, none allowed. */
-        public List<McpTool> tools() {
-            return tools;
-        }
-
-        /** How the service writes a repository, {@code owner/name}, or for Gmail a label. */
-        public Pattern repository() {
-            return repository;
-        }
-
-        /**
-         * Whether the person picks the repositories (Gmail: labels) in ConXist: a Bitbucket token or a Google sign-in
-         * reaches all of its person's, while a GitHub fine-grained token reaches only those picked on GitHub.
-         */
-        public boolean picksRepositories() {
-            return picksRepositories;
-        }
-
-        public Optional<McpTool> tool(String name) {
-            return tools.stream().filter(tool -> tool.name().equals(name)).findFirst();
-        }
-
-        /** An error code whose words name this service, such as {@code github-unreachable}. */
-        public String code(String problem) {
-            return name().toLowerCase(Locale.ROOT) + "-" + problem;
-        }
-    }
+    public static final int MAX_NAME_LENGTH = 60;
+    public static final int MAX_TOOLS = 200;
+    public static final int MAX_CHECK_PATH_LENGTH = 500;
 
     public enum Status {
         WORKS,
-        /** The service refused the token: the person replaces it. */
+        /** The API refused the secret: the person replaces it. */
         SIGN_IN_NEEDED,
         UNREACHABLE
+    }
+
+    /**
+     * Where the imported tools came from.
+     *
+     * @param address where ConXist fetched it, or null when a person uploaded the file
+     */
+    public record Description(String title, String version, URI address, Instant importedAt) {
+        public Description {
+            title = Texts.cut(title, 120);
+            version = Texts.cut(version, 40);
+            Objects.requireNonNull(importedAt, "importedAt");
+        }
     }
 
     public Integration {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(workspaceId, "workspaceId");
-        Objects.requireNonNull(kind, "kind");
-        Objects.requireNonNull(account, "account");
-        Objects.requireNonNull(tokenEnding, "tokenEnding");
-        repositories = List.copyOf(repositories.size() > MAX_REPOSITORIES
-                ? repositories.subList(0, MAX_REPOSITORIES) : repositories);
-        allowedTools = Set.copyOf(allowedTools);
-        if (!allowedTools.stream().allMatch(tool -> kind.tool(tool).isPresent())) {
-            throw new InvalidIntegration(kind.code("tool-unknown"), kind.label() + " has no such tool in ConXist.");
+        name = name == null ? "" : name.strip();
+        if (name.isEmpty()) {
+            throw new InvalidIntegration("name-required", "Give the API a name.");
+        }
+        if (name.codePointCount(0, name.length()) > MAX_NAME_LENGTH) {
+            throw new InvalidIntegration("name-too-long", "A name is at most " + MAX_NAME_LENGTH + " characters.");
+        }
+        Objects.requireNonNull(address, "address");
+        Objects.requireNonNull(auth, "auth");
+        checkPath = checkPath == null || checkPath.isBlank() ? null : checkPath.strip();
+        if (checkPath != null && (!checkPath.startsWith("/") || checkPath.length() > MAX_CHECK_PATH_LENGTH
+                || checkPath.contains("#") || checkPath.contains(" ") || ApiTool.climbs(checkPath))) {
+            throw new InvalidIntegration("check-path-invalid", "The check path starts with / and holds no spaces.");
+        }
+        // The sign-in's own key is never an input: ConXist sets it, so the model can't swap in a key it read.
+        tools = Objects.requireNonNullElse(tools, List.<ApiTool>of()).stream().map(tool -> tool.withoutSignIn(auth))
+                .toList();
+        if (tools.size() > MAX_TOOLS) {
+            throw new InvalidIntegration("too-many-tools", "An API keeps at most " + MAX_TOOLS + " tools.");
+        }
+        Set<String> names = new HashSet<>();
+        for (ApiTool tool : tools) {
+            if (!names.add(tool.name().toLowerCase(Locale.ROOT))) {
+                throw new InvalidIntegration("tool-name-taken", name + " already has a tool called " + tool.name() + ".");
+            }
         }
         status = Objects.requireNonNullElse(status, Status.WORKS);
     }
 
-    /** The name people see. */
-    public String name() {
-        return kind.label();
-    }
-
-    /** ConXist's tools for this kind, with the ones agents may use marked allowed. */
-    public List<McpTool> tools() {
-        return kind.tools().stream().map(tool -> tool.withAllowed(allowedTools.contains(tool.name()))).toList();
-    }
-
     public boolean allows(String tool) {
-        return allowedTools.contains(tool);
+        return tool(tool).map(ApiTool::allowed).orElse(false);
     }
 
-    public Optional<McpTool> tool(String name) {
-        return tools().stream().filter(tool -> tool.name().equals(name)).findFirst();
+    public Optional<ApiTool> tool(String toolName) {
+        return tools.stream().filter(tool -> tool.name().equals(toolName)).findFirst();
     }
 
-    /** Whether agents may read all of a mailbox but Spam and Trash, rather than some labels (Gmail). */
-    public boolean allMail() {
-        return repositories.equals(List.of(GmailTools.ALL_MAIL));
+    /** The logo to show: the one a person chose, else the one ConXist found; null when there is neither. */
+    public String shownIcon() {
+        return logo != null ? logo.image() : icon;
     }
 
-    /** The listed repository written this way, ignoring case, as GitHub does. */
-    public Optional<String> repository(String name) {
-        if (name == null) {
-            return Optional.empty();
+    /** Allows exactly these tools; names it doesn't have are refused. */
+    public Integration allow(Set<String> allowed) {
+        for (String wanted : allowed) {
+            if (tool(wanted).isEmpty()) {
+                throw new InvalidIntegration("tool-unknown", name + " has no tool called " + wanted + ".");
+            }
         }
-        String wanted = name.strip().toLowerCase(Locale.ROOT);
-        return repositories.stream().filter(repo -> repo.toLowerCase(Locale.ROOT).equals(wanted)).findFirst();
+        return withTools(tools.stream().map(tool -> tool.withAllowed(allowed.contains(tool.name()))).toList());
     }
 
-    public Integration allow(Set<String> tools) {
-        return new Integration(id, workspaceId, kind, account, repositories, tokenEnding, tools, status, addedAt,
-                checkedAt);
+    public Integration withTools(List<ApiTool> newTools) {
+        return new Integration(id, workspaceId, name, address, auth, account, ending, checkPath, status, icon, logo,
+                description, newTools, addedAt, checkedAt);
     }
 
-    /** The repositories agents may read, now the ones given. */
-    public Integration withRepositories(List<String> picked, Instant now) {
-        return new Integration(id, workspaceId, kind, account, picked, tokenEnding, allowedTools, status, addedAt, now);
-    }
-
-    /** What the token reaches now; a new token may belong to another account. */
-    public Integration checked(String newAccount, List<String> newRepositories, String newEnding, Instant now) {
-        return new Integration(id, workspaceId, kind, newAccount, newRepositories, newEnding, allowedTools,
-                Status.WORKS, addedAt, now);
+    public Integration withTools(List<ApiTool> newTools, Description newDescription) {
+        return new Integration(id, workspaceId, name, address, auth, account, ending, checkPath, status, icon, logo,
+                newDescription, newTools, addedAt, checkedAt);
     }
 
     public Integration withStatus(Status newStatus, Instant now) {
-        return new Integration(id, workspaceId, kind, account, repositories, tokenEnding, allowedTools, newStatus,
-                addedAt, now);
+        return new Integration(id, workspaceId, name, address, auth, account, ending, checkPath, newStatus, icon, logo,
+                description, tools, addedAt, now);
     }
 
-    /** The last 4 characters of a token. */
-    public static String endingOf(String token) {
-        return token.length() <= 4 ? token : token.substring(token.length() - 4);
+    public Integration withLogo(Logo newLogo) {
+        return new Integration(id, workspaceId, name, address, auth, account, ending, checkPath, status, icon, newLogo,
+                description, tools, addedAt, checkedAt);
     }
 
-    /** The allowed tools' names, in ConXist's order. */
-    public List<String> orderedAllowedTools() {
-        return kind.tools().stream().map(McpTool::name).filter(allowedTools::contains).collect(Collectors.toList());
+    /** A new connection: name, address, sign-in, check path and secret, checked just now. */
+    public Integration connected(String newName, URI newAddress, ApiAuth newAuth, String newAccount,
+            String newEnding, String newCheckPath, String newIcon, Instant now) {
+        return new Integration(id, workspaceId, newName, newAddress, newAuth, newAccount, newEnding, newCheckPath,
+                Status.WORKS, newIcon, logo, description, tools, addedAt, now);
+    }
+
+    /** The last 4 characters of a secret. */
+    public static String endingOf(String secret) {
+        return secret.length() <= 4 ? secret : secret.substring(secret.length() - 4);
     }
 }

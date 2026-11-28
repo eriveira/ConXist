@@ -212,6 +212,19 @@ class McpServersIntegrationTest {
                 .andExpect(jsonPath("$.server.icon").value(brand));
         mvc.perform(get("/api/mcps").header(HEADER, workspace)).andExpect(jsonPath("$[0].icon").value(brand));
 
+        // Or a file the person uploads (ADR 0027): kept with no address, and only a real image.
+        String uploaded = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(
+                new byte[] {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'});
+        mvc.perform(put("/api/mcps/{id}/logo", server).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"image\":\"" + uploaded + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.icon").value(uploaded))
+                .andExpect(jsonPath("$.logo.address").doesNotExist());
+        mvc.perform(put("/api/mcps/{id}/logo", server).header(HEADER, workspace)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"image\":\"data:image/png;base64,PGh0bWw+\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("logo.not-image"));
+
         mvc.perform(delete("/api/mcps/{id}/logo", server).header(HEADER, workspace)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.icon").value(Matchers.startsWith("data:image/png;base64,")))
                 .andExpect(jsonPath("$.logo").doesNotExist());

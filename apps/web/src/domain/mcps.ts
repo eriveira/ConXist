@@ -37,9 +37,9 @@ export interface McpServer {
   checkedAt: string;
 }
 
-/** A logo a person chose by its address. ConXist fetched it once and keeps its own copy. */
+/** A logo a person chose: by its address (fetched once), or a file they uploaded (no address). ConXist keeps a copy. */
 export interface McpLogoChoice {
-  address: string;
+  address: string | null;
   fetchedAt: string;
 }
 

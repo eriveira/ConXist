@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import com.conxist.agents.AgentBriefs;
 import com.conxist.connectors.application.McpConnections.Connection;
 import com.conxist.connectors.domain.InvalidMcp;
+import com.conxist.connectors.domain.Logo;
 import com.conxist.connectors.domain.McpServer;
 import com.conxist.platform.Conflict;
 import com.conxist.platform.CurrentWorkspace;
@@ -167,6 +168,16 @@ public final class ManageMcpServers {
         McpServer changed = server.withLogo(new McpServer.Logo(image, at, clock.instant()));
         saveLogo(changed);
         log.info("Workspace {} chose a logo for MCP server {}", server.workspaceId(), serverId);
+        return views.server(changed);
+    }
+
+    /** Shows a file a person uploaded as the server's logo (ADR 0027): a small PNG, JPG, SVG, WebP or ICO. */
+    public McpViews.ServerView uploadLogo(UUID serverId, String dataUrl) {
+        McpServer server = load(serverId);
+        Logo file = Logo.uploaded(dataUrl, clock.instant());
+        McpServer changed = server.withLogo(new McpServer.Logo(file.image(), null, file.fetchedAt()));
+        saveLogo(changed);
+        log.info("Workspace {} uploaded a logo for MCP server {}", server.workspaceId(), serverId);
         return views.server(changed);
     }
 

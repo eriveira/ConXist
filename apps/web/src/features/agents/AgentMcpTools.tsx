@@ -35,7 +35,7 @@ export function AgentMcpTools({ draft, servers, onChange, locked }: {
         return (
         <AgentToolGroup key={server.id} mark={<McpLogo name={server.name} icon={server.icon} size="sm" />}
           title={<>{server.name}{' '}
-            <Pill tone="info">{t('kind' in server && server.kind === 'api' ? 'integration.kind' : 'agent.tools.mcp')}</Pill></>}
+            <Pill tone="info">{t('kind' in server && server.kind === 'api' ? 'api.kind' : 'agent.tools.mcp')}</Pill></>}
           picked={picks.length} total={tools.length} changing={picks.filter((tool) => !tool.readOnly).length}
           startOpen={picks.length > 0} locked={locked}>
           {tools.map((tool) => {

@@ -50,7 +50,7 @@ export function SettingsPage({ workspace, onSaved, canDelete, onDeleted }: {
           )}
           {section === 'llm' && <LlmProvidersSection />}
           {section === 'mcps' && <McpsSection />}
-          {section === 'integrations' && <IntegrationsSection workspaceName={workspace.name} />}
+          {section === 'integrations' && <IntegrationsSection />}
           {section === 'variables' && <VariablesSection />}
           {section === 'guardrails' && <GuardrailsSection workspaceId={workspace.id} />}
         </div>
