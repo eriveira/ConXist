@@ -42,7 +42,9 @@ export function McpToolTable({ server, tools, allowed, busy, fresh, onToggle }: 
     return index < 0 ? null : document.getElementById(`${idBase}-${index}`) as HTMLInputElement | null;
   }
 
+  // While a tick saves, the boxes say so but keep focus: a disabled box would drop it to the page.
   function toggle(tool: McpTool) {
+    if (busy) return;
     if (!tool.readOnly && !allowed.has(tool.name)) setAsking(tool.name);
     else onToggle(tool);
   }
@@ -77,7 +79,8 @@ export function McpToolTable({ server, tools, allowed, busy, fresh, onToggle }: 
               <Fragment key={tool.name}>
                 <tr>
                   <td className="allow">
-                    <input type="checkbox" id={box} checked={allowed.has(tool.name)} disabled={locked || Boolean(busy) || isAsking}
+                    <input type="checkbox" id={box} checked={allowed.has(tool.name)} disabled={locked || isAsking}
+                      aria-disabled={Boolean(busy) || undefined}
                       aria-label={t('mcp.table.allow', { name: tool.name })} aria-describedby={`${box}-about`}
                       aria-busy={busy === tool.name || undefined} onChange={() => toggle(tool)} />
                   </td>

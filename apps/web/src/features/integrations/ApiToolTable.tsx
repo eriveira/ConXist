@@ -33,7 +33,9 @@ export function ApiToolTable({ apiName, tools, allowed, busy, query = '', onTogg
   const locked = (tool: ApiTool) => allowed.has(tool.name) && usersOf(tool).length > 0;
   const boxId = (tool: ApiTool) => `${idBase}-${tools.indexOf(tool)}`;
 
+  // While a tick saves, the boxes say so but keep focus: a disabled box would drop it to the page.
   function toggle(tool: ApiTool) {
+    if (busy) return;
     if (!tool.reads && !allowed.has(tool.name)) setAsking(tool.name);
     else onToggle([tool.name], !allowed.has(tool.name));
   }
@@ -53,6 +55,7 @@ export function ApiToolTable({ apiName, tools, allowed, busy, query = '', onTogg
   }
 
   function toggleSection(list: readonly ApiTool[]) {
+    if (busy) return;
     const { checked, reads } = sectionState(list);
     if (checked) {
       const off = list.filter((tool) => allowed.has(tool.name) && !locked(tool)).map((tool) => tool.name);
@@ -90,7 +93,8 @@ export function ApiToolTable({ apiName, tools, allowed, busy, query = '', onTogg
             <tbody key={key}>
               <tr className="api-section">
                 <td className="allow">
-                  <input type="checkbox" id={sectionBox} checked={state.checked} disabled={busy || state.reads.length === 0}
+                  <input type="checkbox" id={sectionBox} checked={state.checked} disabled={state.reads.length === 0}
+                    aria-disabled={busy || undefined}
                     ref={(box) => { if (box) box.indeterminate = state.mixed; }}
                     aria-label={t('api.tools.sectionAllow', { section: label })} onChange={() => toggleSection(group.tools)} />
                 </td>
@@ -116,7 +120,7 @@ export function ApiToolTable({ apiName, tools, allowed, busy, query = '', onTogg
                     <tr>
                       <td className="allow">
                         <input type="checkbox" id={box} checked={allowed.has(tool.name)}
-                          disabled={locked(tool) || Boolean(busy) || isAsking}
+                          disabled={locked(tool) || isAsking} aria-disabled={busy || undefined}
                           aria-label={t('mcp.table.allow', { name: tool.name })} aria-describedby={`${box}-about`}
                           onChange={() => toggle(tool)} />
                       </td>

@@ -17,8 +17,10 @@ export function ImportDescription({ integration, onImported, busy, setBusy }: {
   const file = useRef<HTMLInputElement>(null);
   const [address, setAddress] = useState(integration.description?.address ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [fromFile, setFromFile] = useState(false);
 
   async function send(from: { address: string } | { text: string }) {
+    setFromFile('text' in from);
     setBusy(true);
     setError(null);
     try {
@@ -59,7 +61,7 @@ export function ImportDescription({ integration, onImported, busy, setBusy }: {
           <small id={ids.help} className="hint">{t('api.import.help')}</small>
         </div>
         <button type="submit" className="btn primary" disabled={busy || address.trim() === ''}>
-          {busy ? t('api.import.busy') : t('api.import.go')}
+          {busy && !fromFile ? t('api.import.busy') : t('api.import.go')}
         </button>
       </div>
       <p className="api-import-file">
@@ -67,7 +69,7 @@ export function ImportDescription({ integration, onImported, busy, setBusy }: {
         <input ref={file} type="file" className="sr-only" tabIndex={-1} aria-hidden="true"
           accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml" onChange={picked} />
         <button type="button" className="btn sm" disabled={busy} onClick={() => file.current?.click()}>
-          <Icon name="upload" size={16} /> {t('api.import.file')}
+          <Icon name="upload" size={16} /> {busy && fromFile ? t('api.import.busy') : t('api.import.file')}
         </button>
       </p>
       {error && <p id={ids.error} className="alert error" role="alert"><Icon name="alert" /> {error}</p>}

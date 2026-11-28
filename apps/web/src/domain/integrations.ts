@@ -257,21 +257,42 @@ export function nameFromAddress(address: string): string {
 }
 
 export type ToolProblem = 'name-invalid' | 'name-taken' | 'path-invalid' | 'description-empty' | 'input-invalid'
-  | 'input-twice' | 'input-reserved' | null;
+  | 'input-twice' | 'input-reserved' | 'input-sign-in' | null;
+
+/** Whether ConXist sets this input itself with the sign-in: the key's header or query parameter, or Authorization. */
+export function setBySignIn(auth: ApiAuth, input: Pick<ApiInput, 'name' | 'in'>): boolean {
+  const name = input.name.trim().toLowerCase();
+  if (input.in === 'HEADER') {
+    if (auth.kind === 'BEARER' || auth.kind === 'BASIC') return name === 'authorization';
+    return auth.kind === 'API_KEY' && auth.place === 'HEADER' && name === (auth.name ?? '').toLowerCase();
+  }
+  return input.in === 'QUERY' && auth.kind === 'API_KEY' && auth.place === 'QUERY' && name === (auth.name ?? '').toLowerCase();
+}
+
+/** A path that could leave the API's address: a . or .. part, or an encoded dot, slash or backslash. */
+function climbs(path: string): boolean {
+  return /%2e|%2f|%5c|\\/i.test(path) || path.split('/').some((part) => part === '.' || part === '..');
+}
 
 /** What is wrong with a tool in the editor before saving it; `taken` holds the other tools' names. */
-export function toolProblem(tool: ApiToolDraft, taken: readonly string[]): ToolProblem {
+export function toolProblem(tool: ApiToolDraft, taken: readonly string[], auth?: ApiAuth): ToolProblem {
   if (!TOOL_NAME.test(tool.name)) return 'name-invalid';
   if (taken.some((name) => name.toLowerCase() === tool.name.toLowerCase())) return 'name-taken';
-  if (!tool.path.startsWith('/') || /[\s?#]|\.\./.test(tool.path)) return 'path-invalid';
+  if (!tool.path.startsWith('/') || /[\s?#]/.test(tool.path) || climbs(tool.path)) return 'path-invalid';
   if (tool.description.trim() === '') return 'description-empty';
+  return inputProblem(tool, auth)?.problem ?? null;
+}
+
+/** The first wrong input of a tool, and its place in the list, so the editor can mark that row only. */
+export function inputProblem(tool: ApiToolDraft, auth?: ApiAuth): { problem: ToolProblem; at: number } | null {
   const seen = new Set<string>();
-  for (const input of tool.inputs) {
-    if (!INPUT_NAME.test(input.name)) return 'input-invalid';
+  for (const [at, input] of tool.inputs.entries()) {
+    if (!INPUT_NAME.test(input.name)) return { problem: 'input-invalid', at };
     const key = `${input.in}:${input.name.toLowerCase()}`;
-    if (seen.has(key)) return 'input-twice';
+    if (seen.has(key)) return { problem: 'input-twice', at };
     seen.add(key);
-    if (input.in === 'HEADER' && RESERVED_HEADERS.includes(input.name.toLowerCase())) return 'input-reserved';
+    if (input.in === 'HEADER' && RESERVED_HEADERS.includes(input.name.toLowerCase())) return { problem: 'input-reserved', at };
+    if (auth && setBySignIn(auth, input)) return { problem: 'input-sign-in', at };
   }
   return null;
 }

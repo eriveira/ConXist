@@ -4,9 +4,10 @@ import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import {
   type ApiInputPlace, type ApiTool, type ApiToolDraft, type ApiTry, draftOf, INPUT_PLACES, INPUT_TYPES, type Integration,
-  MAX_TOOL_DESCRIPTION, MAX_TOOL_INPUTS, METHODS, type ToolProblem, toolProblem, toolReads, tryValue, withPathInputs,
+  inputProblem, MAX_TOOL_DESCRIPTION, MAX_TOOL_INPUTS, METHODS, type ToolProblem, toolProblem, toolReads, tryValue,
+  withPathInputs,
 } from '../../domain/integrations';
-import { useT } from '../../i18n/i18n';
+import { useLanguage, useT } from '../../i18n/i18n';
 import { problemMessage } from '../../i18n/problems';
 import { McpLogo } from '../mcps/McpParts';
 
@@ -60,7 +61,7 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    const wrong = toolProblem(sent(), taken);
+    const wrong = toolProblem(sent(), taken, integration.auth);
     setProblem(wrong);
     if (wrong) return;
     setBusy('save');
@@ -90,7 +91,7 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
   }
 
   async function send() {
-    const wrong = toolProblem(sent(), taken);
+    const wrong = toolProblem(sent(), taken, integration.auth);
     setProblem(wrong);
     if (wrong) return;
     const inputs: Record<string, unknown> = {};
@@ -117,8 +118,13 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
 
   const message = problem
     ? <p id={ids.problem} className="alert error" role="alert"><Icon name="alert" /> {t(`api.tool.problem.${problem}`)}</p> : null;
-  const invalid = (...names: ToolProblem[]) => (problem !== null && names.includes(problem)
-    ? { 'aria-invalid': true as const } : {});
+  /** A field's help, and when the problem is about it, the problem too: marked invalid and read with it. */
+  const field = (help: string | undefined, ...names: ToolProblem[]) => {
+    const wrong = problem !== null && names.includes(problem);
+    const describedBy = [help, wrong ? ids.problem : undefined].filter(Boolean).join(' ');
+    return { 'aria-describedby': describedBy || undefined, ...(wrong ? { 'aria-invalid': true as const } : {}) };
+  };
+  const badInput = problem !== null && problem.startsWith('input-') ? inputProblem(sent(), integration.auth)?.at ?? -1 : -1;
   const working = busy !== null;
   return (
     <Dialog title={tool ? t('api.tool.editTitle', { name: tool.name }) : t('api.tool.newTitle', { name: integration.name })}
@@ -156,8 +162,8 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
           <div className="field">
             <label htmlFor={ids.name}>{t('api.tool.name')}</label>
             <input id={ids.name} type="text" className="mono" autoComplete="off" spellCheck={false} maxLength={64}
-              value={draft.name} disabled={working || used} aria-describedby={ids.nameHelp}
-              {...invalid('name-invalid', 'name-taken')} onChange={(event) => set({ name: event.target.value })} />
+              value={draft.name} disabled={working || used}
+              {...field(ids.nameHelp, 'name-invalid', 'name-taken')} onChange={(event) => set({ name: event.target.value })} />
             <small id={ids.nameHelp} className="hint">{t('api.tool.nameHelp')}</small>
             {(problem === 'name-invalid' || problem === 'name-taken') && message}
           </div>
@@ -180,7 +186,7 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
             <div className="api-path">
               <span className="mono muted" aria-hidden="true">{shortPath(integration.address)}</span>
               <input id={ids.path} type="text" className="mono" autoComplete="off" spellCheck={false} maxLength={500}
-                value={draft.path} disabled={working} aria-describedby={ids.pathHelp} {...invalid('path-invalid')}
+                value={draft.path} disabled={working} {...field(ids.pathHelp, 'path-invalid')}
                 onChange={(event) => set({ path: event.target.value })} />
             </div>
             <small id={ids.pathHelp} className="hint">{t('api.tool.pathHelp', { address: integration.address })}</small>
@@ -190,7 +196,7 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
         <div className="field">
           <label htmlFor={ids.about}>{t('api.tool.about')}</label>
           <textarea id={ids.about} rows={3} maxLength={MAX_TOOL_DESCRIPTION} value={draft.description} disabled={working}
-            aria-describedby={ids.aboutHelp} {...invalid('description-empty')}
+            {...field(ids.aboutHelp, 'description-empty')}
             onChange={(event) => set({ description: event.target.value })} />
           <small id={ids.aboutHelp} className="hint">{t('api.tool.aboutHelp')}</small>
           {problem === 'description-empty' && message}
@@ -227,12 +233,13 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
                   const rowLabel = input.name || t('api.input.unnamed', { n: index + 1 });
                   return (
                     <tr key={index}>
-                      <td>
+                      <td data-label={t('api.input.name')}>
                         <input type="text" className="mono" value={input.name} maxLength={64} disabled={working || path}
-                          aria-label={t('api.input.nameOf', { n: index + 1 })} {...invalid('input-invalid', 'input-twice', 'input-reserved')}
+                          aria-label={t('api.input.nameOf', { n: index + 1 })}
+                          {...(index === badInput ? field(undefined, problem) : {})}
                           onChange={(event) => setInput(index, { name: event.target.value })} />
                       </td>
-                      <td>
+                      <td data-label={t('api.input.in')}>
                         <select value={input.in} disabled={working || path} aria-label={t('api.input.inOf', { name: rowLabel })}
                           onChange={(event) => setInput(index, { in: event.target.value as ApiInputPlace })}>
                           {INPUT_PLACES.filter((place) => place !== 'PATH' || path).map((place) => (
@@ -240,19 +247,19 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td data-label={t('api.input.type')}>
                         <select value={input.type} disabled={working} aria-label={t('api.input.typeOf', { name: rowLabel })}
                           onChange={(event) => setInput(index, { type: event.target.value, schema: {} })}>
                           {!INPUT_TYPES.includes(input.type as never) && <option value={input.type}>{t('api.type.other', { type: input.type })}</option>}
                           {INPUT_TYPES.map((type) => <option key={type} value={type}>{t(`api.type.${type}`)}</option>)}
                         </select>
                       </td>
-                      <td className="allow">
+                      <td className="allow" data-label={t('api.input.required')}>
                         <input type="checkbox" checked={input.required || path} disabled={working || path}
                           aria-label={t('api.input.requiredOf', { name: rowLabel })}
                           onChange={(event) => setInput(index, { required: event.target.checked })} />
                       </td>
-                      <td>
+                      <td data-label={t('api.input.about')}>
                         <input type="text" value={input.description} maxLength={500} disabled={working}
                           aria-label={t('api.input.aboutOf', { name: rowLabel })}
                           onChange={(event) => setInput(index, { description: event.target.value })} />
@@ -273,7 +280,7 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
             </table>
           </div>
         )}
-        {(problem === 'input-invalid' || problem === 'input-twice' || problem === 'input-reserved') && message}
+        {badInput >= 0 && message}
         <p>
           <button type="button" className="btn sm" disabled={working || draft.inputs.length >= MAX_TOOL_INPUTS}
             onClick={() => set({ inputs: [...draft.inputs, { name: '', in: draft.method === 'GET' ? 'QUERY' : 'BODY', type: 'string', schema: {}, required: false, description: '' }] })}>
@@ -302,10 +309,12 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
               {busy === 'try' ? <><span className="spin" aria-hidden="true" /> {t('api.try.sending')}</> : t('api.try.send')}
             </button>
           </p>
-          <div role="status" aria-live="polite">
-            {tried && 'error' in tried && <p className="alert error"><Icon name="alert" /> {tried.error}</p>}
-            {tried && 'result' in tried && <TryAnswer result={tried.result} />}
-          </div>
+          {/* Only the outcome is announced; the answer itself is there to read, not read out whole. */}
+          <p className="sr-only" role="status" aria-live="polite">
+            {tried && 'result' in tried ? t('api.try.answered', { status: tried.result.status }) : ''}
+          </p>
+          {tried && 'error' in tried && <p className="alert error" role="alert"><Icon name="alert" /> {tried.error}</p>}
+          {tried && 'result' in tried && <TryAnswer result={tried.result} />}
         </section>
       </form>
     </Dialog>
@@ -315,12 +324,13 @@ export function ToolEditorDialog({ integration, tool, onClose, onSaved }: {
 /** One answer of Try it: its status and size, and the answer as text. The API's text: shown as text only. */
 function TryAnswer({ result }: { result: ApiTry }) {
   const t = useT();
+  const language = useLanguage();
   const ok = result.status >= 200 && result.status < 300;
   return (
     <div className={ok ? 'api-answer' : 'api-answer failed'}>
       <p className="api-answer-head">
         <b>{t('api.try.status', { status: result.status })}</b>{' '}
-        <span className="muted">{t('api.try.meta', { size: size(result.bytes), millis: result.millis, request: result.request })}</span>
+        <span className="muted">{t('api.try.meta', { size: size(result.bytes, language), millis: result.millis, request: result.request })}</span>
       </p>
       {result.text !== null
         ? <pre className="api-answer-body" tabIndex={0}>{pretty(result.text)}</pre>
@@ -337,8 +347,9 @@ function pretty(text: string): string {
   }
 }
 
-function size(bytes: number): string {
-  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+function size(bytes: number, language: string): string {
+  const number = new Intl.NumberFormat(language, { maximumFractionDigits: 1 });
+  return bytes < 1024 ? `${number.format(bytes)} B` : `${number.format(bytes / 1024)} KB`;
 }
 
 /** The address's path, shown before the tool's own, such as "…/v1". */

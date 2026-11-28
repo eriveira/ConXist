@@ -34,6 +34,8 @@ export function LogoBox({ target, onAddress, onUpload, onDrop }: {
   const [address, setAddress] = useState(target.logo?.address ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether the problem is the typed address's, so only then that field shows as wrong.
+  const [addressWrong, setAddressWrong] = useState(false);
   const chosen = target.logo;
   const typed = address.trim();
 
@@ -52,6 +54,7 @@ export function LogoBox({ target, onAddress, onUpload, onDrop }: {
   function use(event: FormEvent) {
     event.preventDefault();
     if (!typed || busy) return;
+    setAddressWrong(true);
     void run(() => onAddress(typed));
   }
 
@@ -59,7 +62,10 @@ export function LogoBox({ target, onAddress, onUpload, onDrop }: {
     const chosenFile = event.target.files?.[0];
     event.target.value = '';
     if (!chosenFile) return;
-    if (!LOGO_TYPES.includes(chosenFile.type)) {
+    setAddressWrong(false);
+    // Browsers often give an .ico no type, or another one: its name says what it is, and the API checks its bytes.
+    const ico = /\.ico$/i.test(chosenFile.name) && !LOGO_TYPES.includes(chosenFile.type);
+    if (!LOGO_TYPES.includes(chosenFile.type) && !ico) {
       setError(t('logo.upload.notImage'));
       return;
     }
@@ -68,8 +74,8 @@ export function LogoBox({ target, onAddress, onUpload, onDrop }: {
       return;
     }
     void run(async () => {
-      const dataUrl = await readAsDataUrl(chosenFile);
-      await onUpload(dataUrl);
+      const read = await readAsDataUrl(chosenFile);
+      await onUpload(ico ? read.replace(/^data:[^;,]*/, 'data:image/x-icon') : read);
       setAddress('');
     });
   }
@@ -77,7 +83,7 @@ export function LogoBox({ target, onAddress, onUpload, onDrop }: {
   const uploaded = chosen !== null && chosen.address === null;
   const lead = uploaded ? t('logo.uploaded') : chosen ? t('mcp.logo.chosen')
     : target.icon ? t('mcp.logo.found') : t('mcp.logo.none', { name: target.name });
-  const describedBy = error ? `${ids.help} ${ids.error}` : ids.help;
+  const describedBy = error && addressWrong ? `${ids.help} ${ids.error}` : ids.help;
   return (
     <form className="mcp-logo-box" aria-labelledby={ids.title} onSubmit={use} noValidate>
       <h3 id={ids.title}>{t('mcp.logo.title')}</h3>
@@ -88,7 +94,7 @@ export function LogoBox({ target, onAddress, onUpload, onDrop }: {
           <label htmlFor={ids.address}>{t('mcp.logo.address')}</label>
           <input id={ids.address} className="input" type="text" inputMode="url" autoComplete="off" spellCheck={false}
             placeholder="https://…/logo.png" value={address} maxLength={2000} disabled={busy}
-            aria-invalid={error ? true : undefined} aria-describedby={describedBy}
+            aria-invalid={error && addressWrong ? true : undefined} aria-describedby={describedBy}
             onChange={(event) => { setAddress(event.target.value); setError(null); }} />
           {chosen && chosen.address !== null && typed === chosen.address
             ? <small id={ids.help} className="hint ok"><Icon name="check" size={14} /> {t('mcp.logo.saved', { when: dateTime(chosen.fetchedAt, language) })}</small>

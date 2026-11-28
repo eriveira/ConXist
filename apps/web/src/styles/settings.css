@@ -274,3 +274,14 @@
 .warn-list { margin: 8px 0 12px; padding-left: 20px; display: grid; gap: 6px; }
 .copy-example { margin: 0 0 16px; padding: 12px 14px; border: 1px dashed var(--cx-border); border-radius: var(--cx-radius-sm); font-size: 13.5px; max-width: 72ch; }
 .guardrails-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 320px)); gap: 16px; }
+/* Review fixes (ADR 0027): a wrong field shows it, long addresses wrap, and each input's fields keep a label on phones. */
+.api-tool-form textarea[aria-invalid="true"], .api-inputs input[aria-invalid="true"] { border-color: var(--cx-err-fg); }
+.api-how > div { min-width: 0; }
+.api-how li, .status-line, .field .hint { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .api-inputs tr { grid-template-columns: minmax(0, 1fr); }
+  .api-inputs td.allow { display: flex; align-items: center; gap: 8px; }
+  .api-inputs td[data-label]::before { content: attr(data-label); display: block; margin: 0 0 4px; font-size: 12.5px; font-weight: 700; color: var(--cx-fg-muted); }
+  .api-inputs td.allow[data-label]::before { display: inline; margin: 0; order: 2; }
+}
+.api-left-out .mono, .api-path .mono, .api-try-field .mono { font-family: var(--cx-font-mono); overflow-wrap: anywhere; }
