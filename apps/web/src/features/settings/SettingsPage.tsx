@@ -4,6 +4,7 @@ import { useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { SETTINGS_SECTIONS, settingsHref, useSettingsSection } from '../../navigation';
 import { GeneralSection } from './GeneralSection';
+import { GuardrailsSection } from './GuardrailsSection';
 import { LlmProvidersSection } from './LlmProvidersSection';
 import { VariablesSection } from './VariablesSection';
 import { IntegrationsSection } from '../integrations/IntegrationsSection';
@@ -45,6 +46,7 @@ export function SettingsPage({ workspace, onSaved, canDelete, onDeleted }: {
           {section === 'mcps' && <McpsSection />}
           {section === 'integrations' && <IntegrationsSection workspaceName={workspace.name} />}
           {section === 'variables' && <VariablesSection />}
+          {section === 'guardrails' && <GuardrailsSection workspaceId={workspace.id} />}
         </div>
       </div>
     </section>

@@ -8,6 +8,7 @@ import type { GmailSignIn, Integration, IntegrationCheck, IntegrationKind, Token
 import type { McpCheck, McpConnection, McpServer } from '../domain/mcps';
 import type { ConnectionCheck, LlmProvider, LlmProviders, OfferedModels } from '../domain/settings';
 import type { RunLimits } from '../domain/runLimits';
+import type { Guardrails, GuardrailsChange } from '../domain/guardrails';
 import type { Variable } from '../domain/variables';
 import type { Agent, AgentModel, AgentDefinition, AgentSummary, AgentUse, AgentToolInfo, AgentVersion } from '../domain/agents';
 import type { Skill, SkillDefinition, SkillSummary, SkillVersion } from '../domain/skills';
@@ -123,6 +124,8 @@ export const api = {
     }),
   runLimits: () => request<RunLimits>('/api/run-limits'),
   saveRunLimits: (limits: RunLimits) => putJson<RunLimits>('/api/run-limits', limits),
+  guardrails: () => request<Guardrails>('/api/guardrails'),
+  saveGuardrails: (change: GuardrailsChange) => putJson<Guardrails>('/api/guardrails', change),
   variables: () => request<Variable[]>('/api/variables'),
   addVariable: (variable: Omit<Variable, 'id'>) => postJson<Variable>('/api/variables', variable),
   changeVariable: (id: string, variable: Omit<Variable, 'id'>) =>

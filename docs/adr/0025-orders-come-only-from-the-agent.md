@@ -46,6 +46,14 @@ The first step (this change):
    a meeting ordering another meeting into an issue, an email asking for a meeting in a search, an input over the
    limit, and reports past the cap. Code must hold in each.
 
+5. **Settings › Guardrails** (owner, 2026-11-28: "mock it now"; mock `App/mocks/guardrails-settings-v1`). ConXist's
+   rule is shown in plain words and word for word, marked always on; no workspace can change or remove it. Each
+   workspace can add its own rules (up to 2,000 characters, variables filled), which every agent follows in a
+   `<workspace-rules>` block after ConXist's rules and before its own instructions; they can only add limits. Each
+   workspace can lower the most text one outside call may send (200 to 4,000 characters). Stored in
+   `workspace_guardrails` (V26), deleted with the workspace. How many words in a row count as copying stays fixed at
+   12: the owner agreed it is too technical to set.
+
 Later steps, from the plan:
 
 - With the next change to Try it: per change tool, a person sets its purpose, target and how many changes one run may

@@ -9,7 +9,26 @@ export interface TestRunStep {
   name: string;
   detail: string;
   ok: boolean;
+  /** Why ConXist didn't send this tool call (ADR 0025); null when it was sent. */
+  refusal: StepRefusal | null;
   millis: number;
+}
+
+/**
+ * COPIES_SOURCE: the call repeated a long passage of something the run read; detail names where it was read.
+ * TOO_LONG: the call held more text than the workspace allows; detail is the limit in characters.
+ */
+export interface StepRefusal {
+  reason: 'COPIES_SOURCE' | 'TOO_LONG';
+  detail: string;
+}
+
+/** Something the data the run read asked to be done, which the agent did not carry out (ADR 0025). */
+export interface FoundRequest {
+  /** What it asked, as the model put it: untrusted text, shown only as quoted plain text. */
+  request: string;
+  /** Where it was read, or null when the model didn't say. */
+  foundIn: string | null;
 }
 
 /** What one test run did. Nothing of it is kept on the server. */
@@ -22,6 +41,7 @@ export interface TestRunResult {
   /** The answer as plain text (ADR 0023). */
   answer: string | null;
   steps: TestRunStep[];
+  requestsFound: FoundRequest[];
   toolCalls: number;
   inputTokens: number;
   outputTokens: number;

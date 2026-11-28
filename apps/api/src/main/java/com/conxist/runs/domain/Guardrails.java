@@ -20,7 +20,8 @@ public record Guardrails(String rules, int maxInputCharacters) {
 
     public Guardrails {
         rules = rules == null ? "" : rules.replace("\r\n", "\n").strip();
-        if (rules.length() > MAX_RULES) {
+        // Counted in characters as people see them, as the app counts them, so an emoji is one.
+        if (rules.codePointCount(0, rules.length()) > MAX_RULES) {
             throw new RuleViolation("guardrails.rules-too-long",
                     "Workspace rules can be up to " + MAX_RULES + " characters.");
         }

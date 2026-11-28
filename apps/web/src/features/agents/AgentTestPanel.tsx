@@ -2,7 +2,9 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import type { CapturedDocument, Source } from '../../domain/model';
-import { type TestRunResult, type TestRunStep, firstChoice, runChoiceGroups } from '../../domain/testRuns';
+import {
+  type FoundRequest, type StepRefusal, type TestRunResult, type TestRunStep, firstChoice, runChoiceGroups,
+} from '../../domain/testRuns';
 import { providerLabel, type Translate, useLanguage, useT } from '../../i18n/i18n';
 import type { MessageKey } from '../../i18n/messages';
 import { ApiError } from '../../api/client';
@@ -210,6 +212,7 @@ function RunResult({ result }: { result: TestRunResult }) {
           <p className="test-text">{result.answer}</p>
         </section>
       )}
+      <RequestsFound id={`${result.agentId}-requests`} requests={result.requestsFound ?? []} />
       <details className="test-steps">
         <summary>{t('run.steps')} ({result.steps.length})</summary>
         <ol>{result.steps.map((step, index) => <StepRow key={index} step={step} />)}</ol>
@@ -227,11 +230,46 @@ function StepRow({ step }: { step: TestRunStep }) {
     : labelOr(t, `run.tool.${step.name}`, step.name);
   return (
     <li className={step.ok ? undefined : 'failed'}><div className="step-row">
-      <span className="grow">{label}{!step.ok && <> · <b>{t('run.step.failed')}</b></>}
+      <span className="grow">{label}{!step.ok && <> · <b>{t(step.refusal ? 'run.step.refused' : 'run.step.failed')}</b></>}
+        {step.refusal && <span className="test-guard">{refusalText(t, step.refusal, language)}</span>}
         {step.kind === 'TOOL' && step.detail && <span className="test-detail">{step.detail}</span>}</span>
       <span className="muted">{step.millis < 1000 ? '< 1 s' : t('run.meta.time', { seconds })}</span>
     </div></li>
   );
+}
+
+/**
+ * What the data the run read asked for, which the agent did not do (ADR 0025). The model writes these and a hostile
+ * source can steer it, so each is quoted plain text under a heading that says where it came from, never a link.
+ */
+function RequestsFound({ id, requests }: { id: string; requests: FoundRequest[] }) {
+  const t = useT();
+  return (
+    <section className="test-requests" aria-labelledby={id}>
+      <h3 id={id}>{t('run.requests')} <span className="pill">{requests.length}</span></h3>
+      {requests.length === 0 ? <p>{t('run.requests.none')}</p> : (
+        <>
+          <p>{t('run.requests.lead')}</p>
+          <ul>
+            {requests.map((found, index) => (
+              <li key={index}>
+                <q>{found.request}</q>
+                {found.foundIn && <span className="where">{t('run.requests.where', { place: found.foundIn })}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+function refusalText(t: Translate, refusal: StepRefusal, language: string): string {
+  if (refusal.reason === 'TOO_LONG') {
+    const limit = Number(refusal.detail);
+    return t('run.refused.TOO_LONG', { limit: Number.isFinite(limit) ? new Intl.NumberFormat(language).format(limit) : refusal.detail });
+  }
+  return t('run.refused.COPIES_SOURCE', { place: refusal.detail });
 }
 
 /** The words for a key, or the fallback when this version of the app has none. */

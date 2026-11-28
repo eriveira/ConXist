@@ -396,7 +396,7 @@ class StartTestRunTest {
         assertThat(result.steps()).filteredOn(step -> step.name().equals("docs__create_issue")).singleElement()
                 .satisfies(step -> {
                     assertThat(step.ok()).isFalse();
-                    assertThat(step.refusal()).isEqualTo("Refused by ConXist: it copies a long passage from Pricing.");
+                    assertThat(step.refusal()).isEqualTo(new TestRunResult.Refusal("COPIES_SOURCE", "Pricing"));
                 });
         assertThat(result.toolCalls()).isEqualTo(2);
     }
@@ -441,7 +441,7 @@ class StartTestRunTest {
         assertThat(model.requests.get(1).exchanges().get(0).results().get(1).content())
                 .startsWith("Error input-too-long");
         assertThat(result.steps()).filteredOn(step -> step.refusal() != null).singleElement()
-                .satisfies(step -> assertThat(step.refusal()).isEqualTo("Refused by ConXist: it holds more than 4,000 characters."));
+                .satisfies(step -> assertThat(step.refusal()).isEqualTo(new TestRunResult.Refusal("TOO_LONG", "4000")));
     }
 
     @Test
@@ -507,8 +507,7 @@ class StartTestRunTest {
                 .isLessThan(system.indexOf("<agent "));
         assertThat(mcpCalls).containsExactly(Map.of("body", "Short."));
         assertThat(result.steps()).filteredOn(step -> step.refusal() != null).singleElement()
-                .satisfies(step -> assertThat(step.refusal()).isEqualTo("Refused by ConXist: it holds more than 300"
-                        + " characters."));
+                .satisfies(step -> assertThat(step.refusal()).isEqualTo(new TestRunResult.Refusal("TOO_LONG", "300")));
     }
 
     @Test

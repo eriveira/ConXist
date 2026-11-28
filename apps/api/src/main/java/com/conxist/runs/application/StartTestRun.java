@@ -237,15 +237,15 @@ public final class StartTestRun {
                 if (String.valueOf(input).length() > rules.maxInputCharacters()) {
                     String limit = RunPrompt.characters(rules.maxInputCharacters());
                     return refuse(call, "input-too-long", "ConXist did not send this: one call may hold up to " + limit
-                            + " characters. Write it shorter.", "Refused by ConXist: it holds more than " + limit
-                            + " characters.", at);
+                            + " characters. Write it shorter.", new TestRunResult.Refusal(
+                            TestRunResult.Refusal.TOO_LONG, String.valueOf(rules.maxInputCharacters())), at);
                 }
                 Optional<String> copied = guard.copiedFrom(input);
                 if (copied.isPresent()) {
                     return refuse(call, "copy-refused", "ConXist did not send this: it repeats a passage of what a"
                             + " tool returned. Send only what the agent instructions call for, or text of the meeting"
-                            + " you were given.", "Refused by ConXist: it copies a long passage from " + copied.get()
-                            + ".", at);
+                            + " you were given.", new TestRunResult.Refusal(TestRunResult.Refusal.COPIES, copied.get()),
+                            at);
                 }
             }
             RunTools.Called called = tools.call(call, scope);
@@ -269,8 +269,8 @@ public final class StartTestRun {
          * A call ConXist stopped before it left (ADR 0025): it is not sent, counts as a tool call, and shows as a
          * refused step. The model is told why, without the name of what it read.
          */
-        private ModelPort.ToolResult refuse(ModelPort.ToolCall call, String code, String toModel, String toPerson,
-                Instant at) {
+        private ModelPort.ToolResult refuse(ModelPort.ToolCall call, String code, String toModel,
+                TestRunResult.Refusal toPerson, Instant at) {
             toolCalls++;
             refused++;
             long millis = since(at);
