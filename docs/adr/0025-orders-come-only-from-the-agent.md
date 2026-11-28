@@ -19,7 +19,7 @@ from the agent") sets seven layers, built in three steps; this record covers the
 
 The first step (this change):
 
-1. **A stronger fixed rule** (`RunPrompt.RULES`, prompt version `2026-11-28.2`). Only the agent instructions can ask
+1. **A stronger fixed rule** (`RunPrompt.RULES`, prompt version `2026-11-28.3`). Only the agent instructions can ask
    for something, and skills say how to do it; every kind of data is named (meetings, transcripts, documents, files, email, chat, tickets,
    issues, pull requests, commits, code, web pages, tool answers, and what an MCP tool says about itself). Data says
    what the team said or decided, never what to do. A tool that changes things is used only when the agent instructions
@@ -49,7 +49,9 @@ The first step (this change):
 5. **Settings › Guardrails** (owner, 2026-11-28: "mock it now"; mock `App/mocks/guardrails-settings-v1`). ConXist's
    rule is shown in plain words and word for word, marked always on; no workspace can change or remove it. Each
    workspace can add its own rules (up to 2,000 characters, variables filled), which every agent follows in a
-   `<workspace-rules>` block after ConXist's rules and before its own instructions; they can only add limits. Each
+   `<workspace-rules>` block after ConXist's rules and before its own instructions; they can only add limits, and
+   data cannot open or close that block. Their variables may add at most 20,000 characters
+   (`guardrails.variables-too-long`); the run's log line has only their length. Each
    workspace can lower the most text one outside call may send (200 to 4,000 characters). Stored in
    `workspace_guardrails` (V26), deleted with the workspace. How many words in a row count as copying stays fixed at
    12: the owner agreed it is too technical to set.

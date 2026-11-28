@@ -19,6 +19,12 @@ export function SettingsPage({ workspace, onSaved, canDelete, onDeleted }: {
 }) {
   const t = useT();
   const section = useSettingsSection();
+  const nav = useRef<HTMLElement>(null);
+  // On a phone the sections scroll sideways; the open one is brought into view so the person sees where they are.
+  useEffect(() => {
+    nav.current?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
+  }, [section]);
   const title = useRef<HTMLHeadingElement>(null);
 
   // Opened from the workspace menu, whose link goes away: focus lands on the page, not the document.
@@ -31,7 +37,7 @@ export function SettingsPage({ workspace, onSaved, canDelete, onDeleted }: {
         <p>{t('settings.lead', { name: workspace.name })}</p>
       </div>
       <div className="settings-layout">
-        <nav className="settings-nav" aria-label={t('settings.sections')}>
+        <nav ref={nav} className="settings-nav" aria-label={t('settings.sections')}>
           {SETTINGS_SECTIONS.map((id) => (
             <a key={id} href={settingsHref(id)} aria-current={id === section ? 'page' : undefined}>
               {t(`settings.${id}` as MessageKey)}

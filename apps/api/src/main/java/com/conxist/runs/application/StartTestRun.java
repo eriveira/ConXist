@@ -291,10 +291,10 @@ public final class StartTestRun {
             // Ids, sizes and counts only: never the meeting, the instructions or the answer (AGENTS.md, Tool calling).
             log.log(System.Logger.Level.INFO,
                     "Test run of agent {0} in workspace {1} on meeting {2}: {3}, model {4}, prompt {5}, {6} turns, "
-                            + "{7} tool calls ({8} refused), {9} requests found, {10,number,#} input and "
-                            + "{11,number,#} output tokens, {12,number,#} ms",
+                            + "{7} tool calls ({8} refused), {9} requests found, {10} characters of workspace rules, "
+                            + "{11,number,#} input and {12,number,#} output tokens, {13,number,#} ms",
                     agent.id(), workspace.id(), meeting.id(), outcome, choice.id(), RunPrompt.VERSION, turns,
-                    toolCalls, refused, found.list().size(), inputTokens, outputTokens, millis);
+                    toolCalls, refused, found.list().size(), rules.rules().length(), inputTokens, outputTokens, millis);
             return new TestRunResult(agent.id(), outcome, choice.effort().name(), choice.id(), answer,
                     List.copyOf(steps), found.list(), toolCalls, inputTokens, outputTokens, millis);
         }

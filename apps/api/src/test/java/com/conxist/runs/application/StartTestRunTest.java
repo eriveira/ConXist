@@ -517,7 +517,7 @@ class StartTestRunTest {
 
         run.run(AGENT_ID, SOURCE_ID, MEETING_ID);
 
-        assertThat(model.requests.get(0).system()).doesNotContain("<workspace-rules>");
+        assertThat(model.requests.get(0).system()).doesNotContain("<workspace-rules>\n");
     }
 
     private void changeAgent(UUID server, String tool) {

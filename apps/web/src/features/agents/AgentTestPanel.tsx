@@ -246,7 +246,7 @@ function RequestsFound({ id, requests }: { id: string; requests: FoundRequest[] 
   const t = useT();
   return (
     <section className="test-requests" aria-labelledby={id}>
-      <h3 id={id}>{t('run.requests')} <span className="pill">{requests.length}</span></h3>
+      <h3 id={id}>{t('run.requests')} <span className="pill info">{requests.length}</span></h3>
       {requests.length === 0 ? <p>{t('run.requests.none')}</p> : (
         <>
           <p>{t('run.requests.lead')}</p>
@@ -269,7 +269,8 @@ function refusalText(t: Translate, refusal: StepRefusal, language: string): stri
     const limit = Number(refusal.detail);
     return t('run.refused.TOO_LONG', { limit: Number.isFinite(limit) ? new Intl.NumberFormat(language).format(limit) : refusal.detail });
   }
-  return t('run.refused.COPIES_SOURCE', { place: refusal.detail });
+  if (refusal.reason === 'COPIES_SOURCE') return t('run.refused.COPIES_SOURCE', { place: refusal.detail });
+  return t('run.refused.other');
 }
 
 /** The words for a key, or the fallback when this version of the app has none. */

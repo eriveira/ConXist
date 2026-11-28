@@ -76,6 +76,8 @@ describe('AgentTestPanel', () => {
             refusal: { reason: 'COPIES_SOURCE', detail: 'Board meeting, 20 Nov' }, millis: 3 },
           { kind: 'TOOL', name: 'jira__create_issue', detail: '', ok: false,
             refusal: { reason: 'TOO_LONG', detail: '1500' }, millis: 2 },
+          { kind: 'TOOL', name: 'jira__create_issue', detail: '', ok: false,
+            refusal: { reason: 'NEWER_REASON', detail: '' }, millis: 2 },
           RESULT.steps[2]] } }),
     });
     const { container } = render(panel());
@@ -90,7 +92,8 @@ describe('AgentTestPanel', () => {
     expect(within(found).queryByRole('link')).toBeNull();
     expect(within(found).getByText('Found in: Weekly sync')).toBeInTheDocument();
     await userEvent.click(screen.getByText(/What it did/));
-    expect(screen.getAllByText('refused by ConXist')).toHaveLength(2);
+    expect(screen.getAllByText('refused by ConXist')).toHaveLength(3);
+    expect(screen.getByText('ConXist didn’t send it.')).toBeInTheDocument();
     expect(screen.getByText('It copies a long passage from Board meeting, 20 Nov, which this run wasn’t given.'))
       .toBeInTheDocument();
     expect(screen.getByText('It holds more than 1,500 characters, this workspace’s limit.')).toBeInTheDocument();

@@ -56,7 +56,7 @@ function RulesCard({ saved, onSaved }: { saved: Guardrails; onSaved: (next: Guar
   const t = useT();
   const [rules, setRules] = useState(saved.rules);
   const save = useSave(onSaved);
-  const ids = { field: useId(), hint: useId(), count: useId(), problem: useId() };
+  const ids = { field: useId(), hint: useId(), count: useId() };
   const count = characterCount(rules);
   const dirty = rules.trim() !== saved.rules;
 
@@ -68,7 +68,7 @@ function RulesCard({ saved, onSaved }: { saved: Guardrails; onSaved: (next: Guar
   return (
     <SettingsCard id="guardrails-rules" title={t('settings.guardrails.rules')} lead={t('settings.guardrails.rules.lead')}>
       <form className="guardrails-form" noValidate onSubmit={submit}>
-        {save.problem && <p id={ids.problem} className="alert error" role="alert"><Icon name="alert" /> {save.problem}</p>}
+        {save.problem && <p className="alert error" role="alert"><Icon name="alert" /> {save.problem}</p>}
         <div className="field">
           <label htmlFor={ids.field}>{t('settings.guardrails.rules.label')}</label>
           <textarea id={ids.field} rows={6} value={rules} readOnly={save.busy}
