@@ -170,7 +170,7 @@ public final class StartTestRun {
             List<RunPrompt.ToolDescription> described = new ArrayList<>(tools.descriptions(scope));
             described.add(FoundRequests.DESCRIPTION);
             this.system = RunPrompt.system(agent, described, variables.of(workspace.id()), rules);
-            this.guard = new CopyGuard(RunPrompt.capped(meeting.text()));
+            this.guard = new CopyGuard(RunPrompt.capped(meeting.text()), rules.copyGuardWords());
             this.started = clock.instant();
             this.deadline = started.plusSeconds(limits.timeoutSeconds());
         }
@@ -283,7 +283,7 @@ public final class StartTestRun {
         private void logCall(ModelPort.ToolCall call, String outcome, long millis) {
             log.log(System.Logger.Level.INFO,
                     "Tool {0} ({1}) for agent {2} in workspace {3}: {4}, {5,number,#} ms", call.name(),
-                    RunPrompt.VERSION, agent.id(), workspace.id(), outcome, millis);
+                    RunPrompt.version(rules), agent.id(), workspace.id(), outcome, millis);
         }
 
         private TestRunResult end(RunOutcome outcome, String answer) {
@@ -293,7 +293,7 @@ public final class StartTestRun {
                     "Test run of agent {0} in workspace {1} on meeting {2}: {3}, model {4}, prompt {5}, {6} turns, "
                             + "{7} tool calls ({8} refused), {9} requests found, {10} characters of workspace rules, "
                             + "{11,number,#} input and {12,number,#} output tokens, {13,number,#} ms",
-                    agent.id(), workspace.id(), meeting.id(), outcome, choice.id(), RunPrompt.VERSION, turns,
+                    agent.id(), workspace.id(), meeting.id(), outcome, choice.id(), RunPrompt.version(rules), turns,
                     toolCalls, refused, found.list().size(), rules.rules().length(), inputTokens, outputTokens, millis);
             return new TestRunResult(agent.id(), outcome, choice.effort().name(), choice.id(), answer,
                     List.copyOf(steps), found.list(), toolCalls, inputTokens, outputTokens, millis);

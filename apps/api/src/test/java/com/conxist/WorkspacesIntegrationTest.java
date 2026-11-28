@@ -74,7 +74,7 @@ class WorkspacesIntegrationTest {
                             .content("{\"maxSteps\":8,\"timeoutSeconds\":90,\"maxToolCalls\":12}"))
                     .andExpect(status().isOk());
             mvc.perform(put("/api/guardrails").header(HEADER, workspace).contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"rules\":\"Answer in Spanish.\",\"maxInputCharacters\":2000}"))
+                            .content("{\"revision\":0,\"rules\":\"Answer in Spanish.\",\"maxInputCharacters\":2000}"))
                     .andExpect(status().isOk());
         }
         await().atMost(Duration.ofSeconds(10)).until(() -> rows("hub_items", gone) == 2 && rows("hub_items", kept) == 2);

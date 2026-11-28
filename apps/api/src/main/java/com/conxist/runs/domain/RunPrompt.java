@@ -1,5 +1,9 @@
 package com.conxist.runs.domain;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -77,13 +81,44 @@ public final class RunPrompt {
         return String.format(Locale.ENGLISH, "%,d", count);
     }
 
+    /** ConXist's rule as a person reads and edits it in Settings: one paragraph per rule. */
+    public static final String CONXIST_RULE = paragraphs(RULES);
+
     /**
-     * ConXist's rules as a person reads them in Settings: one paragraph per rule, ending with the rule for tools that
-     * change things at the workspace's limit, the one an agent with such a tool gets.
+     * The rule every agent of the workspace gets first, as a person reads it in Settings: ConXist's or the workspace's
+     * own version, ending with the rule for tools that change things at the workspace's limit, the one an agent with
+     * such a tool gets.
      */
     public static String rulesAsParagraphs(Guardrails guardrails) {
-        return (RULES + CHANGES.formatted(characters(guardrails.maxInputCharacters())))
-                .replaceAll("\\n(?!- )\\s*", " ");
+        String base = guardrails.baseRuleEdited() ? guardrails.baseRule() : CONXIST_RULE;
+        return base + paragraphs(CHANGES.formatted(characters(guardrails.maxInputCharacters())));
+    }
+
+    /** Whether a text is ConXist's rule, written as the prompt has it or as Settings shows it. */
+    public static boolean isConxistRule(String text) {
+        String words = text.strip().replaceAll("\\s+", " ");
+        return words.equals(RULES.replaceAll("\\s+", " ")) || words.equals(CONXIST_RULE.replaceAll("\\s+", " "));
+    }
+
+    /**
+     * The prompt version a run logs: this one, or, when the workspace replaced ConXist's rule, this one with a short
+     * fingerprint of its version, so runs on different versions can be told apart without logging the text.
+     */
+    public static String version(Guardrails guardrails) {
+        if (!guardrails.baseRuleEdited()) {
+            return VERSION;
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(guardrails.baseRule().getBytes(StandardCharsets.UTF_8));
+            return VERSION + "+workspace-rule-" + HexFormat.of().formatHex(digest, 0, 4);
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("Every Java runtime has SHA-256", impossible);
+        }
+    }
+
+    private static String paragraphs(String text) {
+        return text.replaceAll("\\n(?!- )\\s*", " ");
     }
 
     /** The system prompt; {@code tools} are the tool names this run offers, so the model knows what each is for. */
@@ -107,7 +142,7 @@ public final class RunPrompt {
     public static String system(AgentBrief agent, List<ToolDescription> tools, Map<String, String> variables,
             Guardrails guardrails) {
         boolean changes = tools.stream().anyMatch(ToolDescription::changesThings);
-        StringBuilder text = new StringBuilder(RULES)
+        StringBuilder text = new StringBuilder(guardrails.baseRuleEdited() ? neutralized(guardrails.baseRule()) : RULES)
                 .append(changes ? CHANGES.formatted(characters(guardrails.maxInputCharacters())) : READ_ONLY)
                 .append("\n\n");
         if (!guardrails.rules().isEmpty()) {
